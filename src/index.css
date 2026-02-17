@@ -1,0 +1,159 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+@layer base {
+  :root {
+    --background: #EFEBE9;
+    /* brown-50 - Light brown background */
+    --foreground: #3E2723;
+    /* brown-900 - Dark brown text */
+
+    /* Material Design Z-index Layers */
+    --md-z-index-modal: 1300;
+    --md-z-index-drawer: 1200;
+    --md-z-index-appbar: 1100;
+    --md-z-index-snackbar: 1400;
+
+    /* Material Design Transition Durations */
+    --md-duration-shortest: 150ms;
+    --md-duration-shorter: 200ms;
+    --md-duration-short: 250ms;
+    --md-duration-standard: 300ms;
+    --md-duration-complex: 375ms;
+    --md-duration-entering: 225ms;
+    --md-duration-leaving: 195ms;
+
+    /* Material Design Transition Easings */
+    --md-easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --md-easing-deceleration: cubic-bezier(0.0, 0.0, 0.2, 1);
+    --md-easing-acceleration: cubic-bezier(0.4, 0.0, 1, 1);
+    --md-easing-sharp: cubic-bezier(0.4, 0.0, 0.6, 1);
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    min-width: 100%;
+    min-height: 100vh;
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: 'Outfit', sans-serif;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.6;
+  }
+
+  /* Headings with stronger weights */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+  }
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+  }
+
+  h3 {
+    font-size: 1.75rem;
+    font-weight: 700;
+  }
+
+  h4 {
+    font-size: 1.5rem;
+    font-weight: 600;
+  }
+
+  h5 {
+    font-size: 1.25rem;
+    font-weight: 600;
+  }
+
+  h6 {
+    font-size: 1.125rem;
+    font-weight: 600;
+  }
+
+  /* Focus Visible (for accessibility) */
+  *:focus-visible {
+    outline: 2px solid #FFB74D;
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+
+  /* Ripple Effect */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .ripple::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width var(--md-duration-complex) var(--md-easing-deceleration),
+      height var(--md-duration-complex) var(--md-easing-deceleration);
+  }
+
+  .ripple:active::after {
+    width: 200%;
+    height: 200%;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #D7CCC8;
+    /* brown-100 */
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #8D6E63;
+    /* brown-400 */
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: #6D4C41;
+    /* brown-600 */
+  }
+}

@@ -1,0 +1,296 @@
+.analise-turma {
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.turma-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    color: white;
+    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.25);
+}
+
+.turma-header h1 {
+    font-size: 2.5rem;
+    margin: 0 0 0.5rem 0;
+    font-weight: 700;
+}
+
+.escola-info,
+.bimestre-info {
+    margin: 0.3rem 0;
+    opacity: 0.95;
+    font-size: 1.1rem;
+}
+
+.overview-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 3rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 16px;
+    padding: 1.5rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border-left: 4px solid;
+}
+
+.stat-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.stat-card.total {
+    border-color: #667eea;
+}
+
+.stat-card.media {
+    border-color: #10b981;
+}
+
+.stat-card.melhor {
+    border-color: #f59e0b;
+}
+
+.stat-card.pior {
+    border-color: #ef4444;
+}
+
+.card-icon {
+    color: inherit;
+    margin-bottom: 1rem;
+}
+
+.stat-card.total .card-icon {
+    color: #667eea;
+}
+
+.stat-card.media .card-icon {
+    color: #10b981;
+}
+
+.stat-card.melhor .card-icon {
+    color: #f59e0b;
+}
+
+.stat-card.pior .card-icon {
+    color: #ef4444;
+}
+
+.card-content h3 {
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6b7280;
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0.5rem 0;
+    color: #1f2937;
+}
+
+.stat-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #374151;
+    margin: 0.5rem 0;
+}
+
+.stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+}
+
+.stat-breakdown {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    margin-top: 1rem;
+}
+
+.stat-item {
+    font-size: 0.9rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+.stat-item.ativo {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.stat-item.transferido {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.stat-item.remanejado {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.chart-section,
+.table-section {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.chart-section h2,
+.table-section h2 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.5rem;
+    color: #1f2937;
+}
+
+.table-container {
+    overflow-x: auto;
+}
+
+.disciplinas-table,
+.bimestres-table,
+.disciplinas-multibimestre-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.disciplinas-table thead,
+.bimestres-table thead,
+.disciplinas-multibimestre-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.disciplinas-table th,
+.bimestres-table th,
+.disciplinas-multibimestre-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.disciplinas-multibimestre-table th.bimestre-header {
+    padding: 0.5rem 1rem;
+    text-align: center;
+    border-right: 2px solid rgba(255, 255, 255, 0.2);
+}
+
+.disciplinas-multibimestre-table th:last-child {
+    border-right: none;
+}
+
+.disciplinas-table td,
+.bimestres-table td,
+.disciplinas-multibimestre-table td {
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.disciplinas-multibimestre-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.disciplinas-table tbody tr:hover,
+.bimestres-table tbody tr:hover {
+    background: #f9fafb;
+}
+
+.disciplina-nome {
+    font-weight: 600;
+    color: #1f2937;
+}
+
+.bimestre-label {
+    font-weight: 600;
+    color: #1f2937;
+    min-width: 120px;
+}
+
+.aprovacao-badge-small {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.25rem 0.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.8rem;
+}
+
+.nota {
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.nota.boa {
+    color: #10b981;
+}
+
+.nota.media {
+    color: #f59e0b;
+}
+
+.nota.baixa {
+    color: #ef4444;
+}
+
+.aprovacao-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.no-data {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6b7280;
+    font-size: 1.2rem;
+}
+
+.grafico-bimestres-container {
+    width: 100%;
+}
+
+.grafico-bimestres-container h3 {
+    margin: 0 0 1.5rem 0;
+    font-size: 1.2rem;
+    color: #1f2937;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .analise-turma {
+        padding: 1rem;
+    }
+
+    .turma-header h1 {
+        font-size: 1.8rem;
+    }
+
+    .overview-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .stat-number {
+        font-size: 2rem;
+    }
+}
