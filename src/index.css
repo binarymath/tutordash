@@ -7,10 +7,13 @@
 
 @layer base {
   :root {
+    /* Material Design Color System - Dark Cards on Light Brown Background */
     --background: #EFEBE9;
-    /* brown-50 - Light brown background */
-    --foreground: #3E2723;
-    /* brown-900 - Dark brown text */
+    /* brown-100 - light brown for main bg */
+    --foreground: #EFEBE9;
+    /* brown-50 - light text */
+    --surface-card: rgba(38, 21, 14, 0.95);
+    /* brown-900 with slight transparency */
 
     /* Material Design Z-index Layers */
     --md-z-index-modal: 1300;

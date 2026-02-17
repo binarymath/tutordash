@@ -102,9 +102,9 @@ const GraficoDisciplinasSingle = ({ disciplinas, totalAtivos = 0, totalTransferi
                         y={0}
                         dy={15}
                         textAnchor="end"
-                        fill="#D7CCC8"
+                        fill="#FFFFFF"
                         fontSize={10}
-                        fontWeight={500}
+                        fontWeight="bold"
                         transform="rotate(-45)"
                     >
                         <tspan x="0" dy="0">{linha1}</tspan>
@@ -121,9 +121,9 @@ const GraficoDisciplinasSingle = ({ disciplinas, totalAtivos = 0, totalTransferi
                     y={0}
                     dy={15}
                     textAnchor="end"
-                    fill="#D7CCC8"
+                    fill="#FFFFFF"
                     fontSize={10}
-                    fontWeight={500}
+                    fontWeight="bold"
                     transform="rotate(-45)"
                 >
                     {value}
@@ -150,8 +150,8 @@ const GraficoDisciplinasSingle = ({ disciplinas, totalAtivos = 0, totalTransferi
                     />
                     <YAxis
                         domain={[0, 10]}
-                        tick={{ fill: '#D7CCC8' }}
-                        label={{ value: 'Média', angle: -90, position: 'insideLeft', fill: '#D7CCC8' }}
+                        tick={{ fill: '#FFFFFF', fontWeight: 'bold' }}
+                        label={{ value: 'Média', angle: -90, position: 'insideLeft', fill: '#FFFFFF', fontWeight: 'bold' }}
                         axisLine={{ stroke: '#5D4037' }}
                         tickLine={{ stroke: '#5D4037' }}
                     />
@@ -258,9 +258,9 @@ const GraficoDisciplinasComparativo = ({ bimestresDisponiveis, estatisticasPorBi
                         y={0}
                         dy={15}
                         textAnchor="end"
-                        fill="#D7CCC8"
+                        fill="#FFFFFF"
                         fontSize={10}
-                        fontWeight={500}
+                        fontWeight="bold"
                         transform="rotate(-45)"
                     >
                         <tspan x="0" dy="0">{linha1}</tspan>
@@ -277,9 +277,9 @@ const GraficoDisciplinasComparativo = ({ bimestresDisponiveis, estatisticasPorBi
                     y={0}
                     dy={15}
                     textAnchor="end"
-                    fill="#D7CCC8"
+                    fill="#FFFFFF"
                     fontSize={10}
-                    fontWeight={500}
+                    fontWeight="bold"
                     transform="rotate(-45)"
                 >
                     {value}
@@ -306,8 +306,8 @@ const GraficoDisciplinasComparativo = ({ bimestresDisponiveis, estatisticasPorBi
                     />
                     <YAxis
                         domain={[0, 10]}
-                        tick={{ fill: '#D7CCC8' }}
-                        label={{ value: 'Média', angle: -90, position: 'insideLeft', fill: '#D7CCC8' }}
+                        tick={{ fill: '#FFFFFF', fontWeight: 'bold' }}
+                        label={{ value: 'Média', angle: -90, position: 'insideLeft', fill: '#FFFFFF', fontWeight: 'bold' }}
                         axisLine={{ stroke: '#5D4037' }}
                         tickLine={{ stroke: '#5D4037' }}
                     />

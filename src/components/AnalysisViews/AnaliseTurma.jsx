@@ -33,7 +33,53 @@ const AnaliseTurma = () => {
         );
     }
 
-    const { infoGeral, totalAlunos, totalAtivos, totalTransferidos, totalRemanejados } = dadosMapao;
+    const { infoGeral } = dadosMapao;
+
+    // Calcula totais unificados considerando todos os bimestres e o último status de cada aluno
+    const { totalAlunos, totalAtivos, totalTransferidos, totalRemanejados } = useMemo(() => {
+        if (!bimestresDisponiveis.length) {
+            // Fallback para dadosMapao se não houver bimestres específicos carregados (caso raro se dadosMapao existe)
+            return {
+                totalAlunos: dadosMapao?.totalAlunos || 0,
+                totalAtivos: dadosMapao?.totalAtivos || 0,
+                totalTransferidos: dadosMapao?.totalTransferidos || 0,
+                totalRemanejados: dadosMapao?.totalRemanejados || 0
+            };
+        }
+
+        const alunosMap = new Map();
+
+        // Ordena os bimestres para processar em ordem cronológica (1 -> 4)
+        // Isso garante que o status do último bimestre carregado seja o considerado
+        const bimestresOrdenados = [...bimestresDisponiveis].sort((a, b) => a - b);
+
+        bimestresOrdenados.forEach(bim => {
+            const dados = dadosBimestres[bim];
+            if (!dados) return;
+
+            dados.alunos.forEach(aluno => {
+                // Mapeia cada aluno pelo nome, atualizando o status conforme avança os bimestres
+                alunosMap.set(aluno.nome, aluno.situacao);
+            });
+        });
+
+        let tAtivos = 0;
+        let tTransferidos = 0;
+        let tRemanejados = 0;
+
+        alunosMap.forEach(status => {
+            if (status === 'Ativo') tAtivos++;
+            else if (status === 'Transferido') tTransferidos++;
+            else if (status === 'Remanejamento') tRemanejados++;
+        });
+
+        return {
+            totalAlunos: alunosMap.size,
+            totalAtivos: tAtivos,
+            totalTransferidos: tTransferidos,
+            totalRemanejados: tRemanejados
+        };
+    }, [bimestresDisponiveis, dadosBimestres, dadosMapao]);
     const { disciplinas, mediaGeralTurma } = estatisticas;
 
     // Encontra melhor e pior disciplina
@@ -73,9 +119,10 @@ const AnaliseTurma = () => {
                     <div>
                         <h3 className="text-sm font-medium text-brown-300 uppercase tracking-wider">Total de Alunos</h3>
                         <p className="text-3xl font-bold text-white">{totalAlunos}</p>
-                        <div className="mt-1 flex flex-col text-xs font-medium gap-0.5">
+                        <div className="mt-1 flex flex-col text-xs font-semibold gap-0.5">
                             <span className="text-accent-green">✓ {totalAtivos} Ativos</span>
                             <span className="text-accent-gold">→ {totalTransferidos} Transferidos</span>
+                            <span className="text-accent-red">✕ {totalRemanejados} Remanejados</span>
                         </div>
                     </div>
                 </Card>
@@ -103,7 +150,7 @@ const AnaliseTurma = () => {
                         <h3 className="text-sm font-medium text-brown-300 uppercase tracking-wider">Destaque</h3>
                         <p className="text-xs text-brown-200 truncate max-w-[150px]" title={melhorDisciplina.nome}>{melhorDisciplina.nome}</p>
                         <p className="text-3xl font-bold text-white">{melhorDisciplina.media.toFixed(2)}</p>
-                        <div className="text-xs font-medium text-brown-400">{melhorDisciplina.taxaAprovacao}% de aprovação</div>
+                        <div className="text-xs font-medium text-white">{melhorDisciplina.taxaAprovacao}% de aprovação</div>
                     </div>
                 </Card>
 
@@ -153,7 +200,7 @@ const AnaliseTurma = () => {
                         </h2>
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-brown-300 uppercase bg-brown-900/30">
+                                <thead className="text-xs text-white uppercase bg-brown-900/30">
                                     <tr>
                                         <th className="px-4 py-3 rounded-l-lg">Bimestre</th>
                                         <th className="px-4 py-3">Média</th>
@@ -177,13 +224,13 @@ const AnaliseTurma = () => {
                                                 <td className={`px-4 py-4 font-bold ${mediaGeral >= 7 ? 'text-accent-green' : mediaGeral >= 5 ? 'text-accent-gold' : 'text-accent-red'}`}>
                                                     {mediaGeral.toFixed(2)}
                                                 </td>
-                                                <td className="px-4 py-4 text-brown-200 show-hover">{medianaGeral.toFixed(2)}</td>
+                                                <td className="px-4 py-4 text-white show-hover">{medianaGeral.toFixed(2)}</td>
                                                 <td>
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-16 h-1.5 bg-brown-800 rounded-full overflow-hidden">
                                                             <div className="h-full bg-accent-blue" style={{ width: `${aprovacaoGeral}%` }}></div>
                                                         </div>
-                                                        <span className="text-xs font-medium text-brown-300">{aprovacaoGeral.toFixed(0)}%</span>
+                                                        <span className="text-xs font-medium text-white">{aprovacaoGeral.toFixed(0)}%</span>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -210,7 +257,7 @@ const AnaliseTurma = () => {
                                     <tr>
                                         <th rowSpan="2" className="px-4 py-3 bg-brown-900/50 text-white font-semibold rounded-tl-lg sticky left-0 z-10 backdrop-blur-md">Disciplina</th>
                                         {bimestresDisponiveis.map(bim => (
-                                            <th key={bim} colSpan="4" className="text-center px-4 py-2 text-brown-300 text-xs uppercase bg-brown-900/30 border-b border-brown-800">
+                                            <th key={bim} colSpan="5" className="text-center px-4 py-2 text-white text-xs uppercase bg-brown-900/30 border-b border-brown-800">
                                                 {bim}º Bimestre
                                             </th>
                                         ))}
@@ -218,10 +265,11 @@ const AnaliseTurma = () => {
                                     <tr>
                                         {bimestresDisponiveis.map(bim => (
                                             <React.Fragment key={bim}>
-                                                <th className="px-3 py-2 text-xs font-medium text-brown-400 bg-brown-900/20">Média</th>
-                                                <th className="px-3 py-2 text-xs font-medium text-brown-400 bg-brown-900/20">Mediana</th>
-                                                <th className="px-3 py-2 text-xs font-medium text-brown-400 bg-brown-900/20">Desvio</th>
-                                                <th className="px-3 py-2 text-xs font-medium text-brown-400 bg-brown-900/20">Aprovação</th>
+                                                <th className="px-3 py-2 text-xs font-medium text-white bg-brown-900/20">Média</th>
+                                                <th className="px-3 py-2 text-xs font-medium text-white bg-brown-900/20">Mediana</th>
+                                                <th className="px-3 py-2 text-xs font-medium text-white bg-brown-900/20">Moda</th>
+                                                <th className="px-3 py-2 text-xs font-medium text-white bg-brown-900/20">Desvio</th>
+                                                <th className="px-3 py-2 text-xs font-medium text-white bg-brown-900/20">Aprovação</th>
                                             </React.Fragment>
                                         ))}
                                     </tr>
@@ -240,6 +288,7 @@ const AnaliseTurma = () => {
                                                             <td className="px-3 py-3 text-brown-600">-</td>
                                                             <td className="px-3 py-3 text-brown-600">-</td>
                                                             <td className="px-3 py-3 text-brown-600">-</td>
+                                                            <td className="px-3 py-3 text-brown-600">-</td>
                                                         </React.Fragment>
                                                     );
                                                 }
@@ -248,8 +297,9 @@ const AnaliseTurma = () => {
                                                         <td className={`px-3 py-3 font-bold ${discData.media >= 7 ? 'text-accent-green' : discData.media >= 5 ? 'text-accent-gold' : 'text-accent-red'}`}>
                                                             {discData.media.toFixed(2)}
                                                         </td>
-                                                        <td className="px-3 py-3 text-brown-300">{discData.mediana.toFixed(2)}</td>
-                                                        <td className="px-3 py-3 text-brown-400 text-xs">{discData.desvioPadrao.toFixed(2)}</td>
+                                                        <td className="px-3 py-3 text-white">{discData.mediana.toFixed(2)}</td>
+                                                        <td className="px-3 py-3 text-white text-xs">{discData.moda}</td>
+                                                        <td className="px-3 py-3 text-white text-xs">{discData.desvioPadrao.toFixed(2)}</td>
                                                         <td className="px-3 py-3">
                                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${discData.taxaAprovacao >= 70 ? 'bg-accent-green/10 text-accent-green' : 'bg-accent-red/10 text-accent-red'}`}>
                                                                 {discData.taxaAprovacao.toFixed(0)}%
@@ -264,11 +314,12 @@ const AnaliseTurma = () => {
                             </table>
                         ) : (
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-brown-300 uppercase bg-brown-900/30">
+                                <thead className="text-xs text-white uppercase bg-brown-900/30">
                                     <tr>
                                         <th className="px-4 py-3 rounded-l-lg">Disciplina</th>
                                         <th className="px-4 py-3">Média</th>
                                         <th className="px-4 py-3">Mediana</th>
+                                        <th className="px-4 py-3">Moda</th>
                                         <th className="px-4 py-3">Desvio Padrão</th>
                                         <th className="px-4 py-3 rounded-r-lg">Aprovação</th>
                                     </tr>
@@ -282,8 +333,9 @@ const AnaliseTurma = () => {
                                                 <td className={`px-4 py-4 font-bold ${disc.media >= 7 ? 'text-accent-green' : disc.media >= 5 ? 'text-accent-gold' : 'text-accent-red'}`}>
                                                     {disc.media.toFixed(2)}
                                                 </td>
-                                                <td className="px-4 py-4 text-brown-200">{disc.mediana.toFixed(2)}</td>
-                                                <td className="px-4 py-4 text-brown-400">{disc.desvioPadrao.toFixed(2)}</td>
+                                                <td className="px-4 py-4 text-white">{disc.mediana.toFixed(2)}</td>
+                                                <td className="px-4 py-4 text-white">{disc.moda}</td>
+                                                <td className="px-4 py-4 text-white">{disc.desvioPadrao.toFixed(2)}</td>
                                                 <td className="px-4 py-4">
                                                     <div className="flex items-center gap-2">
                                                         <div className="w-20 h-1.5 bg-brown-800 rounded-full overflow-hidden">
@@ -292,7 +344,7 @@ const AnaliseTurma = () => {
                                                                 style={{ width: `${disc.taxaAprovacao}%` }}
                                                             ></div>
                                                         </div>
-                                                        <span className="text-xs font-medium text-brown-300">{disc.taxaAprovacao}%</span>
+                                                        <span className="text-xs font-medium text-white">{disc.taxaAprovacao}%</span>
                                                     </div>
                                                 </td>
                                             </tr>

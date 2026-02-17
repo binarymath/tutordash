@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useData } from '../../contexts/DataContext';
 import { calcularEstatisticasAluno, calcularEstatisticasTurma } from '../../services/mapaoService';
-import { User, Search, TrendingUp, AlertCircle, Award, Calendar } from 'lucide-react';
+import { User, Search, TrendingUp, AlertCircle, Award, Calendar, AlertTriangle } from 'lucide-react';
 import GraficoRadarAluno from '../Charts/GraficoRadarAluno';
 import GraficoComparativoAluno from '../Charts/GraficoComparativoAluno';
 import GraficoEvolucaoAluno from '../Charts/GraficoEvolucaoAluno';
@@ -10,7 +10,18 @@ const AnaliseIndividual = () => {
     const { dadosMapao, incluirInativos, dadosBimestres, bimestresDisponiveis } = useData();
     const [alunoSelecionado, setAlunoSelecionado] = useState(null);
     const [busca, setBusca] = useState('');
+
     const [mostrarSidebar, setMostrarSidebar] = useState(true);
+    const [showStickyHeader, setShowStickyHeader] = useState(false);
+
+    // Controle do header fixo ao rolar
+    React.useEffect(() => {
+        const handleScroll = () => {
+            setShowStickyHeader(window.scrollY > 300);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
     const estatisticasTurma = useMemo(() => {
         if (!dadosMapao) return null;
@@ -18,11 +29,36 @@ const AnaliseIndividual = () => {
     }, [dadosMapao, incluirInativos]);
 
     const alunosDisponiveis = useMemo(() => {
-        if (!dadosMapao) return [];
-        return incluirInativos
-            ? dadosMapao.alunos
-            : dadosMapao.alunos.filter(a => a.isAtivo);
-    }, [dadosMapao, incluirInativos]);
+        if (!dadosBimestres) return [];
+
+        const todosAlunosMap = new Map();
+
+        // Itera sobre todos os bimestres disponíveis para coletar alunos
+        Object.values(dadosBimestres).forEach(dadosBimestre => {
+            if (!dadosBimestre) return;
+
+            dadosBimestre.alunos.forEach(aluno => {
+                // Se estiver filtrando inativos, verifica o status
+                if (incluirInativos || aluno.isAtivo) {
+                    // Armazena o aluno (se já existir, mantém o mais recente ou o do bimestre atual se preferir,
+                    // mas aqui estamos garantindo que ele exista na lista)
+                    if (!todosAlunosMap.has(aluno.nome)) {
+                        todosAlunosMap.set(aluno.nome, aluno);
+                    } else {
+                        // Opcional: Atualizar para o objeto mais "recente" ou completo se necessário
+                        // Se o aluno no Map vier de um bimestre anterior, e o atual for mais novo, podemos atualizar
+                        // Mas como o objeto aluno é similar, o importante é ter o nome na lista.
+                        // Para garantir que usamos os dados do bimestre ATUAL se disponível, podemos priorizar:
+                        if (dadosMapao && dadosBimestre === dadosMapao) {
+                            todosAlunosMap.set(aluno.nome, aluno);
+                        }
+                    }
+                }
+            });
+        });
+
+        return Array.from(todosAlunosMap.values()).sort((a, b) => a.nome.localeCompare(b.nome));
+    }, [dadosBimestres, incluirInativos, dadosMapao]);
 
     const alunosFiltrados = useMemo(() => {
         if (!busca) return alunosDisponiveis;
@@ -86,13 +122,13 @@ const AnaliseIndividual = () => {
 
     return (
         <div className="w-full">
-            <div className={`grid gap-6 ${mostrarSidebar ? 'xl:grid-cols-[360px_1fr]' : 'grid-cols-1'}`}>
-                <div className={mostrarSidebar ? 'block' : 'hidden'}>
-                    <div className="search-section bg-white/90 backdrop-blur-sm border border-brown-300 rounded-2xl p-6 shadow-elevation-4 sticky top-6">
-                        <h2 className="flex items-center gap-2 text-xl font-extrabold text-brown-900"><User size={26} /> Análise Individual do Aluno</h2>
+            <div className={`flex gap-6 ${mostrarSidebar ? '' : 'justify-center'}`}>
+                <div className={mostrarSidebar ? 'w-[30%] min-w-[300px] max-w-[400px]' : 'hidden'}>
+                    <div className="search-section bg-brown-900/90 backdrop-blur-sm border border-brown-700 rounded-2xl p-6 shadow-elevation-4 sticky top-6">
+                        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><User size={26} /> Análise Individual</h2>
 
                         <button
-                            className="mt-4 inline-flex items-center justify-center rounded-lg border border-brown-300 bg-brown-100 px-3 py-2 text-sm font-semibold text-brown-800 hover:bg-brown-200 transition-all"
+                            className="mt-4 inline-flex items-center justify-center rounded-lg border border-brown-600 bg-brown-800/50 px-3 py-2 text-sm font-semibold text-white hover:bg-brown-700 transition-all"
                             onClick={() => setMostrarSidebar(false)}
                             title="Ocultar lista"
                             aria-label="Ocultar lista"
@@ -101,28 +137,28 @@ const AnaliseIndividual = () => {
                         </button>
 
                         <div className="search-container relative mt-4">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brown-500" size={20} />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-brown-400" size={20} />
                             <input
                                 type="text"
-                                placeholder="Buscar aluno por nome..."
+                                placeholder="Buscar aluno..."
                                 value={busca}
                                 onChange={(e) => setBusca(e.target.value)}
-                                className="w-full rounded-xl border border-brown-300 bg-white py-3 pl-10 pr-4 text-base font-medium text-brown-900 placeholder:text-brown-500 focus:border-brown-600 focus:outline-none focus:ring-2 focus:ring-brown-600/20 transition-all"
+                                className="w-full rounded-xl border border-brown-600 bg-brown-800 py-3 pl-10 pr-4 text-base font-medium text-white placeholder:text-brown-400 focus:border-brown-400 focus:outline-none focus:ring-2 focus:ring-brown-500/20 transition-all"
                             />
                         </div>
 
-                        <div className="alunos-list mt-4 flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-2">
+                        <div className="alunos-list mt-4 flex flex-col gap-2 max-h-[1200px] overflow-y-auto pr-2 custom-scrollbar">
                             {alunosFiltrados.length === 0 ? (
-                                <p className="text-center text-sm text-brown-600 py-6">Nenhum aluno encontrado</p>
+                                <p className="text-center text-sm text-brown-400 py-6">Nenhum aluno encontrado</p>
                             ) : (
                                 alunosFiltrados.map((aluno, index) => (
                                     <button
                                         key={index}
-                                        className={`aluno-item flex items-center justify-between rounded-xl border px-4 py-3 text-left text-base transition-all ${alunoSelecionado === aluno ? 'bg-gradient-to-r from-brown-200 to-brown-300 text-brown-900 border-brown-400 shadow-elevation-2' : 'bg-white border-brown-200 hover:border-brown-400 hover:bg-brown-50 text-brown-800'}`}
+                                        className={`aluno-item flex items-center justify-between rounded-xl border px-4 py-3 text-left text-base transition-all ${alunoSelecionado === aluno ? 'bg-gradient-to-r from-brown-700 to-brown-600 text-white border-brown-500 shadow-elevation-4' : 'bg-brown-800/30 border-brown-700 hover:border-brown-500 hover:bg-brown-800/50 text-brown-200'}`}
                                         onClick={() => setAlunoSelecionado(aluno)}
                                     >
                                         <span className="aluno-nome font-semibold text-base">{aluno.nome}</span>
-                                        <span className={`aluno-status text-sm font-bold uppercase px-2 py-1 rounded-md ${alunoSelecionado === aluno ? 'bg-brown-400/30 text-brown-900' : aluno.situacao.toLowerCase() === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        <span className={`aluno-status text-xs font-bold uppercase px-2 py-1 rounded-md ${alunoSelecionado === aluno ? 'bg-brown-900/50 text-white' : aluno.situacao.toLowerCase() === 'ativo' ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
                                             {aluno.situacao}
                                         </span>
                                     </button>
@@ -132,10 +168,10 @@ const AnaliseIndividual = () => {
                     </div>
                 </div>
 
-                <div className="space-y-6">
+                <div className={mostrarSidebar ? 'flex-1' : 'w-full'}>
                     {!mostrarSidebar && (
                         <button
-                            className="inline-flex items-center justify-center rounded-lg border border-brown-300 bg-brown-100 px-3 py-2 text-sm font-semibold text-brown-800 hover:bg-brown-200 transition-all self-start"
+                            className="inline-flex items-center justify-center rounded-lg border border-brown-600 bg-brown-800/50 px-3 py-2 text-sm font-semibold text-white hover:bg-brown-700 transition-all self-start"
                             onClick={() => setMostrarSidebar(true)}
                             title="Mostrar lista"
                             aria-label="Mostrar lista"
@@ -144,10 +180,47 @@ const AnaliseIndividual = () => {
                         </button>
                     )}
 
+
+                    {/* Header Fixo ao rolar */}
+                    <div className={`fixed top-0 left-0 right-0 z-[1200] flex items-center justify-between bg-brown-900/95 px-6 py-3 shadow-lg backdrop-blur-md transition-all duration-300 border-b border-brown-700 ${showStickyHeader ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0 pointer-events-none'}`}>
+
+                        <div className="flex items-center gap-4">
+                            <button
+                                className="rounded-lg border border-brown-600 bg-brown-800/50 p-2 text-white hover:bg-brown-700 transition-all disabled:opacity-50"
+                                onClick={() => irParaAlunoAnterior(false)} // Não voltar ao topo no sticky
+                                disabled={indiceAlunoSelecionado <= 0}
+                                title="Aluno Anterior"
+                            >
+                                ←
+                            </button>
+                            <div>
+                                <h2 className="text-lg font-bold text-white leading-none">{alunoSelecionado?.nome}</h2>
+                                <span className={`text-xs font-semibold ${alunoSelecionado?.situacao.toLowerCase() === 'ativo' ? 'text-green-400' : 'text-red-400'}`}>
+                                    {alunoSelecionado?.situacao}
+                                </span>
+                            </div>
+                            <button
+                                className="rounded-lg border border-brown-600 bg-brown-800/50 p-2 text-white hover:bg-brown-700 transition-all disabled:opacity-50"
+                                onClick={() => irParaProximoAluno(false)} // Não voltar ao topo no sticky
+                                disabled={indiceAlunoSelecionado === -1 || indiceAlunoSelecionado >= alunosFiltrados.length - 1}
+                                title="Próximo Aluno"
+                            >
+                                →
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="text-right hidden sm:block">
+                                <span className="text-xs text-brown-300 block uppercase tracking-wider">Média Geral</span>
+                                <span className="text-lg font-bold text-white">{estatisticasAluno?.mediaGeral.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+
                     {alunoSelecionado && estatisticasAluno && (
                         <div className="aluno-details space-y-8">
                             {/* Header do aluno */}
-                            <div className="aluno-header bg-gradient-to-br from-brown-100 via-brown-200 to-brown-100 rounded-3xl p-8 shadow-elevation-4 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 border border-brown-300">
+                            <div className="aluno-header bg-brown-900 rounded-3xl p-8 shadow-elevation-4 grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 border border-brown-700">
                                 <div className="aluno-nav left flex justify-start">
                                     <button
                                         className="aluno-nav-button px-4 py-2 rounded-lg border border-brown-400 bg-white text-brown-900 font-semibold hover:bg-brown-50 transition-all shadow-elevation-1 hover:shadow-elevation-2"
@@ -158,7 +231,7 @@ const AnaliseIndividual = () => {
                                     </button>
                                 </div>
                                 <div className="aluno-info text-center">
-                                    <h1 className="text-2xl font-bold text-brown-900">{alunoSelecionado.nome}</h1>
+                                    <h1 className="text-2xl font-bold text-white">{alunoSelecionado.nome}</h1>
                                     <span className={`status-badge inline-block mt-2 px-3 py-1 rounded-lg text-sm font-semibold ${alunoSelecionado.situacao.toLowerCase() === 'ativo' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                         {alunoSelecionado.situacao}
                                     </span>
@@ -176,38 +249,48 @@ const AnaliseIndividual = () => {
 
                             {/* Cards de estatísticas gerais */}
                             <div className="aluno-stats-cards grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                                <div className="aluno-stat-card media bg-white/90 border backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border-brown-300">
-                                    <TrendingUp className="text-brown-700" size={28} />
+                                <div className="aluno-stat-card media bg-brown-900/50 border backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border-brown-700">
+                                    <TrendingUp className="text-white" size={28} />
                                     <div>
-                                        <p className="stat-label text-xs uppercase tracking-wide text-brown-600">Média Geral</p>
-                                        <p className="stat-value text-2xl font-bold text-brown-900">{estatisticasAluno.mediaGeral.toFixed(2)}</p>
+                                        <p className="stat-label text-xs uppercase tracking-wide text-white font-bold">Média Geral</p>
+                                        <p className="stat-value text-2xl font-bold text-white">{estatisticasAluno.mediaGeral.toFixed(2)}</p>
                                     </div>
                                 </div>
 
-                                <div className="aluno-stat-card faltas bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-300">
-                                    <Calendar className="text-brown-700" size={28} />
+                                <div className="aluno-stat-card faltas bg-brown-900/50 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-700">
+                                    <Calendar className="text-white" size={28} />
                                     <div>
-                                        <p className="stat-label text-xs uppercase tracking-wide text-brown-600">Total de Faltas</p>
-                                        <p className="stat-value text-2xl font-bold text-brown-900">
+                                        <p className="stat-label text-xs uppercase tracking-wide text-white font-bold">Total de Faltas</p>
+                                        <p className="stat-value text-2xl font-bold text-white">
                                             {bimestresDisponiveis.length > 1 ? totalFaltasAllBimestres : estatisticasAluno.totalFaltas}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="aluno-stat-card melhor bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-300">
-                                    <Award className="text-brown-700" size={28} />
+                                <div className="aluno-stat-card melhor bg-brown-900/50 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-700">
+                                    <Award className="text-white" size={28} />
                                     <div>
-                                        <p className="stat-label text-xs uppercase tracking-wide text-brown-600">Melhor Disciplina</p>
-                                        <p className="stat-value-small text-sm font-semibold text-brown-800">{estatisticasAluno.melhorDisciplina?.nome}</p>
-                                        <p className="stat-nota text-xl font-bold text-brown-900">{estatisticasAluno.melhorDisciplina?.nota.toFixed(1)}</p>
+                                        <p className="stat-label text-xs uppercase tracking-wide text-white font-bold">Melhor Disciplina</p>
+                                        {estatisticasAluno.melhorDisciplina ? (
+                                            <div className="flex flex-col">
+                                                <p className="stat-value text-lg font-bold text-white leading-tight" title={estatisticasAluno.melhorDisciplina.nome}>
+                                                    {estatisticasAluno.melhorDisciplina.nome}
+                                                </p>
+                                                <p className="text-3xl font-extrabold text-accent-green mt-1">{estatisticasAluno.melhorDisciplina.nota.toFixed(2)}</p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-sm text-brown-400">N/A</p>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="aluno-stat-card risco bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-300">
-                                    <AlertCircle className="text-red-600" size={28} />
+                                <div className="aluno-stat-card pior bg-brown-900/50 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-2 flex items-center gap-4 border border-brown-700">
+                                    <AlertTriangle className="text-white" size={28} />
                                     <div>
-                                        <p className="stat-label text-xs uppercase tracking-wide text-brown-600">Disciplinas em Risco</p>
-                                        <p className="stat-value text-2xl font-bold text-red-700">{estatisticasAluno.disciplinasEmRisco.length}</p>
+                                        <p className="stat-label text-xs uppercase tracking-wide text-white font-bold">Disciplinas &lt; 5.0</p>
+                                        <p className="stat-value text-2xl font-bold text-white">
+                                            {Object.values(alunoSelecionado.disciplinas).filter(d => d.media !== null && d.media < 5).length}
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -232,8 +315,8 @@ const AnaliseIndividual = () => {
                             {/* Gráficos */}
                             <div className="graficos-section grid grid-cols-1 xl:grid-cols-2 gap-6">
                                 {bimestresDisponiveis.length > 1 && (
-                                    <div className="grafico-card full-width bg-gradient-to-br from-white/95 to-brown-50/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-4 xl:col-span-2 border border-brown-300">
-                                        <h3 className="text-xl font-bold text-brown-900 mb-4">📈 Evolução ao Longo dos Bimestres</h3>
+                                    <div className="grafico-card full-width bg-brown-900/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-8 xl:col-span-2 border border-brown-700">
+                                        <h3 className="text-xl font-bold text-white mb-4">📈 Evolução ao Longo dos Bimestres</h3>
                                         <GraficoEvolucaoAluno
                                             nomeAluno={alunoSelecionado.nome}
                                             dadosBimestres={dadosBimestres}
@@ -241,8 +324,8 @@ const AnaliseIndividual = () => {
                                     </div>
                                 )}
 
-                                <div className="grafico-card full-width bg-gradient-to-br from-white/95 to-brown-50/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-4 xl:col-span-2 border border-brown-300">
-                                    <h3 className="text-xl font-bold text-brown-900 mb-4">📊 Desempenho por Disciplina (Radar)</h3>
+                                <div className="grafico-card full-width bg-brown-900/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-8 xl:col-span-2 border border-brown-700">
+                                    <h3 className="text-xl font-bold text-white mb-4">📊 Desempenho por Disciplina (Radar)</h3>
                                     <GraficoRadarAluno
                                         aluno={alunoSelecionado}
                                         dadosBimestres={dadosBimestres}
@@ -250,149 +333,175 @@ const AnaliseIndividual = () => {
                                     />
                                 </div>
 
-                                <div className="grafico-card full-width bg-gradient-to-br from-white/95 to-brown-50/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-4 xl:col-span-2 border border-brown-300">
-                                    <h3 className="text-xl font-bold text-brown-900 mb-4">📈 Comparação com Média da Turma</h3>
+                                <div className="grafico-card full-width bg-brown-900/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-8 xl:col-span-2 border border-brown-700">
+                                    <h3 className="text-xl font-bold text-white mb-4">📈 Comparação com Média da Turma</h3>
                                     <GraficoComparativoAluno
                                         aluno={alunoSelecionado}
                                         mediaTurma={estatisticasTurma?.disciplinas}
+                                        dadosBimestres={dadosBimestres}
+                                        bimestresDisponiveis={bimestresDisponiveis}
                                     />
                                 </div>
                             </div>
 
                             {/* Tabela detalhada */}
-                            <div className="tabela-detalhada bg-gradient-to-br from-white/95 to-brown-50/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-4 border border-brown-300">
-                                <h3 className="text-xl font-bold text-brown-900 mb-4">📋 Detalhamento por Disciplina</h3>
+                            <div className="tabela-detalhada bg-brown-900/90 backdrop-blur-sm rounded-2xl p-6 shadow-elevation-8 border border-brown-700">
+                                <h3 className="text-xl font-bold text-white mb-4">📋 Detalhamento por Disciplina</h3>
                                 <div className="table-container overflow-x-auto">
                                     {bimestresDisponiveis.length > 1 ? (
-                                        <table className="detalhamento-table w-max min-w-[1200px] table-fixed border-separate border-spacing-0 rounded-xl overflow-visible text-brown-900">
+                                        <table className="detalhamento-table w-max min-w-[1400px] table-fixed border-separate border-spacing-0 rounded-xl overflow-visible text-white">
                                             <colgroup>
                                                 <col className="col-disciplina" />
                                                 {bimestresDisponiveis.map(bim => (
                                                     <React.Fragment key={bim}>
                                                         <col className="col-nota" />
                                                         <col className="col-faltas" />
-                                                        <col className="col-aus" />
-                                                        <col className="col-status" />
                                                         <col className="col-comp" />
+                                                        <col className="col-perc" />
                                                     </React.Fragment>
                                                 ))}
+                                                <col className="col-media-geral" />
                                             </colgroup>
-                                            <thead className="bg-brown-200">
+                                            <thead className="bg-brown-900/30">
                                                 <tr>
                                                     <th
-                                                        className="sticky left-0 z-30 px-4 py-3 text-sm font-bold text-center bg-brown-200 text-brown-900 uppercase tracking-wide"
+                                                        className="sticky left-0 z-30 px-4 py-3 text-sm font-bold text-center bg-brown-900 text-white uppercase tracking-wide"
                                                         rowSpan={2}
                                                     >
                                                         Disciplina
                                                     </th>
                                                     {bimestresDisponiveis.map((bim) => (
-                                                        <th key={bim} colSpan={5} className="px-3 py-3 text-sm font-bold text-center text-brown-900 uppercase tracking-wide">
+                                                        <th key={bim} colSpan={4} className="px-3 py-3 text-sm font-bold text-center text-white uppercase tracking-wide">
                                                             {bim}º Bimestre
                                                         </th>
                                                     ))}
+                                                    <th rowSpan={2} className="px-4 py-3 text-sm font-bold text-center text-accent-gold uppercase tracking-wide bg-brown-900/40 border-l-2 border-accent-gold/30">
+                                                        Média Geral
+                                                    </th>
                                                 </tr>
-                                                <tr className="bg-brown-100">
+                                                <tr className="bg-brown-900/20">
                                                     {bimestresDisponiveis.map((bim) => (
                                                         <React.Fragment key={bim}>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-brown-900 uppercase tracking-wider">Média</th>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-brown-900 uppercase tracking-wider">Mediana</th>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-brown-900 uppercase tracking-wider">Desvio Padrão</th>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-brown-900 uppercase tracking-wider">Aprovação</th>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-brown-900 uppercase tracking-wider">Comparativo</th>
+                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Média</th>
+                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Ausências</th>
+                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Comparativo</th>
+                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">(%) Ausências</th>
                                                         </React.Fragment>
                                                     ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="text-white/90">
-                                                {Object.keys(alunoSelecionado.disciplinas).map(nomeDisc => (
-                                                    <tr key={nomeDisc} className="odd:bg-white/5 even:bg-white/10 hover:bg-white/15">
-                                                        <td className="sticky left-0 z-10 bg-[#1A1411] px-4 py-3 text-sm font-semibold text-white">{nomeDisc}</td>
-                                                        {bimestresDisponiveis.map(bim => {
-                                                            const alunoNoBim = dadosBimestres[bim]?.alunos.find(a => a.nome === alunoSelecionado.nome);
-                                                            const dadosDisciplina = alunoNoBim?.disciplinas[nomeDisc];
-                                                            const estatisticasTurmaBim = dadosBimestres[bim] ? calcularEstatisticasTurma(dadosBimestres[bim], incluirInativos) : null;
+                                            <tbody className="text-white font-medium">
+                                                {Object.keys(alunoSelecionado.disciplinas).map(nomeDisc => {
+                                                    // Calcula a média geral de todos os bimestres disponíveis
+                                                    const todasNotas = [];
+                                                    bimestresDisponiveis.forEach(bim => {
+                                                        const alunoNoBim = dadosBimestres[bim]?.alunos.find(a => a.nome === alunoSelecionado.nome);
+                                                        const dadosDisc = alunoNoBim?.disciplinas[nomeDisc];
+                                                        if (dadosDisc && dadosDisc.media !== null) {
+                                                            todasNotas.push(dadosDisc.media);
+                                                        }
+                                                    });
+                                                    const mediaGeralFinal = todasNotas.length > 0 
+                                                        ? todasNotas.reduce((a, b) => a + b, 0) / todasNotas.length 
+                                                        : null;
+                                                    const mediaGeralAprovada = mediaGeralFinal && mediaGeralFinal >= 5;
+                                                    
+                                                    return (
+                                                        <tr key={nomeDisc} className="hover:bg-brown-800/30 transition-colors border-b border-brown-800">
+                                                            <td className="sticky left-0 z-10 bg-brown-900 px-4 py-3 text-sm font-bold text-white border-r border-brown-700">{nomeDisc}</td>
+                                                            {bimestresDisponiveis.map((bim, index) => {
+                                                                const alunoNoBim = dadosBimestres[bim]?.alunos.find(a => a.nome === alunoSelecionado.nome);
+                                                                const dadosDisciplina = alunoNoBim?.disciplinas[nomeDisc];
+                                                                const estatisticasTurmaBim = dadosBimestres[bim] ? calcularEstatisticasTurma(dadosBimestres[bim], incluirInativos) : null;
+                                                                const totalAulasDadas = dadosBimestres[bim]?.infoGeral?.totalAulasDadas || 0;
 
-                                                            if (!dadosDisciplina || dadosDisciplina.media === null) {
+                                                                if (!dadosDisciplina || dadosDisciplina.media === null) {
+                                                                    return (
+                                                                        <React.Fragment key={bim}>
+                                                                            <td className="px-3 py-3 text-center">-</td>
+                                                                            <td className="px-3 py-3 text-center">-</td>
+                                                                            <td className="px-3 py-3 text-center">-</td>
+                                                                            <td className="px-3 py-3 text-center">-</td>
+                                                                        </React.Fragment>
+                                                                    );
+                                                                }
+
+                                                                const aprovado = dadosDisciplina.media >= 5;
+                                                                const mediaTurmaBim = estatisticasTurmaBim?.disciplinas[nomeDisc]?.media || 0;
+                                                                const diferenca = dadosDisciplina.media - mediaTurmaBim;
+                                                                const percentualAusencias = totalAulasDadas > 0 ? ((dadosDisciplina.faltas / totalAulasDadas) * 100) : 0;
+
                                                                 return (
                                                                     <React.Fragment key={bim}>
-                                                                        <td className="px-3 py-3">-</td>
-                                                                        <td className="px-3 py-3">-</td>
-                                                                        <td className="px-3 py-3">-</td>
-                                                                        <td className="px-3 py-3">-</td>
-                                                                        <td className="px-3 py-3">-</td>
+                                                                        <td className={`px-3 py-3 font-bold text-center ${aprovado ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                                            {dadosDisciplina.media.toFixed(2)}
+                                                                        </td>
+                                                                        <td className="px-3 py-3 text-center">{dadosDisciplina.faltas}</td>
+                                                                        <td className={`px-3 py-3 font-semibold text-center ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                                            {diferenca >= 0 ? '↑' : '↓'} {Math.abs(diferenca).toFixed(2)}
+                                                                        </td>
+                                                                        <td className={`px-3 py-3 text-center ${percentualAusencias > 25 ? 'text-red-400 font-bold' : 'text-white'}`}>
+                                                                            {percentualAusencias.toFixed(1)}%
+                                                                        </td>
                                                                     </React.Fragment>
                                                                 );
-                                                            }
-
-                                                            const aprovado = dadosDisciplina.media >= 5;
-                                                            const mediaTurmaBim = estatisticasTurmaBim?.disciplinas[nomeDisc]?.media || 0;
-                                                            const diferenca = dadosDisciplina.media - mediaTurmaBim;
-
-                                                            return (
-                                                                <React.Fragment key={bim}>
-                                                                    <td className={`px-3 py-3 font-bold ${aprovado ? 'text-emerald-300' : 'text-red-300'}`}>
-                                                                        {dadosDisciplina.media.toFixed(2)}
-                                                                    </td>
-                                                                    <td className="px-3 py-3">{dadosDisciplina.faltas}</td>
-                                                                    <td className="px-3 py-3">{dadosDisciplina.ausenciasCompensadas}</td>
-                                                                    <td className="px-3 py-3">
-                                                                        <span className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${aprovado ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200'}`}>
-                                                                            {aprovado ? '✓' : '✗'}
-                                                                        </span>
-                                                                    </td>
-                                                                    <td className={`px-3 py-3 font-semibold ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                                                                        {diferenca >= 0 ? '↑' : '↓'} {Math.abs(diferenca).toFixed(2)}
-                                                                    </td>
-                                                                </React.Fragment>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                ))}
+                                                            })}
+                                                            <td className={`px-4 py-3 font-extrabold text-center text-lg bg-brown-900/40 border-l-2 border-accent-gold/30 ${mediaGeralFinal !== null ? (mediaGeralAprovada ? 'text-accent-gold' : 'text-red-400') : ''}`}>
+                                                                {mediaGeralFinal !== null ? mediaGeralFinal.toFixed(2) : '-'}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     ) : (
-                                        <table className="detalhamento-table w-max min-w-[900px] table-fixed border-separate border-spacing-0 rounded-xl overflow-visible text-white">
+                                        <table className="detalhamento-table w-max min-w-[1000px] table-fixed border-separate border-spacing-0 rounded-xl overflow-visible text-white">
                                             <colgroup>
                                                 <col className="col-disciplina" />
                                                 <col className="col-nota" />
                                                 <col className="col-faltas" />
-                                                <col className="col-aus" />
-                                                <col className="col-status" />
                                                 <col className="col-comp" />
+                                                <col className="col-perc" />
+                                                <col className="col-media-geral" />
                                             </colgroup>
-                                            <thead className="bg-gradient-to-r from-[#2B1B12] via-[#3D2A20] to-[#2B1B12] text-white">
+                                            <thead className="bg-brown-900/30">
                                                 <tr>
-                                                    <th className="sticky left-0 z-30 bg-gradient-to-r from-[#2B1B12] via-[#3D2A20] to-[#2B1B12] text-center px-4 py-3 font-semibold">Disciplina</th>
-                                                    <th className="px-3 py-2 text-sm font-semibold">Nota</th>
-                                                    <th className="px-3 py-2 text-sm font-semibold">Faltas</th>
-                                                    <th className="px-3 py-2 text-sm font-semibold">Aus. Compensadas</th>
-                                                    <th className="px-3 py-2 text-sm font-semibold">Status</th>
-                                                    <th className="px-3 py-2 text-sm font-semibold">Comparação c/ Turma</th>
+                                                    <th className="sticky left-0 z-30 bg-brown-900 text-center px-4 py-3 font-bold text-white uppercase tracking-wide">Disciplina</th>
+                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Média</th>
+                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Ausências</th>
+                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Comparativo</th>
+                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">(%) Ausências</th>
+                                                    <th className="px-4 py-3 text-sm font-bold text-accent-gold uppercase tracking-wide bg-brown-900/40 border-l-2 border-accent-gold/30">Média Geral</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="text-white/90">
+                                            <tbody className="text-white font-medium">
                                                 {Object.entries(alunoSelecionado.disciplinas).map(([nome, dados]) => {
                                                     if (dados.media === null) return null;
 
                                                     const mediaTurma = estatisticasTurma?.disciplinas[nome]?.media || 0;
                                                     const diferenca = dados.media - mediaTurma;
                                                     const aprovado = dados.media >= 5;
+                                                    const totalAulasDadas = dadosMapao?.infoGeral?.totalAulasDadas || 0;
+                                                    const percentualAusencias = totalAulasDadas > 0 ? ((dados.faltas / totalAulasDadas) * 100) : 0;
+                                                    // Para bimestre único, média geral é a própria média
+                                                    const mediaGeral = dados.media;
+                                                    const mediaGeralAprovada = mediaGeral >= 5;
 
                                                     return (
-                                                        <tr key={nome} className="odd:bg-white/5 even:bg-white/10 hover:bg-white/15">
-                                                            <td className="sticky left-0 z-10 bg-[#1A1411] px-4 py-3 text-sm font-semibold text-white">{nome}</td>
-                                                            <td className={`px-3 py-3 font-bold ${aprovado ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                        <tr key={nome} className="hover:bg-brown-800/30 transition-colors border-b border-brown-800">
+                                                            <td className="sticky left-0 z-10 bg-brown-900 px-4 py-3 text-sm font-bold text-white border-r border-brown-700">{nome}</td>
+                                                            <td className={`px-3 py-3 font-bold text-center ${aprovado ? 'text-emerald-400' : 'text-red-400'}`}>
                                                                 {dados.media.toFixed(2)}
                                                             </td>
-                                                            <td className="px-3 py-3">{dados.faltas}</td>
-                                                            <td className="px-3 py-3">{dados.ausenciasCompensadas}</td>
-                                                            <td className="px-3 py-3">
-                                                                <span className={`inline-flex items-center justify-center rounded-md px-2 py-1 text-xs font-semibold ${aprovado ? 'bg-emerald-500/15 text-emerald-200' : 'bg-red-500/15 text-red-200'}`}>
-                                                                    {aprovado ? '✓ Aprovado' : '✗ Reprovado'}
-                                                                </span>
-                                                            </td>
-                                                            <td className={`px-3 py-3 font-semibold ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                                            <td className="px-3 py-3 text-center">{dados.faltas}</td>
+                                                            <td className={`px-3 py-3 font-semibold text-center ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                                                                 {diferenca >= 0 ? '↑' : '↓'} {Math.abs(diferenca).toFixed(2)}
+                                                            </td>
+                                                            <td className={`px-3 py-3 text-center ${percentualAusencias > 25 ? 'text-red-400 font-bold' : 'text-white'}`}>
+                                                                {percentualAusencias.toFixed(1)}%
+                                                            </td>
+                                                            <td className={`px-4 py-3 font-extrabold text-center text-lg bg-brown-900/40 border-l-2 border-accent-gold/30 ${mediaGeralAprovada ? 'text-accent-gold' : 'text-red-400'}`}>
+                                                                {mediaGeral.toFixed(2)}
                                                             </td>
                                                         </tr>
                                                     );
@@ -405,18 +514,18 @@ const AnaliseIndividual = () => {
 
                             <div className="flex items-center justify-between gap-4 flex-wrap">
                                 <button
-                                    className="aluno-nav-button px-4 py-2 rounded-lg border border-white/15 bg-white/5 text-white font-semibold hover:bg-white/10 transition"
                                     onClick={() => irParaAlunoAnterior(true)}
                                     disabled={indiceAlunoSelecionado <= 0}
+                                    className="aluno-nav-button px-4 py-2 rounded-lg border border-brown-300 bg-brown-200 text-brown-900 font-bold hover:bg-brown-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                                 >
-                                    Aluno Anterior
+                                    ← Anterior
                                 </button>
                                 <button
-                                    className="aluno-nav-button px-4 py-2 rounded-lg border border-white/15 bg-white/5 text-white font-semibold hover:bg-white/10 transition"
                                     onClick={() => irParaProximoAluno(true)}
                                     disabled={indiceAlunoSelecionado === -1 || indiceAlunoSelecionado >= alunosFiltrados.length - 1}
+                                    className="aluno-nav-button px-4 py-2 rounded-lg border border-brown-300 bg-brown-200 text-brown-900 font-bold hover:bg-brown-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
                                 >
-                                    Próximo Aluno
+                                    Próximo Aluno →
                                 </button>
                             </div>
                         </div>

@@ -147,7 +147,7 @@ const Modal = ({
             </div>
 
             {/* Animations (inline styles) */}
-            <style jsx>{`
+            <style>{`
         @keyframes fade-in {
           from {
             opacity: 0;

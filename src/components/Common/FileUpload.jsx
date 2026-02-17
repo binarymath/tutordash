@@ -1,14 +1,25 @@
 import React, { useRef, useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
-import { useData } from '../../contexts/DataContext';
+import { useTurma } from '../../contexts/TurmaContext';
 import { lerMapao } from '../../services/mapaoService';
 
 const FileUpload = () => {
-    const { carregarDadosBimestre, setLoading, setError, bimestresCarregados, dadosBimestres } = useData();
+    const { turmaSelecionada, adicionarBimestre, obterBimestres } = useTurma();
     const [uploadStatus, setUploadStatus] = useState({});
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    // Obter bimestres carregados da turma atual
+    const dadosBimestres = obterBimestres(turmaSelecionada);
+    const bimestresCarregados = Object.keys(dadosBimestres).filter(bim => dadosBimestres[bim] !== null);
 
     const handleFileChange = async (bimestre, file) => {
         if (!file) return;
+
+        if (!turmaSelecionada) {
+            setError('Por favor, selecione uma turma antes de fazer upload');
+            return;
+        }
 
         // Valida o tipo de arquivo
         if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
@@ -19,12 +30,12 @@ const FileUpload = () => {
         setLoading(true);
         setError(null);
         setUploadStatus(prev => ({ ...prev, [bimestre]: 'loading' }));
-        console.log(`Iniciando upload do ${bimestre}º bimestre...`);
+        console.log(`Iniciando upload do ${bimestre}º bimestre para turma ${turmaSelecionada}...`);
 
         try {
             const dados = await lerMapao(file);
             console.log('Dados lidos:', dados);
-            carregarDadosBimestre(bimestre, dados);
+            adicionarBimestre(turmaSelecionada, bimestre, dados);
             setUploadStatus(prev => ({ ...prev, [bimestre]: 'success' }));
             console.log(`Dados do ${bimestre}º bimestre carregados com sucesso.`);
         } catch (err) {
@@ -134,6 +145,31 @@ const FileUpload = () => {
                     Selecione os arquivos Excel (.xlsx ou .xls) correspondentes a cada bimestre para gerar os gráficos evolutivos e comparativos.
                 </p>
             </div>
+
+            {/* Turma Selecionada */}
+            {turmaSelecionada ? (
+                <div className="mb-4 flex items-center gap-2 text-accent-gold bg-accent-gold/10 border border-accent-gold/30 px-4 py-3 rounded-xl">
+                    <CheckCircle size={18} />
+                    <span className="text-sm font-bold">
+                        Turma selecionada: {turmaSelecionada}
+                    </span>
+                </div>
+            ) : (
+                <div className="mb-4 flex items-center gap-2 text-accent-red bg-accent-red/10 border border-accent-red/30 px-4 py-3 rounded-xl">
+                    <AlertCircle size={18} />
+                    <span className="text-sm font-bold">
+                        Nenhuma turma selecionada - selecione ou crie uma turma primeiro
+                    </span>
+                </div>
+            )}
+
+            {/* Mensagem de erro geral */}
+            {error && (
+                <div className="mb-4 flex items-center gap-2 text-accent-red bg-accent-red/10 border border-accent-red/30 px-4 py-3 rounded-xl">
+                    <AlertCircle size={18} />
+                    <span className="text-sm">{error}</span>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {[1, 2, 3, 4].map(bim => (

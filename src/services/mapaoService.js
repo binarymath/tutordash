@@ -58,12 +58,25 @@ const processarDados = (jsonData) => {
     // Processa os alunos
     const alunos = [];
 
-    for (let i = CONFIG.LINHA_PRIMEIRO_ALUNO - 1; i < jsonData.length; i++) {
+    // Ignora a última linha (aulas dadas) - processa até jsonData.length - 1
+    for (let i = CONFIG.LINHA_PRIMEIRO_ALUNO - 1; i < jsonData.length - 1; i++) {
         const linha = jsonData[i];
 
         if (!linha || !linha[0]) continue; // Linha vazia
 
         const nomeAluno = linha[0];
+        // Ignora linhas de rodapé/totais que possam ter sido lidas como aluno
+        if (nomeAluno) {
+            const nomeUpper = nomeAluno.toString().toUpperCase().trim();
+            if (nomeUpper.includes('TOTAL') ||
+                nomeUpper.includes('QUANTIDADE') ||
+                nomeUpper.includes('AULAS') ||
+                nomeUpper.includes('MÉDIA') ||
+                nomeUpper.includes('DADAS')) {
+                continue;
+            }
+        }
+
         const situacao = linha[1] || STATUS_ALUNO.ATIVO;
 
         // Processa notas de cada disciplina
@@ -132,12 +145,38 @@ export const calcularEstatisticasTurma = (dados, incluirInativos = false) => {
             const somaQuadrados = notas.reduce((acc, n) => acc + Math.pow(n - media, 2), 0);
             const desvioPadrao = Math.sqrt(somaQuadrados / notas.length);
 
+            // Cálculo da Moda
+            const frequencia = {};
+            let maxFreq = 0;
+            notas.forEach(n => {
+                frequencia[n] = (frequencia[n] || 0) + 1;
+                if (frequencia[n] > maxFreq) maxFreq = frequencia[n];
+            });
+
+            // Se todas as notas aparecem apenas uma vez, não há moda (amodal) para este contexto, 
+            // mas estatisticamente pode-se considerar multimodal ou amodal. 
+            // Para visualização escolar, se maxFreq for 1, podemos mostrar "N/A" ou a própria média/mediana se preferir,
+            // mas aqui vamos listar todos os valores se houver mais de um com a mesma frequência máxima.
+
+            let moda;
+            if (maxFreq === 1 && notas.length > 1) {
+                moda = "Amodal"; // Ou poderia ser vazio, ou a lista toda. "Amodal" é tecnicamente correto se não há repetição.
+            } else {
+                const modos = Object.keys(frequencia)
+                    .filter(n => frequencia[n] === maxFreq)
+                    .map(n => parseFloat(n).toFixed(1)) // Formata para 1 casa decimal
+                    .sort((a, b) => parseFloat(a) - parseFloat(b));
+
+                moda = modos.join(' / ');
+            }
+
             const aprovados = notas.filter(n => n >= CONFIG.NOTA_MINIMA_APROVACAO).length;
 
             estatisticasPorDisciplina[disc.nome] = {
                 codigo: disc.codigo,
                 media: parseFloat(media.toFixed(2)),
                 mediana: parseFloat(mediana.toFixed(2)),
+                moda: moda,
                 desvioPadrao: parseFloat(desvioPadrao.toFixed(2)),
                 notaMaxima: Math.max(...notas),
                 notaMinima: Math.min(...notas),
@@ -188,25 +227,34 @@ export const calcularEstatisticasAluno = (aluno) => {
 
     const totalFaltas = faltas.reduce((acc, f) => acc + f, 0);
 
-    const melhorDisciplina = Object.entries(aluno.disciplinas)
-        .filter(([_, d]) => d.media !== null)
-        .sort((a, b) => b[1].media - a[1].media)[0];
+    // Encontra a melhor nota
+    const disciplinasComNota = Object.entries(aluno.disciplinas)
+        .filter(([_, d]) => d?.media !== null)
+        .map(([nome, d]) => ({ nome, nota: d.media }));
+
+    let melhorDisciplina = null;
+    if (disciplinasComNota.length > 0) {
+        const maxNota = Math.max(...disciplinasComNota.map(d => d.nota));
+        const melhores = disciplinasComNota.filter(d => d.nota === maxNota);
+
+        melhorDisciplina = {
+            nome: melhores.map(d => d.nome).join(' / '),
+            nota: maxNota
+        };
+    }
 
     const piorDisciplina = Object.entries(aluno.disciplinas)
         .filter(([_, d]) => d.media !== null)
         .sort((a, b) => a[1].media - b[1].media)[0];
 
     const disciplinasEmRisco = Object.entries(aluno.disciplinas)
-        .filter(([_, d]) => d.media !== null && d.media < CONFIG.NOTA_MINIMA_APROVACAO)
-        .map(([nome, _]) => nome);
+        .filter(([_, d]) => d?.media !== null && d?.media < CONFIG.NOTA_MINIMA_APROVACAO)
+        .map(([nome, d]) => ({ nome, nota: d.media }));
 
     return {
         mediaGeral: parseFloat(mediaGeral.toFixed(2)),
         totalFaltas,
-        melhorDisciplina: melhorDisciplina ? {
-            nome: melhorDisciplina[0],
-            nota: melhorDisciplina[1].media
-        } : null,
+        melhorDisciplina,
         piorDisciplina: piorDisciplina ? {
             nome: piorDisciplina[0],
             nota: piorDisciplina[1].media

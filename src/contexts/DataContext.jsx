@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useTurma } from './TurmaContext';
 
 const DataContext = createContext();
 
@@ -11,68 +12,36 @@ export const useData = () => {
 };
 
 export const DataProvider = ({ children }) => {
-    // Armazena dados de todos os bimestres
-    const [dadosBimestres, setDadosBimestres] = useState({
-        1: null,
-        2: null,
-        3: null,
-        4: null
-    });
-
-    const [bimestreAtual, setBimestreAtual] = useState(1);
+    const { turmaSelecionada, obterBimestres } = useTurma();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [incluirInativos, setIncluirInativos] = useState(false);
     const [viewMode, setViewMode] = useState('turma'); // 'turma' ou 'individual'
 
-    // Dados do bimestre atual
-    const dadosMapao = dadosBimestres[bimestreAtual];
-
-    const carregarDadosBimestre = (bimestre, dados) => {
-        setDadosBimestres(prev => ({
-            ...prev,
-            [bimestre]: dados
-        }));
-        setError(null);
-    };
-
-    const limparDados = () => {
-        setDadosBimestres({
-            1: null,
-            2: null,
-            3: null,
-            4: null
-        });
-        setBimestreAtual(1);
-        setError(null);
-    };
+    // Dados dos bimestres da turma selecionada
+    const dadosBimestres = turmaSelecionada ? obterBimestres(turmaSelecionada) : {};
+    
+    // Primeiro bimestre disponível ou null
+    const bimestresDisponiveis = Object.keys(dadosBimestres).map(Number).sort();
+    const dadosMapao = bimestresDisponiveis.length > 0 ? dadosBimestres[bimestresDisponiveis[0]] : null;
 
     // Retorna quantos bimestres foram carregados
-    const bimestresCarregados = Object.values(dadosBimestres).filter(d => d !== null).length;
-
-    // Lista de bimestres com dados
-    const bimestresDisponiveis = Object.keys(dadosBimestres)
-        .filter(bim => dadosBimestres[bim] !== null)
-        .map(Number);
+    const bimestresCarregados = bimestresDisponiveis.length;
 
     const value = {
-        dadosMapao, // Dados do bimestre atual
-        dadosBimestres, // Dados de todos os bimestres
-        bimestreAtual,
+        dadosMapao, // Dados do primeiro bimestre disponível
+        dadosBimestres, // Dados de todos os bimestres da turma
         bimestresCarregados,
         bimestresDisponiveis,
         loading,
         error,
         incluirInativos,
         viewMode,
-        setDadosBimestres,
-        setBimestreAtual,
         setLoading,
         setError,
         setIncluirInativos,
         setViewMode,
-        carregarDadosBimestre,
-        limparDados
+        turmaSelecionada
     };
 
     return (

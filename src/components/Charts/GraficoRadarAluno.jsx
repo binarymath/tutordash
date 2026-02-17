@@ -131,9 +131,9 @@ const GraficoRadarAluno = ({ aluno, dadosBimestres = null, bimestresDisponiveis 
                 x={newX}
                 y={newY}
                 textAnchor={textAnchor}
-                fill="#D7CCC8"
+                fill="#FFFFFF"
                 fontSize={11}
-                fontWeight={600}
+                fontWeight="bold"
             >
                 {payload.value}
             </text>
@@ -167,9 +167,9 @@ const GraficoRadarAluno = ({ aluno, dadosBimestres = null, bimestresDisponiveis 
                 margin={{ top: 70, right: 80, bottom: 70, left: 80 }}
             >
                 <PolarGrid
-                    stroke="#3E2723"
+                    stroke="#FFFFFF"
                     strokeWidth={1.5}
-                    opacity={0.5}
+                    opacity={0.8}
                 />
                 <PolarAngleAxis
                     dataKey="disciplina"
@@ -190,6 +190,9 @@ const GraficoRadarAluno = ({ aluno, dadosBimestres = null, bimestresDisponiveis 
                     fill="#D7CCC8"
                     fillOpacity={0.4}
                     strokeWidth={3}
+                />
+                <Legend
+                    wrapperStyle={{ paddingTop: '20px', color: '#FFFFFF', fontWeight: 'bold' }}
                 />
             </RadarChart>
         </ResponsiveContainer>

@@ -1,16 +1,17 @@
 import React from 'react';
 
-const Card = ({ children, className = '', hover = true, onClick }) => {
+export default function Card({ children, hover = false, onClick, className = '' }) {
     return (
         <div
             onClick={onClick}
             className={`
-                bg-white/80 backdrop-blur-sm
-                border border-brown-300 
+                bg-brown-900/95 backdrop-blur-sm
+                border border-brown-700 
                 rounded-2xl p-6 
-                shadow-elevation-2
+                shadow-elevation-4
                 transition-all duration-300 ease-in-out
-                ${hover ? 'hover:shadow-elevation-4 hover:border-brown-400 hover:-translate-y-0.5' : ''}
+                text-white
+                ${hover ? 'hover:shadow-elevation-8 hover:border-brown-600 hover:-translate-y-0.5' : ''}
                 ${onClick ? 'cursor-pointer' : ''}
                 ${className}
             `}
@@ -19,5 +20,3 @@ const Card = ({ children, className = '', hover = true, onClick }) => {
         </div>
     );
 };
-
-export default Card;
