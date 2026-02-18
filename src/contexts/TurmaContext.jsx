@@ -18,29 +18,33 @@ export const TurmaProvider = ({ children }) => {
 
   // Carregar dados ao iniciar
   useEffect(() => {
-    const dadosSalvos = storageService.carregarDados();
-    if (dadosSalvos) {
-      setTurmas(dadosSalvos);
-      
-      // Carregar ordem salva ou criar ordem alfabética
-      const ordemSalva = localStorage.getItem('ordemTurmas');
-      if (ordemSalva) {
-        const ordem = JSON.parse(ordemSalva);
-        // Verificar se todas as turmas na ordem ainda existem
-        const ordemValida = ordem.filter(nome => dadosSalvos[nome]);
-        // Adicionar novas turmas que não estão na ordem
-        const turmasNovas = Object.keys(dadosSalvos).filter(nome => !ordemValida.includes(nome));
-        setOrdemTurmas([...ordemValida, ...turmasNovas.sort()]);
-      } else {
-        setOrdemTurmas(Object.keys(dadosSalvos).sort());
+    const carregar = async () => {
+      const dadosSalvos = await storageService.carregarDados();
+      if (dadosSalvos) {
+        setTurmas(dadosSalvos);
+
+        // Carregar ordem salva ou criar ordem alfabética
+        const ordemSalva = localStorage.getItem('ordemTurmas');
+        if (ordemSalva) {
+          const ordem = JSON.parse(ordemSalva);
+          // Verificar se todas as turmas na ordem ainda existem
+          const ordemValida = ordem.filter(nome => dadosSalvos[nome]);
+          // Adicionar novas turmas que não estão na ordem
+          const turmasNovas = Object.keys(dadosSalvos).filter(nome => !ordemValida.includes(nome));
+          setOrdemTurmas([...ordemValida, ...turmasNovas.sort()]);
+        } else {
+          setOrdemTurmas(Object.keys(dadosSalvos).sort());
+        }
+
+        // Selecionar a primeira turma automaticamente
+        const primeiraTurma = Object.keys(dadosSalvos).sort()[0];
+        if (primeiraTurma) {
+          setTurmaSelecionada(primeiraTurma);
+        }
       }
-      
-      // Selecionar a primeira turma automaticamente
-      const primeiraTurma = Object.keys(dadosSalvos).sort()[0];
-      if (primeiraTurma) {
-        setTurmaSelecionada(primeiraTurma);
-      }
-    }
+    };
+
+    carregar();
   }, []);
 
   // Salvar automaticamente quando houver mudanças
@@ -133,8 +137,13 @@ export const TurmaProvider = ({ children }) => {
 
   const substituirTurmas = useCallback((novasTurmas) => {
     setTurmas(novasTurmas);
+
+    // Atualizar a ordem das turmas
+    const novaOrdem = Object.keys(novasTurmas).sort();
+    setOrdemTurmas(novaOrdem);
+
     // Selecionar primeira turma se houver
-    const primeiraTurma = Object.keys(novasTurmas).sort()[0];
+    const primeiraTurma = novaOrdem[0];
     if (primeiraTurma && !novasTurmas[turmaSelecionada]) {
       setTurmaSelecionada(primeiraTurma);
     }
@@ -158,7 +167,7 @@ export const TurmaProvider = ({ children }) => {
       totalTurmas,
       totalBimestresEsperados,
       totalBimestresCarregados,
-      percentual: totalBimestresEsperados > 0 
+      percentual: totalBimestresEsperados > 0
         ? Math.round((totalBimestresCarregados / totalBimestresEsperados) * 100)
         : 0
     };

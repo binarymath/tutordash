@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { storageService } from '../../services/storageService';
 import { useTurma } from '../../contexts/TurmaContext';
 import { Download, Upload, Trash2 } from 'lucide-react';
@@ -6,24 +6,34 @@ import Card from '../Common/Card';
 import Button from '../Common/Button';
 
 const BackupManager = () => {
-  const { substituirTurmas, obterEstatisticas, obterProgressoUpload } = useTurma();
+  const { substituirTurmas, obterEstatisticas, obterProgressoUpload, turmas } = useTurma();
   const [mensagem, setMensagem] = useState(null);
   const [carregando, setCarregando] = useState(false);
+  const [espacoUsado, setEspacoUsado] = useState({ bytes: 0, kb: '0.00', mb: '0.00', percentual: '0.0' });
 
-  const espacoUsado = storageService.obterEspacoUsado();
+  useEffect(() => {
+    const carregarEspaco = async () => {
+      const dados = await storageService.obterEspacoUsado();
+      setEspacoUsado(dados);
+    };
+    carregarEspaco();
+  }, [turmas]); // Recalcula quando as turmas mudam
+
   const estatisticas = obterEstatisticas();
   const progresso = obterProgressoUpload();
 
-  const handleExportarBackup = () => {
+  const handleExportarBackup = async () => {
     setCarregando(true);
-    const resultado = storageService.exportarBackup();
-    
+    // Passamos o estado atual das turmas para garantir que o backup 
+    // contenha os dados mais recentes da memória
+    const resultado = await storageService.exportarBackup(turmas);
+
     if (resultado.sucesso) {
       setMensagem({ tipo: 'sucesso', texto: '✓ Backup exportado com sucesso!' });
     } else {
       setMensagem({ tipo: 'erro', texto: `✗ Erro: ${resultado.erro}` });
     }
-    
+
     setCarregando(false);
     setTimeout(() => setMensagem(null), 3000);
   };
@@ -33,10 +43,10 @@ const BackupManager = () => {
     if (!file) return;
 
     setCarregando(true);
-    
+
     try {
       const resultado = await storageService.importarBackup(file);
-      
+
       if (resultado.sucesso) {
         substituirTurmas(resultado.turmas);
         setMensagem({ tipo: 'sucesso', texto: '✓ Backup importado com sucesso!' });
@@ -44,25 +54,29 @@ const BackupManager = () => {
         setMensagem({ tipo: 'erro', texto: `✗ Erro: ${resultado.erro}` });
       }
     } catch (error) {
-      setMensagem({ tipo: 'erro', texto: `✗ Erro ao importar: ${error.erro}` });
+      const msgErro = error.erro || error.message || 'Erro desconhecido';
+      setMensagem({ tipo: 'erro', texto: `✗ Falha na importação: ${msgErro}` });
+      console.error('Erro na importação:', error);
     }
-    
+
     setCarregando(false);
     event.target.value = '';
     setTimeout(() => setMensagem(null), 3000);
   };
 
-  const handleLimparDados = () => {
+  const handleLimparDados = async () => {
     if (window.confirm('⚠️ Tem certeza que deseja limpar TODOS os dados?\n\nEsta ação não pode ser desfeita!\n\nRecomendamos fazer backup antes de continuar.')) {
-      const resultado = storageService.limparTudo();
-      
+      setCarregando(true);
+      const resultado = await storageService.limparTudo();
+
       if (resultado.sucesso) {
         substituirTurmas({});
         setMensagem({ tipo: 'sucesso', texto: '✓ Todos os dados foram limpos!' });
       } else {
         setMensagem({ tipo: 'erro', texto: `✗ Erro: ${resultado.erro}` });
       }
-      
+
+      setCarregando(false);
       setTimeout(() => setMensagem(null), 3000);
     }
   };
@@ -80,7 +94,7 @@ const BackupManager = () => {
           <div className="text-brown-300 text-sm font-medium mb-1">Total de Turmas</div>
           <div className="text-3xl font-bold text-white">{estatisticas.totalTurmas || 0}</div>
         </div>
-        
+
         <div className="bg-brown-800/50 p-4 rounded-lg border border-brown-700">
           <div className="text-brown-300 text-sm font-medium mb-1">Arquivos de Mapão</div>
           <div className="text-3xl font-bold text-white">
@@ -90,7 +104,7 @@ const BackupManager = () => {
             {estatisticas.totalTurmas || 0} {estatisticas.totalTurmas === 1 ? 'turma' : 'turmas'} × 4 bimestres
           </div>
         </div>
-        
+
         <div className="bg-brown-800/50 p-4 rounded-lg border border-brown-700">
           <div className="text-brown-300 text-sm font-medium mb-1">Espaço Usado</div>
           <div className="text-3xl font-bold text-white">{espacoUsado.mb} MB</div>
@@ -105,7 +119,7 @@ const BackupManager = () => {
           <span className="font-bold">{progresso.percentual}%</span>
         </div>
         <div className="w-full bg-brown-800/50 rounded-full h-3 overflow-hidden border border-brown-700">
-          <div 
+          <div
             className="bg-gradient-to-r from-accent-gold to-yellow-500 h-full transition-all duration-500 rounded-full"
             style={{ width: `${progresso.percentual}%` }}
           ></div>
@@ -151,11 +165,10 @@ const BackupManager = () => {
 
       {/* Mensagens de Feedback */}
       {mensagem && (
-        <div className={`mt-4 p-4 rounded-lg border font-semibold ${
-          mensagem.tipo === 'sucesso' 
-            ? 'bg-green-900/30 border-green-500/50 text-green-400'
-            : 'bg-red-900/30 border-red-500/50 text-red-400'
-        }`}>
+        <div className={`mt-4 p-4 rounded-lg border font-semibold ${mensagem.tipo === 'sucesso'
+          ? 'bg-green-900/30 border-green-500/50 text-green-400'
+          : 'bg-red-900/30 border-red-500/50 text-red-400'
+          }`}>
           {mensagem.texto}
         </div>
       )}

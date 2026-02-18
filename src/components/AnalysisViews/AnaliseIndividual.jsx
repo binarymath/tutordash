@@ -7,7 +7,7 @@ import GraficoComparativoAluno from '../Charts/GraficoComparativoAluno';
 import GraficoEvolucaoAluno from '../Charts/GraficoEvolucaoAluno';
 
 const AnaliseIndividual = () => {
-    const { dadosMapao, incluirInativos, dadosBimestres, bimestresDisponiveis } = useData();
+    const { dadosMapao, incluirInativos, dadosBimestres, bimestresDisponiveis, turmaSelecionada } = useData();
     const [alunoSelecionado, setAlunoSelecionado] = useState(null);
     const [busca, setBusca] = useState('');
 
@@ -125,7 +125,13 @@ const AnaliseIndividual = () => {
             <div className={`flex gap-6 ${mostrarSidebar ? '' : 'justify-center'}`}>
                 <div className={mostrarSidebar ? 'w-[30%] min-w-[300px] max-w-[400px]' : 'hidden'}>
                     <div className="search-section bg-brown-900/90 backdrop-blur-sm border border-brown-700 rounded-2xl p-6 shadow-elevation-4 sticky top-6">
-                        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white"><User size={26} /> Análise Individual</h2>
+                        <h2 className="flex items-center gap-2 text-xl font-extrabold text-white">
+                            <User size={26} />
+                            Análise Individual
+                            <span className="text-lg font-bold text-white ml-2 block sm:inline">
+                                {turmaSelecionada}
+                            </span>
+                        </h2>
 
                         <button
                             className="mt-4 inline-flex items-center justify-center rounded-lg border border-brown-600 bg-brown-800/50 px-3 py-2 text-sm font-semibold text-white hover:bg-brown-700 transition-all"
@@ -154,7 +160,7 @@ const AnaliseIndividual = () => {
                                 alunosFiltrados.map((aluno, index) => (
                                     <button
                                         key={index}
-                                        className={`aluno-item flex items-center justify-between rounded-xl border px-4 py-3 text-left text-base transition-all ${alunoSelecionado === aluno ? 'bg-gradient-to-r from-brown-700 to-brown-600 text-white border-brown-500 shadow-elevation-4' : 'bg-brown-800/30 border-brown-700 hover:border-brown-500 hover:bg-brown-800/50 text-brown-200'}`}
+                                        className={`aluno-item flex items-center justify-between rounded-xl border px-4 py-3 text-left text-base transition-all ${alunoSelecionado === aluno ? 'bg-gradient-to-r from-brown-700 to-brown-600 text-white border-brown-500 shadow-elevation-4' : 'bg-brown-800/30 border-brown-700 hover:border-brown-500 hover:bg-brown-800/50 text-brown-200 hover:text-white'}`}
                                         onClick={() => setAlunoSelecionado(aluno)}
                                     >
                                         <span className="aluno-nome font-semibold text-base">{aluno.nome}</span>
@@ -385,7 +391,7 @@ const AnaliseIndividual = () => {
                                                             <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Média</th>
                                                             <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Ausências</th>
                                                             <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">Comparativo</th>
-                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">(%) Ausências</th>
+                                                            <th className="px-3 py-2 text-xs font-semibold text-white uppercase tracking-wider">(%) Frequência</th>
                                                         </React.Fragment>
                                                     ))}
                                                 </tr>
@@ -401,11 +407,11 @@ const AnaliseIndividual = () => {
                                                             todasNotas.push(dadosDisc.media);
                                                         }
                                                     });
-                                                    const mediaGeralFinal = todasNotas.length > 0 
-                                                        ? todasNotas.reduce((a, b) => a + b, 0) / todasNotas.length 
+                                                    const mediaGeralFinal = todasNotas.length > 0
+                                                        ? todasNotas.reduce((a, b) => a + b, 0) / todasNotas.length
                                                         : null;
                                                     const mediaGeralAprovada = mediaGeralFinal && mediaGeralFinal >= 5;
-                                                    
+
                                                     return (
                                                         <tr key={nomeDisc} className="hover:bg-brown-800/30 transition-colors border-b border-brown-800">
                                                             <td className="sticky left-0 z-10 bg-brown-900 px-4 py-3 text-sm font-bold text-white border-r border-brown-700">{nomeDisc}</td>
@@ -429,7 +435,8 @@ const AnaliseIndividual = () => {
                                                                 const aprovado = dadosDisciplina.media >= 5;
                                                                 const mediaTurmaBim = estatisticasTurmaBim?.disciplinas[nomeDisc]?.media || 0;
                                                                 const diferenca = dadosDisciplina.media - mediaTurmaBim;
-                                                                const percentualAusencias = totalAulasDadas > 0 ? ((dadosDisciplina.faltas / totalAulasDadas) * 100) : 0;
+                                                                // Calcula frequencia: (Total - Faltas) / Total. Se total for 0, assume 100%.
+                                                                const percentualFrequencia = totalAulasDadas > 0 ? (((totalAulasDadas - dadosDisciplina.faltas) / totalAulasDadas) * 100) : 100;
 
                                                                 return (
                                                                     <React.Fragment key={bim}>
@@ -440,8 +447,8 @@ const AnaliseIndividual = () => {
                                                                         <td className={`px-3 py-3 font-semibold text-center ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                                                                             {diferenca >= 0 ? '↑' : '↓'} {Math.abs(diferenca).toFixed(2)}
                                                                         </td>
-                                                                        <td className={`px-3 py-3 text-center ${percentualAusencias > 25 ? 'text-red-400 font-bold' : 'text-white'}`}>
-                                                                            {percentualAusencias.toFixed(1)}%
+                                                                        <td className={`px-3 py-3 text-center ${percentualFrequencia < 75 ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>
+                                                                            {percentualFrequencia.toFixed(1)}%
                                                                         </td>
                                                                     </React.Fragment>
                                                                 );
@@ -470,7 +477,7 @@ const AnaliseIndividual = () => {
                                                     <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Média</th>
                                                     <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Ausências</th>
                                                     <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">Comparativo</th>
-                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">(%) Ausências</th>
+                                                    <th className="px-3 py-2 text-sm font-bold text-white uppercase tracking-wide">(%) Frequência</th>
                                                     <th className="px-4 py-3 text-sm font-bold text-accent-gold uppercase tracking-wide bg-brown-900/40 border-l-2 border-accent-gold/30">Média Geral</th>
                                                 </tr>
                                             </thead>
@@ -482,7 +489,9 @@ const AnaliseIndividual = () => {
                                                     const diferenca = dados.media - mediaTurma;
                                                     const aprovado = dados.media >= 5;
                                                     const totalAulasDadas = dadosMapao?.infoGeral?.totalAulasDadas || 0;
-                                                    const percentualAusencias = totalAulasDadas > 0 ? ((dados.faltas / totalAulasDadas) * 100) : 0;
+                                                    // Calcula frequencia
+                                                    const percentualFrequencia = totalAulasDadas > 0 ? (((totalAulasDadas - dados.faltas) / totalAulasDadas) * 100) : 100;
+
                                                     // Para bimestre único, média geral é a própria média
                                                     const mediaGeral = dados.media;
                                                     const mediaGeralAprovada = mediaGeral >= 5;
@@ -497,8 +506,8 @@ const AnaliseIndividual = () => {
                                                             <td className={`px-3 py-3 font-semibold text-center ${diferenca >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                                                                 {diferenca >= 0 ? '↑' : '↓'} {Math.abs(diferenca).toFixed(2)}
                                                             </td>
-                                                            <td className={`px-3 py-3 text-center ${percentualAusencias > 25 ? 'text-red-400 font-bold' : 'text-white'}`}>
-                                                                {percentualAusencias.toFixed(1)}%
+                                                            <td className={`px-3 py-3 text-center ${percentualFrequencia < 75 ? 'text-red-400 font-bold' : 'text-emerald-400'}`}>
+                                                                {percentualFrequencia.toFixed(1)}%
                                                             </td>
                                                             <td className={`px-4 py-3 font-extrabold text-center text-lg bg-brown-900/40 border-l-2 border-accent-gold/30 ${mediaGeralAprovada ? 'text-accent-gold' : 'text-red-400'}`}>
                                                                 {mediaGeral.toFixed(2)}

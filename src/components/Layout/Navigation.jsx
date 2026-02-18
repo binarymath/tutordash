@@ -1,5 +1,5 @@
 import React from 'react';
-import { BarChart3, User, FolderKanban, TrendingUp, UploadCloud, Database } from 'lucide-react';
+import { BarChart3, User, FolderKanban, TrendingUp, UploadCloud, Database, BookOpen } from 'lucide-react';
 
 const Navigation = ({ viewMode, onChange }) => {
     const tabs = [
@@ -22,6 +22,11 @@ const Navigation = ({ viewMode, onChange }) => {
             id: 'individual',
             label: 'Análise Individual',
             icon: <User size={18} />,
+        },
+        {
+            id: 'boletim',
+            label: 'Boletim',
+            icon: <BookOpen size={18} />,
         },
         {
             id: 'backup',

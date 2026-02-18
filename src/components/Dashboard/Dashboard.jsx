@@ -9,6 +9,7 @@ import Button from '../Common/Button';
 import FileUpload from '../Common/FileUpload';
 import AnaliseTurma from '../AnalysisViews/AnaliseTurma';
 import AnaliseIndividual from '../AnalysisViews/AnaliseIndividual';
+import BoletimView from '../AnalysisViews/BoletimView';
 import DashboardProgresso from '../Gerenciamento/DashboardProgresso';
 import UploadLote from '../Gerenciamento/UploadLote';
 import BackupManager from '../Gerenciamento/BackupManager';
@@ -25,7 +26,7 @@ const Dashboard = () => {
         error,
         bimestresDisponiveis
     } = useData();
-    
+
     const { turmaSelecionada } = useTurma();
     const bimestresCarregados = bimestresDisponiveis.length;
 
@@ -146,6 +147,7 @@ const Dashboard = () => {
                             {viewMode === 'backup' && <BackupManager />}
                             {viewMode === 'turma' && dadosMapao && <AnaliseTurma />}
                             {viewMode === 'individual' && dadosMapao && <AnaliseIndividual />}
+                            {viewMode === 'boletim' && <BoletimView />}
                         </div>
                     )}
                 </div>

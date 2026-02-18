@@ -92,7 +92,7 @@ const Modal = ({
         >
             {/* Backdrop */}
             <div
-                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in"
+                className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in pointer-events-none"
                 aria-hidden="true"
             />
 
@@ -112,11 +112,11 @@ const Modal = ({
             >
                 {/* Header */}
                 {(title || showCloseButton) && (
-                    <div className="flex items-center justify-between px-6 py-4 border-b border-brown-300 bg-brown-200/50">
+                    <div className="flex items-center justify-between px-6 py-4 border-b border-brown-800 bg-brown-950 rounded-t-xl">
                         {title && (
                             <h2
                                 id="modal-title"
-                                className="text-xl md:text-2xl font-semibold text-brown-900 tracking-tight"
+                                className="text-xl md:text-2xl font-bold text-white tracking-tight"
                             >
                                 {title}
                             </h2>
@@ -124,7 +124,7 @@ const Modal = ({
                         {showCloseButton && (
                             <button
                                 onClick={onClose}
-                                className="ml-auto p-2 rounded-full hover:bg-brown-200 transition-all duration-shorter ripple text-brown-700 hover:text-brown-900"
+                                className="ml-auto p-2 rounded-full hover:bg-brown-800 transition-all duration-shorter ripple text-brown-400 hover:text-white"
                                 aria-label="Fechar modal"
                             >
                                 <X size={24} />
