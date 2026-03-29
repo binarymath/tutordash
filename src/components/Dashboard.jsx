@@ -62,10 +62,16 @@ const Dashboard = ({
                 );
               })()}
               <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">🎓 PP: {s.provaPaulista}</span>
-              {s.ultimoMat !== '-' && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 mt-1">📊 Mat: {s.ultimoMat} | Port: {s.ultimoPort}</span>}
-              {s.ultimoFaltas !== '-' && (
-                <span className={`text-[10px] font-bold px-2 py-1 rounded border mt-1 flex items-center gap-1 ${s.ultimoFaltas === '0' || s.ultimoFaltas === '0%' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                  <AlertCircle className="w-3 h-3" /> Faltas: {s.ultimoFaltas}
+              {s.ultimoMat !== '-' && (
+                <span className="text-[10px] font-bold bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-100 mt-1 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-blue-600 font-black">{s.ultimoBimNome}</span>
+                  <span className="text-emerald-600">📊 Mat: {s.ultimoMat}</span>
+                  <span className="text-indigo-600">Port: {s.ultimoPort}</span>
+                  {s.ultimoFaltas !== '-' && (
+                    <span className={s.ultimoFaltas === '0' || s.ultimoFaltas === '0%' ? 'text-emerald-600' : 'text-red-600'}>
+                      🚨 Faltas: {s.ultimoFaltas}
+                    </span>
+                  )}
                 </span>
               )}
             </div>
@@ -150,10 +156,16 @@ const Dashboard = ({
                                     );
                                   })()}
                                   {studentInfo.provaPaulista !== 'S/D' && <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PP: {studentInfo.provaPaulista}</span>}
-                                  {studentInfo.ultimoMat !== '-' && <span className="bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100 w-full mt-1">📊 Mat: {studentInfo.ultimoMat} | Port: {studentInfo.ultimoPort}</span>}
-                                  {studentInfo.ultimoFaltas !== '-' && (
-                                    <span className={`w-full mt-1 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold ${studentInfo.ultimoFaltas === '0' || studentInfo.ultimoFaltas === '0%' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}`}>
-                                      <AlertCircle className="w-2 h-2" /> Faltas: {studentInfo.ultimoFaltas}
+                                  {studentInfo.ultimoMat !== '-' && (
+                                    <span className="bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 w-full mt-1 flex items-center gap-1.5 flex-wrap text-[9px] font-bold">
+                                      <span className="text-blue-600 font-black">{studentInfo.ultimoBimNome}</span>
+                                      <span className="text-emerald-600">Mat: {studentInfo.ultimoMat}</span>
+                                      <span className="text-indigo-600">Port: {studentInfo.ultimoPort}</span>
+                                      {studentInfo.ultimoFaltas !== '-' && (
+                                        <span className={studentInfo.ultimoFaltas === '0' || studentInfo.ultimoFaltas === '0%' ? 'text-emerald-600' : 'text-red-600'}>
+                                          🚨 {studentInfo.ultimoFaltas} faltas
+                                        </span>
+                                      )}
                                     </span>
                                   )}
                                 </div>
