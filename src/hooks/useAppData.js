@@ -191,19 +191,30 @@ export const useAppData = (config, setShowSettings) => {
 
               headers.forEach((h, idx) => {
                 if (typeof h === 'string') {
-                  const upperH = h.toUpperCase();
+                  const upperH = h.toUpperCase().trim();
                   if (h.includes('\n')) {
                     const subjectName = h.split('\n')[0].trim();
                     if (!subjectName.toUpperCase().includes('TOTAL')) {
                       subjects.push({ index: idx, name: subjectName });
                     }
                   } else if (upperH.includes('FALTA') || upperH.includes('AUSÊN') || upperH.includes('AUSEN') || upperH === '% F' || upperH === 'F') {
-                    if (faltasIdx === -1 || upperH.includes('TOTAL') || upperH.includes('GERAL') || faltasIdx < idx) {
+                    // Prioriza coluna com nome exato "F" ou "TOTAL FALTAS"; caso já tenha um índice, só substitui se for mais específico
+                    const isExact = (upperH === 'F' || upperH === 'TOTAL FALTAS' || upperH === 'FALTAS');
+                    const isPercent = (upperH === '% F' || upperH.includes('%'));
+                    if (faltasIdx === -1) {
+                      faltasIdx = idx;
+                    } else if (isExact) {
+                      // coluna exata sempre vence
+                      faltasIdx = idx;
+                    } else if (!isPercent) {
+                      // coluna sem % prefere sobre colunas de porcentagem anteriores
                       faltasIdx = idx;
                     }
                   }
                 }
               });
+              // Log para diagnóstico (pode ser removido após confirmação)
+              console.debug('[Mapão] faltas col idx:', faltasIdx, '| header:', headers[faltasIdx]);
 
               const dadosDaGuia = jsonData.slice(headerRowIdx + 1).map(row => {
                 const alunoNome = row[0];
