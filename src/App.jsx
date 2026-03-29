@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 
-import { normalizeName, parseGrade } from './utils/helpers';
+import { normalizeName, parseGrade, formatDisciplina } from './utils/helpers';
 import { useAppData } from './hooks/useAppData';
 
 import ConfigModal    from './components/ConfigModal';
@@ -16,10 +16,22 @@ import StudentProfile from './components/StudentProfile';
 const App = () => {
   // ── Configuração persistente ───────────────────────────────
   const [config, setConfig] = useState(() => {
-    const saved = localStorage.getItem('tutorDashConfig');
-    return saved ? JSON.parse(saved) : {
+    const defaultConfig = {
       studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: ''
     };
+
+    try {
+      const saved = localStorage.getItem('tutorDashConfig');
+      if (!saved) return defaultConfig;
+
+      const parsed = JSON.parse(saved);
+      return {
+        ...defaultConfig,
+        ...(parsed && typeof parsed === 'object' ? parsed : {})
+      };
+    } catch {
+      return defaultConfig;
+    }
   });
   useEffect(() => {
     localStorage.setItem('tutorDashConfig', JSON.stringify(config));
@@ -105,8 +117,9 @@ const App = () => {
           if (n > 0 || aluno.notas[disciplina] !== '-') { soma += n; count++; }
         }
       });
-      const shortName = disciplina.length > 12 ? disciplina.substring(0, 10) + '.' : disciplina;
-      return { subject: shortName, fullSubject: disciplina, Aluno: notaAluno, Turma: count > 0 ? parseFloat((soma / count).toFixed(1)) : 0 };
+      const displaySub = formatDisciplina(disciplina);
+      const shortName  = displaySub.length > 12 ? displaySub.substring(0, 10) + '.' : displaySub;
+      return { subject: shortName, fullSubject: displaySub, Aluno: notaAluno, Turma: count > 0 ? parseFloat((soma / count).toFixed(1)) : 0 };
     });
   }, [studentProfile, conceitoData]);
 
@@ -116,7 +129,9 @@ const App = () => {
       .map(([disciplina, notaRaw]) => {
         const val = parseGrade(notaRaw);
         if (val === 0 && notaRaw === '-') return null;
-        return { subject: disciplina.length > 12 ? disciplina.substring(0, 10) + '.' : disciplina, fullSubject: disciplina, Desempenho: val };
+        const displaySub = formatDisciplina(disciplina);
+        const shortName  = displaySub.length > 12 ? displaySub.substring(0, 10) + '.' : displaySub;
+        return { subject: shortName, fullSubject: displaySub, Desempenho: val };
       })
       .filter(Boolean);
   }, [studentProfile]);

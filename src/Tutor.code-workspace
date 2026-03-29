@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "../../../Tutor"
+		},
+		{
+			"path": "."
+		},
+		{
+			"path": "../.git"
+		},
+		{
+			"path": "../dist"
+		},
+		{
+			"path": "../node_modules"
+		},
+		{
+			"path": "../public"
+		}
+	],
+	"settings": {}
+}

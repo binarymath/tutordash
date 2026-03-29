@@ -12,6 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
+import { formatDisciplina } from '../utils/helpers';
 
 // ── Tooltip personalizado dos gráficos ──────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
@@ -110,26 +111,6 @@ const getFaltaStyle = (faltas) => {
   return 'text-red-700 bg-red-50 font-black';
 };
 
-// Mapeia nomes longos da planilha para rótulos amigáveis
-// Testa contra o nome NORMALIZADO (sem acentos) para evitar problemas com Í, Ã, Ç etc.
-const DISPLAY_ALIASES = [
-  { match: /ORIENTA.*LINGU/i,  display: 'OE: Língua Portuguesa' },
-  { match: /ORIENTA.*MATEM/i,  display: 'OE: Matemática'        },
-  { match: /ORIENTA.*PORT/i,   display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–\-]*LINGU/i, display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–\-]*PORT/i,  display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–\-]*MAT/i,   display: 'OE: Matemática'        },
-];
-
-const displayDisciplina = (nome) => {
-  // Normaliza removendo acentos para comparação robusta
-  const normalized = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  for (const alias of DISPLAY_ALIASES) {
-    if (alias.match.test(normalized)) return alias.display;
-  }
-  return nome;
-};
-
 // ── Evolutivo Numérico: grid 2 colunas, tabela dentro de cada card ──
 const EvolutivoNumerico = ({ historicoConceitos }) => {
   // Coleta todas as disciplinas únicas
@@ -176,7 +157,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                 </th>
                 {disciplinas.map(d => (
                   <th key={d} className="px-2 py-2.5 font-black text-slate-600 text-center border-b border-r border-slate-200 last:border-r-0 leading-tight">
-                    <span title={d} className="whitespace-normal break-words">{displayDisciplina(d)}</span>
+                    <span title={d} className="whitespace-normal break-words">{formatDisciplina(d)}</span>
                   </th>
                 ))}
                 {temFaltas && (
@@ -371,9 +352,10 @@ const StudentProfile = ({
               </div>
             )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
+    </div>
 
       {/* ── Evolutivo Numérico: largura total, 2 cards por linha ── */}
       <div>
@@ -422,8 +404,8 @@ const StudentProfile = ({
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio (Último Bimestre)</h4>
             {chartDataMapao.length > 0 ? (
-              <div style={{ position: 'relative', width: '100%', height: '288px' }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <RadarChart cx="50%" cy="50%" outerRadius="60%" data={chartDataMapao} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                     <PolarGrid stroke="#e2e8f0" />
                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
@@ -446,8 +428,8 @@ const StudentProfile = ({
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Desempenho (Prova Paulista)</h4>
             {chartDataProva.length > 0 ? (
-              <div style={{ position: 'relative', width: '100%', height: '288px' }}>
-                <ResponsiveContainer width="100%" height="100%">
+              <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                   <RadarChart cx="50%" cy="50%" outerRadius="60%" data={chartDataProva} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                     <PolarGrid stroke="#e2e8f0" />
                     <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
@@ -470,8 +452,8 @@ const StudentProfile = ({
         <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
           <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Comparação Detalhada: Aluno vs Média da Turma (Último Bimestre)</h4>
           {chartDataMapao.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '384px' }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                 <BarChart data={chartDataMapao} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
@@ -489,8 +471,9 @@ const StudentProfile = ({
             </div>
           )}
           </div>
-        )}
-      </div>
+        </>
+      )}
+    </div>
     </div>
   );
 };

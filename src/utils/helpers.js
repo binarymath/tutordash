@@ -65,3 +65,18 @@ export const fetchWithFallback = async (url) => {
     }
   }
 };
+
+export const formatDisciplina = (nome) => {
+  if (!nome) return '';
+  const n = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  
+  if (n.includes('ORIENTA') && n.includes('LINGU')) return 'OE: Língua Portuguesa';
+  if (n.includes('ORIENTA') && n.includes('MATEM')) return 'OE: Matemática';
+  if (n.includes('ORIENTA') && n.includes('PORT'))  return 'OE: Língua Portuguesa';
+  if (n.startsWith('OE ') || n.startsWith('OE:')) {
+    if (n.includes('LINGU') || n.includes('PORT')) return 'OE: Língua Portuguesa';
+    if (n.includes('MAT')) return 'OE: Matemática';
+  }
+  
+  return nome;
+};

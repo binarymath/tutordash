@@ -4,6 +4,15 @@
 import { useState, useEffect } from 'react';
 import { normalizeName, formatBimestre, fetchWithFallback } from '../utils/helpers';
 
+let xlsxModulePromise = null;
+
+const getXLSX = async () => {
+  if (!xlsxModulePromise) {
+    xlsxModulePromise = import('xlsx');
+  }
+  return xlsxModulePromise;
+};
+
 const fetchAndParseCSV = async (url) => {
   if (!url) return [];
   let fetchUrl = url;
@@ -13,8 +22,9 @@ const fetchAndParseCSV = async (url) => {
   }
   const res = await fetchWithFallback(fetchUrl);
   const text = await res.text();
-  const wb = window.XLSX.read(text, { type: 'string' });
-  return window.XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+  const XLSX = await getXLSX();
+  const wb = XLSX.read(text, { type: 'string' });
+  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
 };
 
 export const useAppData = (config, setShowSettings) => {
@@ -26,14 +36,6 @@ export const useAppData = (config, setShowSettings) => {
   const [isSyncing, setIsSyncing]     = useState(false);
   const [error, setError]             = useState(null);
 
-  // Carrega SheetJS via CDN uma única vez
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = "https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js";
-    script.async = true;
-    document.body.appendChild(script);
-  }, []);
-
   // Polling automático a cada 5 minutos
   useEffect(() => {
     if (data.length > 0 && config.studentsUrl) {
@@ -43,10 +45,6 @@ export const useAppData = (config, setShowSettings) => {
   }, [data.length, config.studentsUrl]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAllData = async (silent = false) => {
-    if (!window.XLSX) {
-      if (!silent) setError("O leitor de planilhas ainda está a carregar. Aguarde um momento e tente novamente.");
-      return;
-    }
     if (!config.studentsUrl) {
       if (!silent) {
         setError("O URL da Planilha de Tutoria (Base) é obrigatória.");
@@ -167,12 +165,13 @@ export const useAppData = (config, setShowSettings) => {
           }
           const res         = await fetchWithFallback(fetchCUrl);
           const arrayBuffer = await res.arrayBuffer();
-          const wb          = window.XLSX.read(arrayBuffer, { type: 'array' });
+          const XLSX        = await getXLSX();
+          const wb          = XLSX.read(arrayBuffer, { type: 'array' });
           let todosConceitos = [];
 
           wb.SheetNames.forEach(nomeDaGuia => {
             const ws       = wb.Sheets[nomeDaGuia];
-            const jsonData = window.XLSX.utils.sheet_to_json(ws, { header: 1 });
+            const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
             let turmaPlanilha = nomeDaGuia;
             let bimestreRaw   = nomeDaGuia;
             let headerRowIdx  = -1;
