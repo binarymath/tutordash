@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // components/StudentProfile.jsx — Perfil 360º do aluno
 // ─────────────────────────────────────────────────────────────
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, UserCheck, TrendingUp,
   LineChart as LineChartIcon, History, BarChart2,
-  User, Calendar
+  User, Calendar, ChevronDown, ChevronUp
 } from 'lucide-react';
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -239,6 +239,10 @@ const StudentProfile = ({
   prevStudent, nextStudent, setSelectedStudent,
   chartDataMapao, chartDataProva
 }) => {
+  const [showAnotacoes, setShowAnotacoes] = useState(true);
+  const [showEvolutivo, setShowEvolutivo] = useState(true);
+  const [showGrafico, setShowGrafico] = useState(true);
+
   if (!studentProfile) return null;
 
   return (
@@ -294,9 +298,21 @@ const StudentProfile = ({
 
         {/* Coluna direita: Anotações */}
         <div className="md:col-span-2">
-          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
-            <History className="w-4 h-4" /> Anotações e Sessões
-          </h3>
+          <div className="flex items-center justify-between mb-4 ml-2">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <History className="w-4 h-4" /> Anotações e Sessões
+            </h3>
+            <button
+              onClick={() => setShowAnotacoes(!showAnotacoes)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
+              title={showAnotacoes ? "Recolher" : "Expandir"}
+            >
+              {showAnotacoes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {showAnotacoes && (
+            <>
 
           {studentSessions.length > 1 && (
             <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
@@ -354,31 +370,54 @@ const StudentProfile = ({
                 <p className="text-slate-400 font-bold uppercase text-xs">Sem anotações registadas para este filtro.</p>
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* ── Evolutivo Numérico: largura total, 2 cards por linha ── */}
       <div>
-        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-slate-200 pb-4">
-          <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico
-        </h3>
-        {studentProfile.historicoConceitos?.length > 0 ? (
-          <EvolutivoNumerico historicoConceitos={studentProfile.historicoConceitos} />
-        ) : (
-          <div className="bg-slate-50 border border-dashed border-slate-200 p-10 rounded-2xl text-center">
-            <p className="text-slate-400 font-bold uppercase text-[10px]">Sem dados bimestrais disponíveis</p>
-          </div>
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+            <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico
+          </h3>
+          <button
+            onClick={() => setShowEvolutivo(!showEvolutivo)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
+            title={showEvolutivo ? "Recolher" : "Expandir"}
+          >
+            {showEvolutivo ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </button>
+        </div>
+        {showEvolutivo && (
+          studentProfile.historicoConceitos?.length > 0 ? (
+            <EvolutivoNumerico historicoConceitos={studentProfile.historicoConceitos} />
+          ) : (
+            <div className="bg-slate-50 border border-dashed border-slate-200 p-10 rounded-2xl text-center">
+              <p className="text-slate-400 font-bold uppercase text-[10px]">Sem dados bimestrais disponíveis</p>
+            </div>
+          )
         )}
       </div>
 
       {/* ── Análise Gráfica ────────────────────────────────────── */}
       <div>
-        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-200 pb-4">
-          <BarChart2 className="w-6 h-6 text-blue-600" /> Análise Gráfica e Comparativa
-        </h3>
+        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-6">
+          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+            <BarChart2 className="w-6 h-6 text-blue-600" /> Análise Gráfica e Comparativa
+          </h3>
+          <button
+            onClick={() => setShowGrafico(!showGrafico)}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
+            title={showGrafico ? "Recolher" : "Expandir"}
+          >
+            {showGrafico ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
+          </button>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {showGrafico && (
+          <>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Radar Mapão */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio (Último Bimestre)</h4>
@@ -449,7 +488,8 @@ const StudentProfile = ({
               <p className="text-slate-400 text-xs font-bold uppercase">Sem dados comparativos suficientes</p>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
