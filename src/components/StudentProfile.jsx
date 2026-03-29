@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend
 } from 'recharts';
-import { formatDisciplina } from '../utils/helpers';
+import { formatDisciplina, parseGrade } from '../utils/helpers';
 
 // ── Tooltip personalizado dos gráficos ──────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
@@ -111,6 +111,21 @@ const getFaltaStyle = (faltas) => {
   return 'text-red-700 bg-red-50 font-black';
 };
 
+const parseNumberFromText = (value) => {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text || text === '-') return null;
+  const numeric = parseFloat(text.replace('%', '').replace(',', '.'));
+  return Number.isNaN(numeric) ? null : numeric;
+};
+
+const getFaltaMetrics = (value) => {
+  const text = String(value ?? '').trim();
+  const numeric = parseNumberFromText(text);
+  if (numeric === null) return { isValid: false, isPercent: false, value: null };
+  return { isValid: true, isPercent: text.includes('%'), value: numeric };
+};
+
 // ── Evolutivo Numérico: grid 2 colunas, tabela dentro de cada card ──
 const EvolutivoNumerico = ({ historicoConceitos }) => {
   // Coleta todas as disciplinas únicas
@@ -127,12 +142,57 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
 
   const temFaltas = historicoConceitos.some(b => b.faltas && b.faltas !== '-');
 
+  const faltasPorBimestre = historicoConceitos.map((bim) => {
+    const metrics = getFaltaMetrics(bim.faltas);
+    const frequencia = metrics.isValid && metrics.isPercent
+      ? Math.max(0, Math.min(100, 100 - metrics.value))
+      : null;
+    return {
+      bimestre: bim.bimestre,
+      faltasRaw: bim.faltas,
+      frequencia,
+      metrics,
+    };
+  });
+
+  const totalFaltas = faltasPorBimestre
+    .filter(item => item.metrics.isValid && !item.metrics.isPercent)
+    .reduce((sum, item) => sum + item.metrics.value, 0);
+
+  const frequenciasValidas = faltasPorBimestre
+    .filter(item => typeof item.frequencia === 'number')
+    .map(item => item.frequencia);
+
+  const mediaFrequencia = frequenciasValidas.length > 0
+    ? frequenciasValidas.reduce((sum, val) => sum + val, 0) / frequenciasValidas.length
+    : null;
+
+  const calcularMediaDisciplina = (disciplina) => {
+    const notasValidas = historicoConceitos
+      .map((bim) => bim.notas[disciplina])
+      .filter((nota) => nota !== undefined && nota !== null && String(nota).trim() !== '' && String(nota).trim() !== '-')
+      .map((nota) => parseGrade(nota));
+
+    if (notasValidas.length === 0) return null;
+    const media = notasValidas.reduce((sum, nota) => sum + nota, 0) / notasValidas.length;
+    return Number.isFinite(media) ? media : null;
+  };
+
+  const disciplinasComRisco = allDisciplinas
+    .map((disciplina) => ({
+      disciplina,
+      media: calcularMediaDisciplina(disciplina),
+    }))
+    .filter((item) => item.media !== null && item.media < 5)
+    .sort((a, b) => a.media - b.media);
+
   const renderAreaCard = (disciplinas, area) => {
     const headerBg     = area?.headerBg     ?? 'bg-slate-600';
     const headerText   = area?.headerText   ?? 'text-white';
     const label        = area?.label        ?? '📋 Outras Disciplinas';
     const borderColor  = area?.borderColor  ?? 'border-slate-200';
     const headBg       = area?.headBg       ?? 'bg-slate-50';
+    const mediaPorDisciplina = disciplinas.map((disciplina) => calcularMediaDisciplina(disciplina));
 
     return (
       <div key={area?.key ?? 'outras'} className={`rounded-2xl overflow-hidden border ${borderColor} shadow-sm bg-white flex flex-col`}>
@@ -193,6 +253,29 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="bg-slate-100 border-t-2 border-slate-200">
+                <td className="px-3 py-2.5 font-black text-slate-600 uppercase tracking-wider border-r border-slate-200 whitespace-nowrap">
+                  Média Geral
+                </td>
+                {mediaPorDisciplina.map((media, idx) => (
+                  <td key={disciplinas[idx]} className="px-2 py-1.5 text-center border-r border-slate-200 last:border-r-0">
+                    {media !== null ? (
+                      <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[11px] ${getNotaStyle(media.toFixed(1))}`}>
+                        {media.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300 text-[11px] font-bold">-</span>
+                    )}
+                  </td>
+                ))}
+                {temFaltas && (
+                  <td className="px-2 py-1.5 text-center border-l-2 border-slate-300 bg-slate-100">
+                    <span className="text-slate-500 text-[10px] font-black">-</span>
+                  </td>
+                )}
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>
@@ -205,24 +288,76 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
 
   return (
     <div className="grid grid-cols-1 gap-4">
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+        <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Pontos de Atenção</p>
+        {disciplinasComRisco.length === 0 ? (
+          <p className="text-[11px] font-bold text-slate-700">Ainda não lançadas menções</p>
+        ) : (
+          <ul className="space-y-2 text-[11px] font-bold text-slate-700">
+            {disciplinasComRisco.map((item) => (
+              <li key={`disc-${item.disciplina}`} className="px-3 py-2 rounded-xl border border-amber-200 bg-white">
+                Disciplina: {formatDisciplina(item.disciplina)} com média {item.media.toFixed(1)} (abaixo de 5.0)
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {/* Card de OE sempre em primeiro */}
       {temOE && renderAreaCard(areaMap['orientacoes'], OE_AREA)}
       {areasComDados.map(area => renderAreaCard(areaMap[area.key], area))}
       {temOutras && renderAreaCard(areaMap['outras'], null)}
+
+      <div className="rounded-2xl overflow-hidden border border-blue-200 shadow-sm bg-white">
+        <div className="bg-blue-600 text-white px-4 py-2.5 flex items-center justify-between">
+          <span className="text-xs font-black uppercase tracking-widest">Indice de Frequencia e Faltas</span>
+          <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full">Resumo Geral</span>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">Total de Faltas</p>
+            <p className="text-2xl font-black text-blue-800 mt-1">{totalFaltas.toFixed(0)}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">Media de Frequencia</p>
+            <p className="text-2xl font-black text-slate-800 mt-1">
+              {mediaFrequencia !== null ? `${mediaFrequencia.toFixed(1)}%` : 'S/D'}
+            </p>
+          </div>
+        </div>
+        {temFaltas && (
+          <div className="px-4 pb-4">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Por Bimestre</p>
+            <div className="flex flex-wrap gap-2">
+              {faltasPorBimestre.map((item, idx) => (
+                <div key={idx} className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-bold text-slate-700">
+                  <span className="text-blue-600 font-black">{item.bimestre.replace('º Bimestre', 'ºBi')}</span>
+                  <span className="mx-1">|</span>
+                  <span>Faltas: {item.faltasRaw || '-'}</span>
+                  <span className="mx-1">|</span>
+                  <span>Freq.: {item.frequencia !== null ? `${item.frequencia.toFixed(1)}%` : 'S/D'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+      </div>
     </div>
   );
 };
 
 // ── Componente principal: StudentProfile ─────────────────────
 const StudentProfile = ({
-  studentProfile, filteredNotes, studentSessions,
-  selectedSessionFilter, setSelectedSessionFilter,
+  studentProfile, filteredNotes, studentSessions, studentSessionCounts,
+  selectedSessionFilters, setSelectedSessionFilters,
   prevStudent, nextStudent, setSelectedStudent,
   chartDataMapao, chartDataProva
 }) => {
   const [showAnotacoes, setShowAnotacoes] = useState(true);
-  const [showEvolutivo, setShowEvolutivo] = useState(true);
-  const [showGrafico, setShowGrafico] = useState(true);
+  const [showProvaPaulista, setShowProvaPaulista] = useState(false);
+  const [showEvolutivo, setShowEvolutivo] = useState(false);
+  const [showGrafico, setShowGrafico] = useState(false);
 
   if (!studentProfile) return null;
 
@@ -264,25 +399,17 @@ const StudentProfile = ({
         </div>
       </div>
 
-      {/* Prova Paulista + Anotações lado a lado */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Coluna esquerda: Prova Paulista */}
-        <div className="md:col-span-1">
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 h-full">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" /> Prova Paulista
-            </h3>
-            <div className="text-4xl font-black text-blue-600 mb-1">{studentProfile.provaPaulista}</div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase">Desempenho Geral</p>
-          </div>
-        </div>
-
-        {/* Coluna direita: Anotações */}
-        <div className="md:col-span-2">
+      {/* Anotações e Sessões */}
+      <div className="space-y-6">
+        <div>
           <div className="flex items-center justify-between mb-4 ml-2">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+            <button
+              onClick={() => setShowAnotacoes(!showAnotacoes)}
+              className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+              title={showAnotacoes ? "Recolher" : "Expandir"}
+            >
               <History className="w-4 h-4" /> Anotações e Sessões
-            </h3>
+            </button>
             <button
               onClick={() => setShowAnotacoes(!showAnotacoes)}
               className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
@@ -295,24 +422,65 @@ const StudentProfile = ({
           {showAnotacoes && (
             <>
 
-          {studentSessions.length > 1 && (
+          {studentProfile.notes.length > 0 && studentSessions.length > 0 && (
             <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Filtrar por Tipo</p>
+              <div className="mb-3">
+                <button
+                  onClick={() => setSelectedSessionFilters([])}
+                  className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700"
+                >
+                  Limpar filtros
+                </button>
+              </div>
               <div className="flex flex-wrap gap-3">
+                <label
+                  className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilters.length === 0 ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedSessionFilters.length === 0}
+                    onChange={() => setSelectedSessionFilters([])}
+                    className="sr-only peer"
+                  />
+                  <span className={`w-4 h-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${selectedSessionFilters.length === 0 ? 'border-blue-600' : 'border-slate-400'} bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500`}>
+                    {selectedSessionFilters.length === 0 && (
+                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                    )}
+                  </span>
+                  <span className={`text-xs font-bold ${selectedSessionFilters.length === 0 ? 'text-blue-700' : 'text-slate-600'}`}>Todos</span>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${selectedSessionFilters.length === 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                    {studentProfile.notes.length}
+                  </span>
+                </label>
+
                 {studentSessions.map(sessao => (
                   <label
                     key={sessao}
-                    className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilter === sessao ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
+                    className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilters.includes(sessao) ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
                   >
                     <input
-                      type="radio"
-                      name="sessionFilter"
+                      type="checkbox"
                       value={sessao}
-                      checked={selectedSessionFilter === sessao}
-                      onChange={e => setSelectedSessionFilter(e.target.value)}
-                      className="text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                      checked={selectedSessionFilters.includes(sessao)}
+                      onChange={() => {
+                        setSelectedSessionFilters(prev => (
+                          prev.includes(sessao)
+                            ? prev.filter(item => item !== sessao)
+                            : [...prev, sessao]
+                        ));
+                      }}
+                      className="sr-only peer"
                     />
-                    <span className={`text-xs font-bold ${selectedSessionFilter === sessao ? 'text-blue-700' : 'text-slate-600'}`}>{sessao}</span>
+                    <span className={`w-4 h-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${selectedSessionFilters.includes(sessao) ? 'border-blue-600' : 'border-slate-400'} bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500`}>
+                      {selectedSessionFilters.includes(sessao) && (
+                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                      )}
+                    </span>
+                    <span className={`text-xs font-bold ${selectedSessionFilters.includes(sessao) ? 'text-blue-700' : 'text-slate-600'}`}>{sessao}</span>
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${selectedSessionFilters.includes(sessao) ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
+                      {studentSessionCounts?.[sessao] || 0}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -320,7 +488,11 @@ const StudentProfile = ({
           )}
 
           <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
-            {filteredNotes.length > 0 ? (
+            {studentProfile.notes.length === 0 ? (
+              <div className="bg-white border border-dashed border-slate-200 p-10 rounded-3xl text-center">
+                <p className="text-slate-400 font-bold uppercase text-xs">Este aluno ainda não possui anotações.</p>
+              </div>
+            ) : filteredNotes.length > 0 ? (
               filteredNotes.map(n => (
                 <div key={n.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
                   {n.tipoSessao && (
@@ -355,14 +527,45 @@ const StudentProfile = ({
           </>
         )}
       </div>
+
+        {/* Prova Paulista em largura total */}
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 w-full">
+          <div className="flex items-center justify-between mb-4">
+            <button
+              onClick={() => setShowProvaPaulista(!showProvaPaulista)}
+              className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+              title={showProvaPaulista ? "Recolher" : "Expandir"}
+            >
+              <TrendingUp className="w-4 h-4" /> Prova Paulista
+            </button>
+            <button
+              onClick={() => setShowProvaPaulista(!showProvaPaulista)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
+              title={showProvaPaulista ? "Recolher" : "Expandir"}
+            >
+              {showProvaPaulista ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {showProvaPaulista && (
+            <>
+              <div className="text-4xl font-black text-blue-600 mb-1">{studentProfile.provaPaulista}</div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">Desempenho Geral</p>
+            </>
+          )}
+        </div>
     </div>
 
       {/* ── Evolutivo Numérico: largura total, 2 cards por linha ── */}
       <div>
         <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-            <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico
-          </h3>
+          <button
+            onClick={() => setShowEvolutivo(!showEvolutivo)}
+            className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+            title={showEvolutivo ? "Recolher" : "Expandir"}
+          >
+            <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico (Conceito Bimestral)
+          </button>
           <button
             onClick={() => setShowEvolutivo(!showEvolutivo)}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
@@ -385,9 +588,13 @@ const StudentProfile = ({
       {/* ── Análise Gráfica ────────────────────────────────────── */}
       <div>
         <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-6">
-          <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+          <button
+            onClick={() => setShowGrafico(!showGrafico)}
+            className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+            title={showGrafico ? "Recolher" : "Expandir"}
+          >
             <BarChart2 className="w-6 h-6 text-blue-600" /> Análise Gráfica e Comparativa
-          </h3>
+          </button>
           <button
             onClick={() => setShowGrafico(!showGrafico)}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"

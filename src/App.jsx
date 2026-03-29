@@ -43,12 +43,12 @@ const App = () => {
   const [selectedValue,         setSelectedValue]         = useState('Todos');
   const [searchTerm,            setSearchTerm]            = useState('');
   const [selectedStudent,       setSelectedStudent]       = useState(null);
-  const [selectedSessionFilter, setSelectedSessionFilter] = useState('Todas');
+  const [selectedSessionFilters, setSelectedSessionFilters] = useState([]);
   const [sortConfig,            setSortConfig]            = useState({ key: 'turma', direction: 'asc' });
   const [showStickyName,        setShowStickyName]        = useState(false);
 
   // Resetar filtro de sessão ao trocar de aluno
-  useEffect(() => { setSelectedSessionFilter('Todas'); }, [selectedStudent]);
+  useEffect(() => { setSelectedSessionFilters([]); }, [selectedStudent]);
 
   // Controle de nome flutuante no header ao rolar
   useEffect(() => {
@@ -155,8 +155,10 @@ const App = () => {
   const sortedData = useMemo(() => {
     return [...filteredData].sort((a, b) => {
       if (sortConfig.key === 'alunos') {
-        const diff = a.tutorados.length - b.tutorados.length;
-        if (diff !== 0) return sortConfig.direction === 'asc' ? diff : -diff;
+        const aStudents = [...a.tutorados].sort((x, y) => x.localeCompare(y, 'pt-BR')).join(' | ').toLowerCase();
+        const bStudents = [...b.tutorados].sort((x, y) => x.localeCompare(y, 'pt-BR')).join(' | ').toLowerCase();
+        if (aStudents < bStudents) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aStudents > bStudents) return sortConfig.direction === 'asc' ? 1 : -1;
       } else {
         const aVal = String(a[sortConfig.key] || '').toLowerCase();
         const bVal = String(b[sortConfig.key] || '').toLowerCase();
@@ -189,15 +191,29 @@ const App = () => {
 
   const studentSessions = useMemo(() => {
     if (!studentProfile) return [];
-    const sessions = new Set(studentProfile.notes.map(n => n.tipoSessao).filter(Boolean));
-    return ['Todas', ...Array.from(sessions)];
+    const sessions = new Set(
+      studentProfile.notes.map(n => (n.tipoSessao && String(n.tipoSessao).trim() ? n.tipoSessao : 'Sem tipo'))
+    );
+    return Array.from(sessions).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [studentProfile]);
+
+  const studentSessionCounts = useMemo(() => {
+    if (!studentProfile) return {};
+    return studentProfile.notes.reduce((acc, note) => {
+      const tipo = note.tipoSessao && String(note.tipoSessao).trim() ? note.tipoSessao : 'Sem tipo';
+      acc[tipo] = (acc[tipo] || 0) + 1;
+      return acc;
+    }, {});
   }, [studentProfile]);
 
   const filteredNotes = useMemo(() => {
     if (!studentProfile) return [];
-    if (selectedSessionFilter === 'Todas') return studentProfile.notes;
-    return studentProfile.notes.filter(n => n.tipoSessao === selectedSessionFilter);
-  }, [studentProfile, selectedSessionFilter]);
+    if (selectedSessionFilters.length === 0) return studentProfile.notes;
+    return studentProfile.notes.filter(n => {
+      const tipo = n.tipoSessao && String(n.tipoSessao).trim() ? n.tipoSessao : 'Sem tipo';
+      return selectedSessionFilters.includes(tipo);
+    });
+  }, [studentProfile, selectedSessionFilters]);
 
   // ── Renderização ───────────────────────────────────────────
   return (
@@ -252,8 +268,9 @@ const App = () => {
                 studentProfile={studentProfile}
                 filteredNotes={filteredNotes}
                 studentSessions={studentSessions}
-                selectedSessionFilter={selectedSessionFilter}
-                setSelectedSessionFilter={setSelectedSessionFilter}
+                studentSessionCounts={studentSessionCounts}
+                selectedSessionFilters={selectedSessionFilters}
+                setSelectedSessionFilters={setSelectedSessionFilters}
                 prevStudent={prevStudent}
                 nextStudent={nextStudent}
                 setSelectedStudent={setSelectedStudent}

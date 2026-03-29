@@ -135,7 +135,15 @@ const Dashboard = ({
                     <td className="px-6 py-4 text-sm text-slate-500 font-bold whitespace-nowrap">{item.tutor}</td>
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-2">
-                        {[...item.tutorados].sort((a, b) => a.localeCompare(b, 'pt-BR')).map((nome, i) => {
+                        {[...item.tutorados]
+                          .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+                          .sort((a, b) => {
+                            if (sortConfig.key !== 'alunos') return 0;
+                            return sortConfig.direction === 'asc'
+                              ? a.localeCompare(b, 'pt-BR')
+                              : b.localeCompare(a, 'pt-BR');
+                          })
+                          .map((nome, i) => {
                           const studentInfo = allStudents.find(s => s.nome === nome);
                           return (
                             <button
