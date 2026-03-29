@@ -110,6 +110,23 @@ const getFaltaStyle = (faltas) => {
   return 'text-red-700 bg-red-50 font-black';
 };
 
+// Mapeia nomes longos da planilha para rótulos amigáveis
+const DISPLAY_ALIASES = [
+  { match: /ORIENTA[CÇ][AÃ]O.*LINGU/i,  display: 'OE: Língua Portuguesa' },
+  { match: /ORIENTA[CÇ][AÃ]O.*MATEM/i,  display: 'OE: Matemática'       },
+  { match: /ORIENTA[CÇ][AÃ]O.*PORT/i,   display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–-]*LINGU/i,          display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–-]*PORT/i,           display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–-]*MAT/i,            display: 'OE: Matemática'       },
+];
+
+const displayDisciplina = (nome) => {
+  for (const alias of DISPLAY_ALIASES) {
+    if (alias.match.test(nome)) return alias.display;
+  }
+  return nome;
+};
+
 // ── Evolutivo Numérico: grid 2 colunas, tabela dentro de cada card ──
 const EvolutivoNumerico = ({ historicoConceitos }) => {
   // Coleta todas as disciplinas únicas
@@ -156,7 +173,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                 </th>
                 {disciplinas.map(d => (
                   <th key={d} className="px-2 py-2.5 font-black text-slate-600 text-center border-b border-r border-slate-200 last:border-r-0 leading-tight">
-                    <span className="whitespace-normal break-words">{d}</span>
+                    <span title={d} className="whitespace-normal break-words">{displayDisciplina(d)}</span>
                   </th>
                 ))}
                 {temFaltas && (
