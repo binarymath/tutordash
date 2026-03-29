@@ -32,12 +32,12 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-// ── Sub-componente: Evolutivo Numérico por áreas ─────────────
+// ── Configuração das áreas do conhecimento ───────────────────
 const AREAS = [
-  { key: 'exatas',    label: '🔢 Exatas',              keywords: ['MATEM', 'FISICA', 'QUIMIC', 'GEOMET'],                                     headerBg: 'bg-blue-600',   headerText: 'text-white' },
-  { key: 'linguagens',label: '📖 Linguagens',           keywords: ['PORTUG', 'LINGUA', 'INGLES', 'ARTE', 'ARTES', 'EDUC.FIS', 'EDUCACAO FISICA','REDACAO'], headerBg: 'bg-violet-600', headerText: 'text-white' },
-  { key: 'humanas',   label: '🌍 Humanas',              keywords: ['HISTOR', 'GEOGR', 'FILOSO', 'SOCIOLO', 'ENSINO RELIG'],                     headerBg: 'bg-amber-500',  headerText: 'text-white' },
-  { key: 'ciencias',  label: '🔬 Ciências da Natureza', keywords: ['CIENC', 'BIOLOG', 'BIO'],                                                  headerBg: 'bg-emerald-600',headerText: 'text-white' },
+  { key: 'exatas',     label: '🔢 Exatas',              keywords: ['MATEM', 'FISICA', 'QUIMIC', 'GEOMET'],                                                  headerBg: 'bg-blue-600',    headerText: 'text-white', accent: 'blue'    },
+  { key: 'linguagens', label: '📖 Linguagens',           keywords: ['PORTUG', 'LINGUA', 'INGLES', 'ARTE', 'ARTES', 'EDUC.FIS', 'EDUCACAO FISICA', 'REDACAO'], headerBg: 'bg-violet-600',  headerText: 'text-white', accent: 'violet'  },
+  { key: 'humanas',    label: '🌍 Humanas',              keywords: ['HISTOR', 'GEOGR', 'FILOSO', 'SOCIOLO', 'ENSINO RELIG'],                                   headerBg: 'bg-amber-500',   headerText: 'text-white', accent: 'amber'   },
+  { key: 'ciencias',   label: '🔬 Ciências da Natureza', keywords: ['CIENC', 'BIOLOG', 'BIO'],                                                                headerBg: 'bg-emerald-600', headerText: 'text-white', accent: 'emerald' },
 ];
 
 const classifyDisciplina = (disciplina) => {
@@ -48,22 +48,29 @@ const classifyDisciplina = (disciplina) => {
   return 'outras';
 };
 
-const getNotaColor = (nota) => {
-  if (!nota || nota === '-') return 'text-slate-300 bg-slate-50';
+const getNotaStyle = (nota) => {
+  if (!nota || nota === '-') return 'text-slate-300 bg-slate-50 border border-slate-100';
   const n = parseFloat(nota.toString().replace(',', '.'));
   if (!isNaN(n)) {
-    if (n >= 7) return 'text-emerald-700 bg-emerald-50 border border-emerald-100';
-    if (n >= 5) return 'text-amber-700 bg-amber-50 border border-amber-100';
-    return 'text-red-700 bg-red-50 border border-red-100';
+    if (n >= 7) return 'text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-sm';
+    if (n >= 5) return 'text-amber-700 bg-amber-50 border border-amber-200 shadow-sm';
+    return 'text-red-700 bg-red-50 border border-red-200 shadow-sm';
   }
   const up = nota.toUpperCase();
-  if (up === 'MB') return 'text-emerald-700 bg-emerald-50 border border-emerald-100';
-  if (up === 'B')  return 'text-blue-700 bg-blue-50 border border-blue-100';
-  if (up === 'R')  return 'text-amber-700 bg-amber-50 border border-amber-100';
-  if (up === 'I')  return 'text-red-700 bg-red-50 border border-red-100';
-  return 'text-slate-600 bg-slate-50';
+  if (up === 'MB') return 'text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-sm';
+  if (up === 'B')  return 'text-blue-700 bg-blue-50 border border-blue-200 shadow-sm';
+  if (up === 'R')  return 'text-amber-700 bg-amber-50 border border-amber-200 shadow-sm';
+  if (up === 'I')  return 'text-red-700 bg-red-50 border border-red-200 shadow-sm';
+  return 'text-slate-600 bg-slate-50 border border-slate-100';
 };
 
+const abrevBim = (bim) =>
+  String(bim)
+    .replace('1º Bimestre', '1ºBi').replace('2º Bimestre', '2ºBi')
+    .replace('3º Bimestre', '3ºBi').replace('4º Bimestre', '4ºBi')
+    .replace('Bimestre', 'Bi');
+
+// ── Evolutivo Numérico em cards ──────────────────────────────
 const EvolutivoNumerico = ({ historicoConceitos }) => {
   const allDisciplinasSet = new Set();
   historicoConceitos.forEach(bim => Object.keys(bim.notas).forEach(d => allDisciplinasSet.add(d)));
@@ -74,57 +81,87 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
   areaMap['outras'] = [];
   allDisciplinas.forEach(d => areaMap[classifyDisciplina(d)].push(d));
 
-  const renderTable = (disciplinas, area, bimestres) => (
-    <div key={area?.key || 'outras'}>
-      <div className={`${area ? area.headerBg : 'bg-slate-600'} ${area ? area.headerText : 'text-white'} px-4 py-2 rounded-t-xl`}>
-        <span className="text-xs font-black uppercase tracking-widest">{area ? area.label : '📋 Outras Disciplinas'}</span>
-      </div>
-      <div className="overflow-x-auto rounded-b-xl border border-slate-200">
-        <table className="w-full text-[10px] border-collapse">
-          <thead>
-            <tr className="bg-slate-100">
-              <th className="text-left px-3 py-2 font-black text-slate-500 uppercase w-24 border-r border-slate-200">Bimestre</th>
-              {disciplinas.map(d => (
-                <th key={d} className="px-2 py-2 font-black text-slate-600 text-center border-r border-slate-200 last:border-r-0">
-                  <span title={d} className="block truncate max-w-[80px]">{d}</span>
-                </th>
-              ))}
-              <th className="px-2 py-2 font-black text-slate-500 text-center w-16">Faltas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bimestres.map((bim, bi) => (
-              <tr key={bi} className={`border-t border-slate-100 ${bi % 2 === 0 ? 'bg-white' : 'bg-slate-50'} hover:bg-slate-100 transition-colors`}>
-                <td className="px-3 py-2 font-black text-blue-600 uppercase border-r border-slate-200">{bim.bimestre}</td>
-                {disciplinas.map(d => {
-                  const nota = bim.notas[d] || '-';
+  const temFaltasReais = historicoConceitos.some(b => b.faltas && b.faltas !== '-');
+
+  const renderAreaCard = (disciplinas, area) => {
+    const headerBg   = area?.headerBg   ?? 'bg-slate-600';
+    const headerText = area?.headerText ?? 'text-white';
+    const label      = area?.label      ?? '📋 Outras Disciplinas';
+
+    return (
+      <div key={area?.key ?? 'outras'} className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
+        {/* Header colorido da área */}
+        <div className={`${headerBg} ${headerText} px-4 py-2.5 flex items-center justify-between`}>
+          <span className="text-xs font-black uppercase tracking-widest">{label}</span>
+          <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
+            {disciplinas.length} disc.
+          </span>
+        </div>
+
+        {/* Uma linha por disciplina */}
+        <div className="divide-y divide-slate-50">
+          {disciplinas.map(disciplina => (
+            <div key={disciplina} className="px-4 py-3 hover:bg-slate-50/70 transition-colors">
+              {/* Nome */}
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{disciplina}</p>
+
+              {/* Linha de badges */}
+              <div className="flex items-end gap-2 flex-wrap">
+                {/* Notas por bimestre */}
+                {historicoConceitos.map((bim, bi) => {
+                  const nota = bim.notas[disciplina] || '-';
                   return (
-                    <td key={d} className="px-2 py-2 text-center border-r border-slate-100 last:border-r-0">
-                      <span className={`inline-block px-2 py-0.5 rounded-lg font-black ${getNotaColor(nota)}`}>{nota}</span>
-                    </td>
+                    <div key={bi} className="flex flex-col items-center gap-1">
+                      <span className="text-[7px] font-bold text-slate-400 uppercase leading-none whitespace-nowrap">
+                        {abrevBim(bim.bimestre)}
+                      </span>
+                      <span className={`inline-flex items-center justify-center w-10 h-8 rounded-xl text-[11px] font-black ${getNotaStyle(nota)}`}>
+                        {nota}
+                      </span>
+                    </div>
                   );
                 })}
-                <td className="px-2 py-2 text-center">
-                  {bim.faltas && bim.faltas !== '-' ? (
-                    <span className={`inline-block px-2 py-0.5 rounded-full font-black text-[9px] ${bim.faltas === '0' || bim.faltas === '0%' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                      {bim.faltas}
-                    </span>
-                  ) : <span className="text-slate-300">-</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+                {/* Faltas (uma coluna separada) */}
+                {temFaltasReais && (
+                  <div className="flex flex-col items-center gap-1 ml-1 pl-2.5 border-l-2 border-slate-100">
+                    <span className="text-[7px] font-bold text-slate-400 uppercase leading-none whitespace-nowrap">Faltas</span>
+                    <div className="flex gap-1">
+                      {historicoConceitos.map((bim, bi) => (
+                        bim.faltas && bim.faltas !== '-' ? (
+                          <span
+                            key={bi}
+                            className={`inline-flex items-center justify-center w-10 h-8 rounded-xl text-[10px] font-black ${
+                              bim.faltas === '0' || bim.faltas === '0%'
+                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                : 'bg-red-50 text-red-600 border border-red-200'
+                            }`}
+                          >
+                            {bim.faltas}
+                          </span>
+                        ) : (
+                          <span key={bi} className="inline-flex items-center justify-center w-10 h-8 rounded-xl text-[10px] font-black text-slate-200 bg-slate-50 border border-slate-100">
+                            -
+                          </span>
+                        )
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
-    <div className="space-y-6 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
+    <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1 custom-scrollbar">
       {AREAS.filter(area => areaMap[area.key]?.length > 0).map(area =>
-        renderTable(areaMap[area.key], area, historicoConceitos)
+        renderAreaCard(areaMap[area.key], area)
       )}
-      {areaMap['outras']?.length > 0 && renderTable(areaMap['outras'], null, historicoConceitos)}
+      {areaMap['outras']?.length > 0 && renderAreaCard(areaMap['outras'], null)}
     </div>
   );
 };
@@ -181,6 +218,7 @@ const StudentProfile = ({
       {/* Coluna esquerda: PP + Evolutivo | Coluna direita: Anotações */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="md:col-span-1 space-y-6">
+
           {/* Prova Paulista */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
