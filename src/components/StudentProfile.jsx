@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, UserCheck, TrendingUp,
   LineChart as LineChartIcon, History, BarChart2,
-  User, Calendar, ChevronDown, ChevronUp
+  User, Calendar, ChevronDown, ChevronUp, Download
 } from 'lucide-react';
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -124,6 +124,133 @@ const getFaltaMetrics = (value) => {
   const numeric = parseNumberFromText(text);
   if (numeric === null) return { isValid: false, isPercent: false, value: null };
   return { isValid: true, isPercent: text.includes('%'), value: numeric };
+};
+
+const toSafeFileName = (text) =>
+  String(text || 'aluno')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9_-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toLowerCase();
+
+const escapeHtml = (text) =>
+  String(text ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const buildRadarSvgDataUri = ({ title, labels, datasets, maxValue = 10 }) => {
+  if (!labels || labels.length === 0) return null;
+
+  const width = 900;
+  const height = 520;
+  const cx = 280;
+  const cy = 280;
+  const radius = 180;
+  const levels = 5;
+
+  const pointByIndex = (index, valueRatio) => {
+    const angle = (-Math.PI / 2) + (index * 2 * Math.PI) / labels.length;
+    const r = radius * valueRatio;
+    return {
+      x: cx + Math.cos(angle) * r,
+      y: cy + Math.sin(angle) * r,
+    };
+  };
+
+  const gridPolygons = Array.from({ length: levels }).map((_, levelIdx) => {
+    const ratio = (levelIdx + 1) / levels;
+    const points = labels.map((_, idx) => {
+      const p = pointByIndex(idx, ratio);
+      return `${p.x},${p.y}`;
+    }).join(' ');
+    return `<polygon points="${points}" fill="none" stroke="#dbeafe" stroke-width="1" />`;
+  }).join('');
+
+  const axes = labels.map((_, idx) => {
+    const p = pointByIndex(idx, 1);
+    return `<line x1="${cx}" y1="${cy}" x2="${p.x}" y2="${p.y}" stroke="#cbd5e1" stroke-width="1" />`;
+  }).join('');
+
+  const labelNodes = labels.map((label, idx) => {
+    const p = pointByIndex(idx, 1.13);
+    const short = String(label).length > 20 ? `${String(label).slice(0, 18)}...` : String(label);
+    return `<text x="${p.x}" y="${p.y}" fill="#334155" font-size="12" font-weight="700" text-anchor="middle" dominant-baseline="middle">${escapeHtml(short)}</text>`;
+  }).join('');
+
+  const dataPolygons = datasets.map((dataset) => {
+    const points = labels.map((_, idx) => {
+      const raw = Number(dataset.values[idx] ?? 0);
+      const clamped = Math.max(0, Math.min(maxValue, raw));
+      const p = pointByIndex(idx, clamped / maxValue);
+      return `${p.x},${p.y}`;
+    }).join(' ');
+
+    const pointDots = labels.map((_, idx) => {
+      const raw = Number(dataset.values[idx] ?? 0);
+      const clamped = Math.max(0, Math.min(maxValue, raw));
+      const p = pointByIndex(idx, clamped / maxValue);
+      return `<circle cx="${p.x}" cy="${p.y}" r="3" fill="${dataset.color}" />`;
+    }).join('');
+
+    return `
+      <polygon points="${points}" fill="${dataset.color}" fill-opacity="0.18" stroke="${dataset.color}" stroke-width="2" />
+      ${pointDots}
+    `;
+  }).join('');
+
+  const legend = datasets.map((dataset, idx) => `
+    <g transform="translate(560, ${95 + idx * 28})">
+      <rect x="0" y="-10" width="14" height="14" fill="${dataset.color}" rx="3" />
+      <text x="22" y="2" fill="#1e293b" font-size="13" font-weight="700">${escapeHtml(dataset.name)}</text>
+    </g>
+  `).join('');
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      <text x="40" y="48" fill="#1e3a8a" font-size="22" font-weight="800">${escapeHtml(title)}</text>
+      <text x="40" y="70" fill="#64748b" font-size="12">Escala de 0 a ${maxValue}</text>
+      <g>
+        ${gridPolygons}
+        ${axes}
+        ${dataPolygons}
+        ${labelNodes}
+      </g>
+      ${legend}
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+};
+
+const svgDataUriToPngBytes = async (svgDataUri, width = 1200, height = 700) => {
+  if (!svgDataUri) return null;
+  const image = new Image();
+  const loaded = new Promise((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = reject;
+  });
+  image.src = svgDataUri;
+  await loaded;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) return null;
+  const buffer = await blob.arrayBuffer();
+  return new Uint8Array(buffer);
 };
 
 // ── Evolutivo Numérico: grid 2 colunas, tabela dentro de cada card ──
@@ -358,6 +485,416 @@ const StudentProfile = ({
   const [showProvaPaulista, setShowProvaPaulista] = useState(false);
   const [showEvolutivo, setShowEvolutivo] = useState(false);
   const [showGrafico, setShowGrafico] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const bimestreRadarLabel = studentProfile?.ultimoBimNome && String(studentProfile.ultimoBimNome).trim() !== 'Sem Dados'
+    ? studentProfile.ultimoBimNome
+    : 'Bimestre atual';
+
+  const buildReportData = () => {
+    const historico = studentProfile?.historicoConceitos || [];
+    const disciplinas = Array.from(
+      new Set(historico.flatMap((bim) => Object.keys(bim.notas || {})))
+    );
+
+    const notasRows = historico.map((bim) => ({
+      bimestre: bim.bimestre || '-',
+      faltas: bim.faltas || '-',
+      notas: disciplinas.map((disciplina) => bim.notas?.[disciplina] || '-'),
+    }));
+
+    const notasComTipo = (studentProfile?.notes || []).map((note) => ({
+      data: note.displayDate || '-',
+      tipo: note.tipoSessao || 'Sem tipo',
+      professor: note.teacher || '-',
+      anotacao: note.note || 'Registo sem descrição.',
+    }));
+
+    const mapaoRows = (chartDataMapao || []).map((item) => ({
+      disciplina: item.fullSubject || item.subject || '-',
+      aluno: item.Aluno ?? '-',
+      turma: item.Turma ?? '-',
+    }));
+
+    const provaRows = (chartDataProva || []).map((item) => ({
+      disciplina: item.fullSubject || item.subject || '-',
+      desempenho: item.Desempenho ?? '-',
+    }));
+
+    const radarMapaoUri = buildRadarSvgDataUri({
+      title: 'Radar de Equilibrio (Aluno vs Media da Turma)',
+      labels: mapaoRows.map((row) => row.disciplina),
+      datasets: [
+        {
+          name: 'Aluno',
+          color: '#2563eb',
+          values: mapaoRows.map((row) => Number(row.aluno) || 0),
+        },
+        {
+          name: 'Media da Turma',
+          color: '#64748b',
+          values: mapaoRows.map((row) => Number(row.turma) || 0),
+        },
+      ],
+    });
+
+    const radarProvaUri = buildRadarSvgDataUri({
+      title: 'Radar de Desempenho (Prova Paulista)',
+      labels: provaRows.map((row) => row.disciplina),
+      datasets: [
+        {
+          name: 'Desempenho',
+          color: '#0ea5e9',
+          values: provaRows.map((row) => Number(row.desempenho) || 0),
+        },
+      ],
+    });
+
+    return {
+      historico,
+      disciplinas,
+      notasRows,
+      notasComTipo,
+      mapaoRows,
+      provaRows,
+      radarMapaoUri,
+      radarProvaUri,
+    };
+  };
+
+  const handleExportPdf = async () => {
+    if (!studentProfile) return;
+
+    let container = null;
+    try {
+      setIsExporting(true);
+      const { default: html2pdf } = await import('html2pdf.js');
+      const { notasRows, disciplinas, notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
+      const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
+
+      const notesHtml = notasComTipo.length > 0
+        ? notasComTipo.map((note) => `
+          <tr>
+            <td>${escapeHtml(note.data)}</td>
+            <td>${escapeHtml(note.tipo)}</td>
+            <td>${escapeHtml(note.professor)}</td>
+            <td>${escapeHtml(note.anotacao)}</td>
+          </tr>
+        `).join('')
+        : `<tr><td colspan="4">Sem anotações registradas.</td></tr>`;
+
+      const mapaoHtml = mapaoRows.length > 0
+        ? mapaoRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.disciplina)}</td>
+            <td>${escapeHtml(row.aluno)}</td>
+            <td>${escapeHtml(row.turma)}</td>
+          </tr>
+        `).join('')
+        : `<tr><td colspan="3">Sem dados para o Radar de Equilíbrio.</td></tr>`;
+
+      const provaHtml = provaRows.length > 0
+        ? provaRows.map((row) => `
+          <tr>
+            <td>${escapeHtml(row.disciplina)}</td>
+            <td>${escapeHtml(row.desempenho)}</td>
+          </tr>
+        `).join('')
+        : `<tr><td colspan="2">Sem dados para o Radar de Desempenho (Prova Paulista).</td></tr>`;
+
+      container = document.createElement('div');
+      container.innerHTML = `
+        <div style="font-family: Arial, sans-serif; color: #0f172a; padding: 0 12px; max-width: 190mm; margin: 0 auto; box-sizing: border-box;">
+          <section style="height: 260mm; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; box-sizing: border-box;">
+            <p style="margin:0; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#1e3a8a; font-weight:bold;">TutorDash • Relatório Oficial</p>
+            <h1 style="margin:16px 0 8px 0; font-size:32px; line-height:1.2; color:#0f172a;">Relatório Individual do Aluno</h1>
+            <p style="margin:0; font-size:15px; color:#334155;"><strong>${escapeHtml(studentProfile.nome)}</strong></p>
+            <p style="margin:10px 0 0; font-size:13px; color:#475569;">Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
+            <p style="margin:10px 0 0; font-size:12px; color:#64748b;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+          </section>
+
+          <div style="page-break-before: always;"></div>
+
+          <header style="border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin: 8px 0 16px;">
+            <h2 style="margin:0; font-size:16px; color:#1e293b;">Relatório Individual do Aluno</h2>
+            <p style="margin:4px 0 0; font-size:11px; color:#64748b;">Aluno: ${escapeHtml(studentProfile.nome)} • Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
+          </header>
+
+          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Dados Gerais</h3>
+          <ul style="margin: 0 0 12px 18px; padding: 0; font-size: 12px;">
+            <li><strong>Aluno:</strong> ${escapeHtml(studentProfile.nome)}</li>
+            <li><strong>Turma:</strong> ${escapeHtml(studentProfile.turma)}</li>
+            <li><strong>Tutor:</strong> ${escapeHtml(studentProfile.tutor)}</li>
+            <li><strong>Prova Paulista:</strong> ${escapeHtml(studentProfile.provaPaulista || 'S/D')}</li>
+            <li><strong>Total de anotações:</strong> ${notasComTipo.length}</li>
+          </ul>
+
+          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Anotações e Sessões</h3>
+          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:16px; box-sizing:border-box; page-break-inside:avoid;">
+          <table style="width:100%; border-collapse: collapse; font-size: 11px;">
+            <thead>
+              <tr>
+                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Data</th>
+                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Tipo</th>
+                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Quem Registrou</th>
+                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Anotação</th>
+              </tr>
+            </thead>
+            <tbody>${notesHtml}</tbody>
+          </table>
+          </div>
+
+          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Análise Gráfica e Comparativa</h3>
+          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:12px; box-sizing:border-box; page-break-inside:avoid;">
+            <p style="margin:0 0 8px 0; font-size:11px; font-weight:bold; color:#334155;">Radar de Equilíbrio (${escapeHtml(bimestreRadarLabel)})</p>
+            ${radarMapaoUri ? `<img src="${radarMapaoUri}" alt="Radar de Equilibrio" style="width:100%; max-width:100%; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px;" />` : ''}
+            <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+              <thead>
+                <tr>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Disciplina</th>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Aluno</th>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Média Turma</th>
+                </tr>
+              </thead>
+              <tbody>${mapaoHtml}</tbody>
+            </table>
+          </div>
+
+          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:12px; box-sizing:border-box; page-break-inside:avoid;">
+            <p style="margin:0 0 8px 0; font-size:11px; font-weight:bold; color:#334155;">Radar de Desempenho (Prova Paulista)</p>
+            ${radarProvaUri ? `<img src="${radarProvaUri}" alt="Radar de Desempenho" style="width:100%; max-width:100%; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px;" />` : ''}
+            <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+              <thead>
+                <tr>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Disciplina</th>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Desempenho</th>
+                </tr>
+              </thead>
+              <tbody>${provaHtml}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      container.querySelectorAll('td').forEach((cell) => {
+        cell.style.border = '1px solid #cbd5e1';
+        cell.style.padding = '6px';
+        cell.style.verticalAlign = 'top';
+      });
+      container.querySelectorAll('th').forEach((cell) => {
+        cell.style.border = '1px solid #cbd5e1';
+        cell.style.padding = '6px';
+      });
+
+      document.body.appendChild(container);
+      const worker = html2pdf()
+        .set({
+          margin: 8,
+          filename: `${fileBase}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2 },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'] },
+        })
+        .from(container)
+        .toPdf();
+
+      const pdf = await worker.get('pdf');
+      const totalPages = pdf.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i);
+        pdf.setFontSize(9);
+        pdf.setTextColor(100);
+        pdf.text(
+          `Página ${i} de ${totalPages}`,
+          pdf.internal.pageSize.getWidth() / 2,
+          pdf.internal.pageSize.getHeight() - 6,
+          { align: 'center' }
+        );
+      }
+
+      await worker.save();
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+    } finally {
+      if (container && container.parentNode) container.parentNode.removeChild(container);
+      setIsExporting(false);
+    }
+  };
+
+  const handleExportDocx = async () => {
+    if (!studentProfile) return;
+
+    try {
+      setIsExporting(true);
+      const [{ saveAs }, docxModule] = await Promise.all([
+        import('file-saver'),
+        import('docx'),
+      ]);
+      const {
+        Document,
+        Packer,
+        Paragraph,
+        Table,
+        TableCell,
+        TableRow,
+        TextRun,
+        HeadingLevel,
+        ImageRun,
+        WidthType,
+      } = docxModule;
+      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
+      const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
+
+      const [radarMapaoPng, radarProvaPng] = await Promise.all([
+        svgDataUriToPngBytes(radarMapaoUri),
+        svgDataUriToPngBytes(radarProvaUri),
+      ]);
+
+      const infoItems = [
+        `Aluno: ${studentProfile.nome}`,
+        `Turma: ${studentProfile.turma}`,
+        `Tutor: ${studentProfile.tutor}`,
+        `Prova Paulista: ${studentProfile.provaPaulista || 'S/D'}`,
+        `Total de anotações: ${notasComTipo.length}`,
+      ];
+
+      const notesTableRows = [
+        new TableRow({
+          children: ['Data', 'Tipo', 'Quem Registrou', 'Anotação'].map((title) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
+          ),
+        }),
+        ...(notasComTipo.length > 0
+          ? notasComTipo.map((note) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(note.data)] }),
+                  new TableCell({ children: [new Paragraph(note.tipo)] }),
+                  new TableCell({ children: [new Paragraph(note.professor)] }),
+                  new TableCell({ children: [new Paragraph(note.anotacao)] }),
+                ],
+              })
+            )
+          : [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Sem anotações registradas.')], columnSpan: 4 }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                ],
+              }),
+            ]),
+      ];
+
+      const mapaoTableRows = [
+        new TableRow({
+          children: ['Disciplina', 'Aluno', 'Média Turma'].map((title) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
+          ),
+        }),
+        ...(mapaoRows.length > 0
+          ? mapaoRows.map((row) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(String(row.disciplina))] }),
+                  new TableCell({ children: [new Paragraph(String(row.aluno))] }),
+                  new TableCell({ children: [new Paragraph(String(row.turma))] }),
+                ],
+              })
+            )
+          : [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Sem dados para o Radar de Equilíbrio.')], columnSpan: 3 }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                ],
+              }),
+            ]),
+      ];
+
+      const provaTableRows = [
+        new TableRow({
+          children: ['Disciplina', 'Desempenho'].map((title) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
+          ),
+        }),
+        ...(provaRows.length > 0
+          ? provaRows.map((row) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(String(row.disciplina))] }),
+                  new TableCell({ children: [new Paragraph(String(row.desempenho))] }),
+                ],
+              })
+            )
+          : [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Sem dados para o Radar da Prova Paulista.')], columnSpan: 2 }),
+                  new TableCell({ children: [new Paragraph('')] }),
+                ],
+              }),
+            ]),
+      ];
+
+      const doc = new Document({
+        sections: [
+          {
+            children: [
+              new Paragraph({ text: 'Relatório Individual do Aluno', heading: HeadingLevel.HEADING_1 }),
+              new Paragraph({ text: `Gerado em ${new Date().toLocaleString('pt-BR')}` }),
+              new Paragraph({ text: '' }),
+              new Paragraph({ text: 'Dados Gerais', heading: HeadingLevel.HEADING_2 }),
+              ...infoItems.map((line) => new Paragraph({ text: line, bullet: { level: 0 } })),
+              new Paragraph({ text: '' }),
+              new Paragraph({ text: 'Anotações e Sessões', heading: HeadingLevel.HEADING_2 }),
+              new Table({ rows: notesTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+              new Paragraph({ text: '' }),
+              new Paragraph({ text: 'Análise Gráfica e Comparativa', heading: HeadingLevel.HEADING_2 }),
+              new Paragraph({ text: `Radar de Equilíbrio (${bimestreRadarLabel})` }),
+              ...(radarMapaoPng
+                ? [
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: radarMapaoPng,
+                          transformation: { width: 520, height: 300 },
+                        }),
+                      ],
+                    }),
+                  ]
+                : []),
+              new Table({ rows: mapaoTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+              new Paragraph({ text: '' }),
+              new Paragraph({ text: 'Radar de Desempenho (Prova Paulista)' }),
+              ...(radarProvaPng
+                ? [
+                    new Paragraph({
+                      children: [
+                        new ImageRun({
+                          data: radarProvaPng,
+                          transformation: { width: 520, height: 300 },
+                        }),
+                      ],
+                    }),
+                  ]
+                : []),
+              new Table({ rows: provaTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+            ],
+          },
+        ],
+      });
+
+      const blob = await Packer.toBlob(doc);
+      saveAs(blob, `${fileBase}.docx`);
+    } catch (error) {
+      console.error('Erro ao exportar DOCX:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   if (!studentProfile) return null;
 
@@ -393,9 +930,25 @@ const StudentProfile = ({
       {/* Cabeçalho do aluno */}
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
         <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
-        <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase">
+        <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase flex-wrap">
           <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
           <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
+        </div>
+        <div className="flex gap-2 mt-4 flex-wrap">
+          <button
+            onClick={handleExportPdf}
+            disabled={isExporting}
+            className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-colors ${isExporting ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300'}`}
+          >
+            <Download className="w-4 h-4" /> Baixar PDF
+          </button>
+          <button
+            onClick={handleExportDocx}
+            disabled={isExporting}
+            className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-colors ${isExporting ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300'}`}
+          >
+            <Download className="w-4 h-4" /> Baixar DOCX
+          </button>
         </div>
       </div>
 
@@ -609,7 +1162,7 @@ const StudentProfile = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Radar Mapão */}
           <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
-            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio (Último Bimestre)</h4>
+            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio ({bimestreRadarLabel})</h4>
             {chartDataMapao.length > 0 ? (
               <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -657,7 +1210,7 @@ const StudentProfile = ({
 
         {/* Barras comparativas */}
         <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Comparação Detalhada: Aluno vs Média da Turma (Último Bimestre)</h4>
+          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Comparação Detalhada: Aluno vs Média da Turma ({bimestreRadarLabel})</h4>
           {chartDataMapao.length > 0 ? (
             <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
