@@ -27,6 +27,14 @@ const fetchAndParseCSV = async (url) => {
   return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
 };
 
+const normalizeHeader = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+
 export const useAppData = (config, setShowSettings) => {
   const [data, setData]               = useState([]);
   const [annotations, setAnnotations] = useState([]);
@@ -186,34 +194,60 @@ export const useAppData = (config, setShowSettings) => {
             if (headerRowIdx !== -1) {
               const headers  = jsonData[headerRowIdx];
               const subjects = [];
-              let faltasIdx  = -1;
+              let tfIdx = -1;
+              let freqIdx = -1;
 
               headers.forEach((h, idx) => {
                 if (typeof h === 'string') {
-                  const upperH = h.toUpperCase().trim();
+                  const upperH = normalizeHeader(h);
                   if (h.includes('\n')) {
                     const subjectName = h.split('\n')[0].trim();
                     if (!subjectName.toUpperCase().includes('TOTAL')) {
                       subjects.push({ index: idx, name: subjectName });
                     }
-                  } else if (upperH.includes('FALTA') || upperH.includes('AUSÊN') || upperH.includes('AUSEN') || upperH === '% F' || upperH === 'F') {
-                    // Prioriza coluna com nome exato "F" ou "TOTAL FALTAS"; caso já tenha um índice, só substitui se for mais específico
-                    const isExact = (upperH === 'F' || upperH === 'TOTAL FALTAS' || upperH === 'FALTAS');
-                    const isPercent = (upperH === '% F' || upperH.includes('%'));
-                    if (faltasIdx === -1) {
-                      faltasIdx = idx;
-                    } else if (isExact) {
-                      // coluna exata sempre vence
-                      faltasIdx = idx;
-                    } else if (!isPercent) {
-                      // coluna sem % prefere sobre colunas de porcentagem anteriores
-                      faltasIdx = idx;
+                  } else {
+                    const compact = upperH.replace(/\s+/g, '');
+
+                    if (tfIdx === -1 && (
+                      compact === 'TF' ||
+                      compact === 'TOTALTF' ||
+                      compact === 'TOTALFALTAS' ||
+                      compact === 'TOTALFALTA'
+                    )) {
+                      tfIdx = idx;
+                    }
+
+                    if (freqIdx === -1 && (
+                      compact === 'FRE(%)' ||
+                      compact === 'FREQ(%)' ||
+                      compact === 'FRE%' ||
+                      compact === 'FREQ%'
+                    )) {
+                      freqIdx = idx;
                     }
                   }
                 }
               });
-              // Log para diagnóstico (pode ser removido após confirmação)
-              console.debug('[Mapão] faltas col idx:', faltasIdx, '| header:', headers[faltasIdx]);
+
+              // Fallback resiliente para diferentes variações por série/ano.
+              if (tfIdx === -1) {
+                tfIdx = headers.findIndex((h) => {
+                  const upperH = normalizeHeader(h);
+                  const compact = upperH.replace(/\s+/g, '');
+                  return (compact.includes('TF') || compact.includes('TOTALFALTA')) && !compact.includes('AN');
+                });
+              }
+
+              if (freqIdx === -1) {
+                freqIdx = headers.findIndex((h) => {
+                  const upperH = normalizeHeader(h);
+                  const compact = upperH.replace(/\s+/g, '');
+                  return compact.includes('FRE') && compact.includes('%') && !compact.includes('AN');
+                });
+              }
+
+              console.debug('[Mapão] tf idx:', tfIdx, '| header:', headers[tfIdx]);
+              console.debug('[Mapão] fre idx:', freqIdx, '| header:', headers[freqIdx]);
 
               const dadosDaGuia = jsonData.slice(headerRowIdx + 1).map(row => {
                 const alunoNome = row[0];
@@ -222,13 +256,21 @@ export const useAppData = (config, setShowSettings) => {
                 subjects.forEach(sub => {
                   notas[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
                 });
-                const faltas = faltasIdx !== -1 && row[faltasIdx] ? String(row[faltasIdx]).trim() : '-';
+                const tfBimestre = tfIdx !== -1 && row[tfIdx] !== undefined && row[tfIdx] !== null && String(row[tfIdx]).trim() !== ''
+                  ? String(row[tfIdx]).trim()
+                  : '-';
+                const freqBimestre = freqIdx !== -1 && row[freqIdx] !== undefined && row[freqIdx] !== null && String(row[freqIdx]).trim() !== ''
+                  ? String(row[freqIdx]).trim()
+                  : '-';
                 return {
                   normalizedName: normalizeName(alunoNome),
                   bimestre: formatBimestre(bimestreRaw),
                   turmaPlanilha: String(turmaPlanilha).trim(),
                   notas,
-                  faltas
+                  tfBimestre,
+                  freqBimestre,
+                  // Mantido por compatibilidade com telas antigas.
+                  faltas: tfBimestre
                 };
               }).filter(Boolean);
 

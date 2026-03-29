@@ -91,7 +91,7 @@ const App = () => {
           provaPaulistaNotas: provaInfo ? provaInfo.notas : null,
           historicoConceitos: conceitosDoAluno,
           ultimoMat: quickMat, ultimoPort: quickPort,
-          ultimoFaltas: ultimoBimestre?.faltas ?? '-',
+          ultimoFaltas: ultimoBimestre?.tfBimestre ?? ultimoBimestre?.faltas ?? '-',
           ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados'
         });
       });

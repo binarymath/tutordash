@@ -270,21 +270,31 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
   const temFaltas = historicoConceitos.some(b => b.faltas && b.faltas !== '-');
 
   const faltasPorBimestre = historicoConceitos.map((bim) => {
-    const metrics = getFaltaMetrics(bim.faltas);
-    const frequencia = metrics.isValid && metrics.isPercent
-      ? Math.max(0, Math.min(100, 100 - metrics.value))
-      : null;
+    const tfRaw = bim.tfBimestre ?? bim.faltas ?? '-';
+    const freqRaw = bim.freqBimestre ?? '-';
+    const tfParsed = parseNumberFromText(tfRaw);
+    const freqParsed = parseNumberFromText(freqRaw);
+
+    // Fallback para dados antigos em que frequência vinha misturada no campo de faltas.
+    const legacyMetrics = getFaltaMetrics(bim.faltas);
+    const frequencia = freqParsed !== null
+      ? Math.max(0, Math.min(100, freqParsed))
+      : (legacyMetrics.isValid && legacyMetrics.isPercent
+          ? Math.max(0, Math.min(100, 100 - legacyMetrics.value))
+          : null);
+
     return {
       bimestre: bim.bimestre,
-      faltasRaw: bim.faltas,
+      faltasRaw: tfRaw,
+      frequenciaRaw: freqRaw,
       frequencia,
-      metrics,
+      tfValue: tfParsed,
     };
   });
 
   const totalFaltas = faltasPorBimestre
-    .filter(item => item.metrics.isValid && !item.metrics.isPercent)
-    .reduce((sum, item) => sum + item.metrics.value, 0);
+    .filter(item => item.tfValue !== null)
+    .reduce((sum, item) => sum + item.tfValue, 0);
 
   const frequenciasValidas = faltasPorBimestre
     .filter(item => typeof item.frequencia === 'number')
@@ -372,8 +382,8 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                   })}
                   {temFaltas && (
                     <td className="px-2 py-1.5 text-center border-l-2 border-slate-200 bg-slate-50/50">
-                      <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[10px] ${getFaltaStyle(bim.faltas)}`}>
-                        {bim.faltas || '-'}
+                      <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[10px] ${getFaltaStyle(bim.tfBimestre ?? bim.faltas)}`}>
+                        {bim.tfBimestre ?? bim.faltas ?? '-'}
                       </span>
                     </td>
                   )}
@@ -462,7 +472,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                   <span className="mx-1">|</span>
                   <span>Faltas: {item.faltasRaw || '-'}</span>
                   <span className="mx-1">|</span>
-                  <span>Freq.: {item.frequencia !== null ? `${item.frequencia.toFixed(1)}%` : 'S/D'}</span>
+                  <span>Freq.: {item.frequencia !== null ? `${item.frequencia.toFixed(1)}%` : (item.frequenciaRaw || 'S/D')}</span>
                 </div>
               ))}
             </div>
