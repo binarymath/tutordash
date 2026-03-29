@@ -34,134 +34,151 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 // ── Configuração das áreas do conhecimento ───────────────────
 const AREAS = [
-  { key: 'exatas',     label: '🔢 Exatas',              keywords: ['MATEM', 'FISICA', 'QUIMIC', 'GEOMET'],                                                  headerBg: 'bg-blue-600',    headerText: 'text-white', accent: 'blue'    },
-  { key: 'linguagens', label: '📖 Linguagens',           keywords: ['PORTUG', 'LINGUA', 'INGLES', 'ARTE', 'ARTES', 'EDUC.FIS', 'EDUCACAO FISICA', 'REDACAO'], headerBg: 'bg-violet-600',  headerText: 'text-white', accent: 'violet'  },
-  { key: 'humanas',    label: '🌍 Humanas',              keywords: ['HISTOR', 'GEOGR', 'FILOSO', 'SOCIOLO', 'ENSINO RELIG'],                                   headerBg: 'bg-amber-500',   headerText: 'text-white', accent: 'amber'   },
-  { key: 'ciencias',   label: '🔬 Ciências da Natureza', keywords: ['CIENC', 'BIOLOG', 'BIO'],                                                                headerBg: 'bg-emerald-600', headerText: 'text-white', accent: 'emerald' },
+  {
+    key: 'exatas',
+    label: '🔢 Exatas & Matemática',
+    keywords: ['MATEM', 'FISICA', 'QUIMIC', 'GEOMET', 'FINANC'],
+    headerBg: 'bg-blue-600', headerText: 'text-white', borderColor: 'border-blue-200', headBg: 'bg-blue-50',
+  },
+  {
+    key: 'linguagens',
+    label: '📖 Linguagens',
+    keywords: ['PORTUG', 'LINGUA', 'INGLES', 'ARTE', 'ARTES', 'EDUC.FIS', 'EDUCACAO FISICA', 'EDUCAÇÃO FÍSICA', 'REDACAO', 'REDAÇÃO', 'ED.FIS'],
+    headerBg: 'bg-violet-600', headerText: 'text-white', borderColor: 'border-violet-200', headBg: 'bg-violet-50',
+  },
+  {
+    key: 'humanas',
+    label: '🌍 Ciências Humanas',
+    keywords: ['HISTOR', 'GEOGR', 'FILOSO', 'SOCIOLO', 'ENSINO RELIG', 'RELIGIOS'],
+    headerBg: 'bg-amber-500', headerText: 'text-white', borderColor: 'border-amber-200', headBg: 'bg-amber-50',
+  },
+  {
+    key: 'ciencias',
+    label: '🔬 Ciências da Natureza',
+    keywords: ['CIENC', 'BIOLOG', 'BIO'],
+    headerBg: 'bg-emerald-600', headerText: 'text-white', borderColor: 'border-emerald-200', headBg: 'bg-emerald-50',
+  },
 ];
 
 const classifyDisciplina = (disciplina) => {
   const upper = disciplina.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   for (const area of AREAS) {
-    if (area.keywords.some(kw => upper.includes(kw))) return area.key;
+    if (area.keywords.some(kw => upper.includes(kw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) return area.key;
   }
   return 'outras';
 };
 
 const getNotaStyle = (nota) => {
-  if (!nota || nota === '-') return 'text-slate-300 bg-slate-50 border border-slate-100';
+  if (!nota || nota === '-') return 'text-slate-300 bg-white';
   const n = parseFloat(nota.toString().replace(',', '.'));
   if (!isNaN(n)) {
-    if (n >= 7) return 'text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-sm';
-    if (n >= 5) return 'text-amber-700 bg-amber-50 border border-amber-200 shadow-sm';
-    return 'text-red-700 bg-red-50 border border-red-200 shadow-sm';
+    if (n >= 7) return 'text-emerald-700 bg-emerald-50 font-black';
+    if (n >= 5) return 'text-amber-700 bg-amber-50 font-black';
+    return 'text-red-700 bg-red-50 font-black';
   }
   const up = nota.toUpperCase();
-  if (up === 'MB') return 'text-emerald-700 bg-emerald-50 border border-emerald-200 shadow-sm';
-  if (up === 'B')  return 'text-blue-700 bg-blue-50 border border-blue-200 shadow-sm';
-  if (up === 'R')  return 'text-amber-700 bg-amber-50 border border-amber-200 shadow-sm';
-  if (up === 'I')  return 'text-red-700 bg-red-50 border border-red-200 shadow-sm';
-  return 'text-slate-600 bg-slate-50 border border-slate-100';
+  if (up === 'MB') return 'text-emerald-700 bg-emerald-50 font-black';
+  if (up === 'B')  return 'text-blue-700 bg-blue-50 font-black';
+  if (up === 'R')  return 'text-amber-700 bg-amber-50 font-black';
+  if (up === 'I')  return 'text-red-700 bg-red-50 font-black';
+  return 'text-slate-600 bg-white font-bold';
 };
 
-const abrevBim = (bim) =>
-  String(bim)
-    .replace('1º Bimestre', '1ºBi').replace('2º Bimestre', '2ºBi')
-    .replace('3º Bimestre', '3ºBi').replace('4º Bimestre', '4ºBi')
-    .replace('Bimestre', 'Bi');
+const getFaltaStyle = (faltas) => {
+  if (!faltas || faltas === '-') return 'text-slate-300 bg-white';
+  if (faltas === '0' || faltas === '0%') return 'text-emerald-700 bg-emerald-50 font-black';
+  return 'text-red-700 bg-red-50 font-black';
+};
 
-// ── Evolutivo Numérico em cards ──────────────────────────────
+// ── Evolutivo Numérico: grid 2 colunas, tabela dentro de cada card ──
 const EvolutivoNumerico = ({ historicoConceitos }) => {
+  // Coleta todas as disciplinas únicas
   const allDisciplinasSet = new Set();
   historicoConceitos.forEach(bim => Object.keys(bim.notas).forEach(d => allDisciplinasSet.add(d)));
   const allDisciplinas = Array.from(allDisciplinasSet);
 
+  // Agrupa por área
   const areaMap = {};
   AREAS.forEach(a => { areaMap[a.key] = []; });
   areaMap['outras'] = [];
   allDisciplinas.forEach(d => areaMap[classifyDisciplina(d)].push(d));
 
-  const temFaltasReais = historicoConceitos.some(b => b.faltas && b.faltas !== '-');
+  const temFaltas = historicoConceitos.some(b => b.faltas && b.faltas !== '-');
 
   const renderAreaCard = (disciplinas, area) => {
-    const headerBg   = area?.headerBg   ?? 'bg-slate-600';
-    const headerText = area?.headerText ?? 'text-white';
-    const label      = area?.label      ?? '📋 Outras Disciplinas';
+    const headerBg     = area?.headerBg     ?? 'bg-slate-600';
+    const headerText   = area?.headerText   ?? 'text-white';
+    const label        = area?.label        ?? '📋 Outras Disciplinas';
+    const borderColor  = area?.borderColor  ?? 'border-slate-200';
+    const headBg       = area?.headBg       ?? 'bg-slate-50';
 
     return (
-      <div key={area?.key ?? 'outras'} className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
-        {/* Header colorido da área */}
-        <div className={`${headerBg} ${headerText} px-4 py-2.5 flex items-center justify-between`}>
+      <div key={area?.key ?? 'outras'} className={`rounded-2xl overflow-hidden border ${borderColor} shadow-sm bg-white flex flex-col`}>
+        {/* Header colorido */}
+        <div className={`${headerBg} ${headerText} px-4 py-2.5 flex items-center justify-between shrink-0`}>
           <span className="text-xs font-black uppercase tracking-widest">{label}</span>
-          <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full">
-            {disciplinas.length} disc.
-          </span>
+          <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full">{disciplinas.length} disc.</span>
         </div>
 
-        {/* Uma linha por disciplina */}
-        <div className="divide-y divide-slate-50">
-          {disciplinas.map(disciplina => (
-            <div key={disciplina} className="px-4 py-3 hover:bg-slate-50/70 transition-colors">
-              {/* Nome */}
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-2">{disciplina}</p>
-
-              {/* Linha de badges */}
-              <div className="flex items-end gap-2 flex-wrap">
-                {/* Notas por bimestre */}
-                {historicoConceitos.map((bim, bi) => {
-                  const nota = bim.notas[disciplina] || '-';
-                  return (
-                    <div key={bi} className="flex flex-col items-center gap-1">
-                      <span className="text-[7px] font-bold text-slate-400 uppercase leading-none whitespace-nowrap">
-                        {abrevBim(bim.bimestre)}
-                      </span>
-                      <span className={`inline-flex items-center justify-center w-10 h-8 rounded-xl text-[11px] font-black ${getNotaStyle(nota)}`}>
-                        {nota}
-                      </span>
-                    </div>
-                  );
-                })}
-
-                {/* Faltas (uma coluna separada) */}
-                {temFaltasReais && (
-                  <div className="flex flex-col items-center gap-1 ml-1 pl-2.5 border-l-2 border-slate-100">
-                    <span className="text-[7px] font-bold text-slate-400 uppercase leading-none whitespace-nowrap">Faltas</span>
-                    <div className="flex gap-1">
-                      {historicoConceitos.map((bim, bi) => (
-                        bim.faltas && bim.faltas !== '-' ? (
-                          <span
-                            key={bi}
-                            className={`inline-flex items-center justify-center w-10 h-8 rounded-xl text-[10px] font-black ${
-                              bim.faltas === '0' || bim.faltas === '0%'
-                                ? 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                : 'bg-red-50 text-red-600 border border-red-200'
-                            }`}
-                          >
-                            {bim.faltas}
-                          </span>
-                        ) : (
-                          <span key={bi} className="inline-flex items-center justify-center w-10 h-8 rounded-xl text-[10px] font-black text-slate-200 bg-slate-50 border border-slate-100">
-                            -
-                          </span>
-                        )
-                      ))}
-                    </div>
-                  </div>
+        {/* Tabela: colunas = disciplinas, linhas = bimestres */}
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-[10px] border-collapse">
+            <thead>
+              <tr className={headBg}>
+                <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-wider border-b border-r border-slate-200 w-20 whitespace-nowrap">
+                  Bimestre
+                </th>
+                {disciplinas.map(d => (
+                  <th key={d} className="px-3 py-2.5 font-black text-slate-600 text-center border-b border-r border-slate-200 last:border-r-0">
+                    <span title={d} className="block max-w-[90px] truncate mx-auto">{d}</span>
+                  </th>
+                ))}
+                {temFaltas && (
+                  <th className="px-3 py-2.5 font-black text-slate-500 text-center border-b border-l-2 border-slate-300 bg-slate-100 whitespace-nowrap">
+                    Faltas
+                  </th>
                 )}
-              </div>
-            </div>
-          ))}
+              </tr>
+            </thead>
+            <tbody>
+              {historicoConceitos.map((bim, bi) => (
+                <tr key={bi} className={`border-b border-slate-50 ${bi % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-slate-100/60 transition-colors`}>
+                  <td className="px-3 py-2.5 font-black text-blue-600 text-[9px] uppercase border-r border-slate-200 whitespace-nowrap">
+                    {bim.bimestre.replace('º Bimestre', 'ºBi')}
+                  </td>
+                  {disciplinas.map(d => {
+                    const nota = bim.notas[d] || '-';
+                    return (
+                      <td key={d} className="px-2 py-1.5 text-center border-r border-slate-100 last:border-r-0">
+                        <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[11px] ${getNotaStyle(nota)}`}>
+                          {nota}
+                        </span>
+                      </td>
+                    );
+                  })}
+                  {temFaltas && (
+                    <td className="px-2 py-1.5 text-center border-l-2 border-slate-200 bg-slate-50/50">
+                      <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[10px] ${getFaltaStyle(bim.faltas)}`}>
+                        {bim.faltas || '-'}
+                      </span>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     );
   };
 
+  const areasComDados = AREAS.filter(area => areaMap[area.key]?.length > 0);
+  const temOutras = areaMap['outras']?.length > 0;
+
   return (
-    <div className="space-y-4 max-h-[640px] overflow-y-auto pr-1 custom-scrollbar">
-      {AREAS.filter(area => areaMap[area.key]?.length > 0).map(area =>
-        renderAreaCard(areaMap[area.key], area)
-      )}
-      {areaMap['outras']?.length > 0 && renderAreaCard(areaMap['outras'], null)}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {areasComDados.map(area => renderAreaCard(areaMap[area.key], area))}
+      {temOutras && renderAreaCard(areaMap['outras'], null)}
     </div>
   );
 };
@@ -178,7 +195,7 @@ const StudentProfile = ({
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-right-8 duration-300">
 
-      {/* Navegação Anterior/Próximo */}
+      {/* Navegação */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <button
           onClick={() => setSelectedStudent(null)}
@@ -205,114 +222,109 @@ const StudentProfile = ({
       </div>
 
       {/* Cabeçalho do aluno */}
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
-          <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase">
-            <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
-            <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
-          </div>
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
+        <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase">
+          <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
+          <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
         </div>
       </div>
 
-      {/* Coluna esquerda: PP + Evolutivo | Coluna direita: Anotações */}
+      {/* Prova Paulista + Anotações lado a lado */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 space-y-6">
-
-          {/* Prova Paulista */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
+        {/* Coluna esquerda: Prova Paulista */}
+        <div className="md:col-span-1">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 h-full">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" /> Prova Paulista
             </h3>
             <div className="text-4xl font-black text-blue-600 mb-1">{studentProfile.provaPaulista}</div>
             <p className="text-[10px] font-bold text-slate-400 uppercase">Desempenho Geral</p>
           </div>
-
-          {/* Evolutivo Numérico */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
-              <LineChartIcon className="w-4 h-4" /> Evolutivo Numérico
-            </h3>
-            {studentProfile.historicoConceitos?.length > 0 ? (
-              <EvolutivoNumerico historicoConceitos={studentProfile.historicoConceitos} />
-            ) : (
-              <div className="bg-slate-50 border border-dashed border-slate-200 p-6 rounded-2xl text-center">
-                <p className="text-slate-400 font-bold uppercase text-[10px]">Sem dados bimestrais</p>
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Anotações e Sessões */}
-        <div className="md:col-span-2 space-y-6">
-          <div>
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
-              <History className="w-4 h-4" /> Anotações e Sessões
-            </h3>
+        {/* Coluna direita: Anotações */}
+        <div className="md:col-span-2">
+          <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
+            <History className="w-4 h-4" /> Anotações e Sessões
+          </h3>
 
-            {studentSessions.length > 1 && (
-              <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Filtrar Anotações</p>
-                <div className="flex flex-wrap gap-3">
-                  {studentSessions.map(sessao => (
-                    <label
-                      key={sessao}
-                      className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilter === sessao ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
-                    >
-                      <input
-                        type="radio"
-                        name="sessionFilter"
-                        value={sessao}
-                        checked={selectedSessionFilter === sessao}
-                        onChange={e => setSelectedSessionFilter(e.target.value)}
-                        className="text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                      />
-                      <span className={`text-xs font-bold ${selectedSessionFilter === sessao ? 'text-blue-700' : 'text-slate-600'}`}>{sessao}</span>
-                    </label>
-                  ))}
+          {studentSessions.length > 1 && (
+            <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Filtrar por Tipo</p>
+              <div className="flex flex-wrap gap-3">
+                {studentSessions.map(sessao => (
+                  <label
+                    key={sessao}
+                    className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilter === sessao ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
+                  >
+                    <input
+                      type="radio"
+                      name="sessionFilter"
+                      value={sessao}
+                      checked={selectedSessionFilter === sessao}
+                      onChange={e => setSelectedSessionFilter(e.target.value)}
+                      className="text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                    />
+                    <span className={`text-xs font-bold ${selectedSessionFilter === sessao ? 'text-blue-700' : 'text-slate-600'}`}>{sessao}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
+            {filteredNotes.length > 0 ? (
+              filteredNotes.map(n => (
+                <div key={n.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+                  {n.tipoSessao && (
+                    <div className="absolute top-0 right-0 bg-amber-50 border-b border-l border-amber-100 px-4 py-1.5 rounded-bl-xl">
+                      <span className="text-[10px] font-black text-amber-600 uppercase">{n.tipoSessao}</span>
+                    </div>
+                  )}
+                  <div className={`flex justify-between items-center mb-4 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-50 pb-3 ${n.tipoSessao ? 'mt-8' : 'mt-1'}`}>
+                    <span className="text-blue-600 flex items-center gap-1">
+                      <User className="w-3 h-3" /> Quem Registrou: {n.teacher}
+                    </span>
+                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {n.displayDate}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {n.note ? (
+                      <div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Anotação / Observação</span>
+                        <p className="text-slate-700 font-medium leading-relaxed">{n.note}</p>
+                      </div>
+                    ) : (
+                      <p className="text-slate-400 font-medium italic text-sm">Registo sem descrição.</p>
+                    )}
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="bg-white border border-dashed border-slate-200 p-10 rounded-3xl text-center">
+                <p className="text-slate-400 font-bold uppercase text-xs">Sem anotações registadas para este filtro.</p>
               </div>
             )}
-
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
-              {filteredNotes.length > 0 ? (
-                filteredNotes.map(n => (
-                  <div key={n.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-                    {n.tipoSessao && (
-                      <div className="absolute top-0 right-0 bg-amber-50 border-b border-l border-amber-100 px-4 py-1.5 rounded-bl-xl">
-                        <span className="text-[10px] font-black text-amber-600 uppercase">{n.tipoSessao}</span>
-                      </div>
-                    )}
-                    <div className={`flex justify-between items-center mb-4 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-50 pb-3 ${n.tipoSessao ? 'mt-8' : 'mt-1'}`}>
-                      <span className="text-blue-600 flex items-center gap-1">
-                        <User className="w-3 h-3" /> Quem Registrou: {n.teacher}
-                      </span>
-                      <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {n.displayDate}</span>
-                    </div>
-                    <div className="space-y-3">
-                      {n.note ? (
-                        <div>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Anotação / Observação</span>
-                          <p className="text-slate-700 font-medium leading-relaxed">{n.note}</p>
-                        </div>
-                      ) : (
-                        <p className="text-slate-400 font-medium italic text-sm">Registo sem descrição.</p>
-                      )}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="bg-white border border-dashed border-slate-200 p-10 rounded-3xl text-center">
-                  <p className="text-slate-400 font-bold uppercase text-xs">Sem anotações registadas para este filtro.</p>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Análise Gráfica */}
-      <div className="mt-8">
+      {/* ── Evolutivo Numérico: largura total, 2 cards por linha ── */}
+      <div>
+        <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-slate-200 pb-4">
+          <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico
+        </h3>
+        {studentProfile.historicoConceitos?.length > 0 ? (
+          <EvolutivoNumerico historicoConceitos={studentProfile.historicoConceitos} />
+        ) : (
+          <div className="bg-slate-50 border border-dashed border-slate-200 p-10 rounded-2xl text-center">
+            <p className="text-slate-400 font-bold uppercase text-[10px]">Sem dados bimestrais disponíveis</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Análise Gráfica ────────────────────────────────────── */}
+      <div>
         <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-200 pb-4">
           <BarChart2 className="w-6 h-6 text-blue-600" /> Análise Gráfica e Comparativa
         </h3>
@@ -337,7 +349,7 @@ const StudentProfile = ({
               </div>
             ) : (
               <div className="flex-1 flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                <p className="text-slate-400 text-xs font-bold uppercase text-center px-4">Sem dados numéricos suficientes para desenhar o radar</p>
+                <p className="text-slate-400 text-xs font-bold uppercase text-center px-4">Sem dados numéricos suficientes</p>
               </div>
             )}
           </div>
