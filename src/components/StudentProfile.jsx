@@ -33,6 +33,14 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // ── Configuração das áreas do conhecimento ───────────────────
+// OE vem PRIMEIRO para ter prioridade sobre outras áreas (ex: OE Matemática ≠ Exatas)
+const OE_AREA = {
+  key: 'orientacoes',
+  label: '📋 Orientações de Estudo',
+  keywords: ['^OE ', 'OE MAT', 'OE LING', 'OE PORT', 'OE LÍN', 'ORIENTAÇ', 'ORIENTAC'],
+  headerBg: 'bg-indigo-600', headerText: 'text-white', borderColor: 'border-indigo-200', headBg: 'bg-indigo-50',
+};
+
 const AREAS = [
   {
     key: 'exatas',
@@ -62,6 +70,12 @@ const AREAS = [
 
 const classifyDisciplina = (disciplina) => {
   const upper = disciplina.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  // Verificar OE primeiro (prioridade máxima) — "OE Matemática" não deve cair em Exatas
+  const isOE = upper.startsWith('OE ') || OE_AREA.keywords.some(kw => {
+    const kwUpper = kw.replace('^', '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return kw.startsWith('^') ? upper.startsWith(kwUpper) : upper.includes(kwUpper);
+  });
+  if (isOE) return 'orientacoes';
   for (const area of AREAS) {
     if (area.keywords.some(kw => upper.includes(kw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) return area.key;
   }
@@ -100,6 +114,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
   // Agrupa por área
   const areaMap = {};
   AREAS.forEach(a => { areaMap[a.key] = []; });
+  areaMap['orientacoes'] = [];
   areaMap['outras'] = [];
   allDisciplinas.forEach(d => areaMap[classifyDisciplina(d)].push(d));
 
@@ -173,10 +188,13 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
   };
 
   const areasComDados = AREAS.filter(area => areaMap[area.key]?.length > 0);
+  const temOE     = areaMap['orientacoes']?.length > 0;
   const temOutras = areaMap['outras']?.length > 0;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div className="grid grid-cols-1 gap-4">
+      {/* Card de OE sempre em primeiro */}
+      {temOE && renderAreaCard(areaMap['orientacoes'], OE_AREA)}
       {areasComDados.map(area => renderAreaCard(areaMap[area.key], area))}
       {temOutras && renderAreaCard(areaMap['outras'], null)}
     </div>
