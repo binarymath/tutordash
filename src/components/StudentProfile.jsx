@@ -111,18 +111,21 @@ const getFaltaStyle = (faltas) => {
 };
 
 // Mapeia nomes longos da planilha para rótulos amigáveis
+// Testa contra o nome NORMALIZADO (sem acentos) para evitar problemas com Í, Ã, Ç etc.
 const DISPLAY_ALIASES = [
-  { match: /ORIENTA[CÇ][AÃ]O.*LINGU/i,  display: 'OE: Língua Portuguesa' },
-  { match: /ORIENTA[CÇ][AÃ]O.*MATEM/i,  display: 'OE: Matemática'       },
-  { match: /ORIENTA[CÇ][AÃ]O.*PORT/i,   display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–-]*LINGU/i,          display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–-]*PORT/i,           display: 'OE: Língua Portuguesa' },
-  { match: /^OE[\s:–-]*MAT/i,            display: 'OE: Matemática'       },
+  { match: /ORIENTA.*LINGU/i,  display: 'OE: Língua Portuguesa' },
+  { match: /ORIENTA.*MATEM/i,  display: 'OE: Matemática'        },
+  { match: /ORIENTA.*PORT/i,   display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–\-]*LINGU/i, display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–\-]*PORT/i,  display: 'OE: Língua Portuguesa' },
+  { match: /^OE[\s:–\-]*MAT/i,   display: 'OE: Matemática'        },
 ];
 
 const displayDisciplina = (nome) => {
+  // Normaliza removendo acentos para comparação robusta
+  const normalized = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   for (const alias of DISPLAY_ALIASES) {
-    if (alias.match.test(nome)) return alias.display;
+    if (alias.match.test(normalized)) return alias.display;
   }
   return nome;
 };
