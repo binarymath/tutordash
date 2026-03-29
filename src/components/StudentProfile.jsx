@@ -70,12 +70,18 @@ const AREAS = [
 
 const classifyDisciplina = (disciplina) => {
   const upper = disciplina.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  // Verificar OE primeiro (prioridade máxima) — "OE Matemática" não deve cair em Exatas
+
+  // 1. OE — prioridade máxima (OE Matemática não deve cair em Exatas)
   const isOE = upper.startsWith('OE ') || OE_AREA.keywords.some(kw => {
     const kwUpper = kw.replace('^', '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return kw.startsWith('^') ? upper.startsWith(kwUpper) : upper.includes(kwUpper);
   });
   if (isOE) return 'orientacoes';
+
+  // 2. Educação Física — prioridade antes de Exatas ("FISICA" é keyword de Exatas)
+  if (upper.includes('EDUC') && upper.includes('FIS')) return 'linguagens';
+
+  // 3. Loop geral
   for (const area of AREAS) {
     if (area.keywords.some(kw => upper.includes(kw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")))) return area.key;
   }
@@ -135,21 +141,26 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
           <span className="text-[9px] font-bold bg-white/20 px-2 py-0.5 rounded-full">{disciplinas.length} disc.</span>
         </div>
 
-        {/* Tabela: colunas = disciplinas, linhas = bimestres */}
-        <div className="overflow-x-auto flex-1">
-          <table className="w-full text-[10px] border-collapse">
+        {/* Tabela: colunas = disciplinas, linhas = bimestres — sem scroll lateral */}
+        <div className="flex-1">
+          <table className="w-full text-[10px] border-collapse table-fixed">
+            <colgroup>
+              <col className="w-20" />
+              {disciplinas.map(d => <col key={d} />)}
+              {temFaltas && <col className="w-16" />}
+            </colgroup>
             <thead>
               <tr className={headBg}>
-                <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-wider border-b border-r border-slate-200 w-20 whitespace-nowrap">
+                <th className="text-left px-3 py-2.5 font-black text-slate-500 uppercase tracking-wider border-b border-r border-slate-200 whitespace-nowrap">
                   Bimestre
                 </th>
                 {disciplinas.map(d => (
-                  <th key={d} className="px-3 py-2.5 font-black text-slate-600 text-center border-b border-r border-slate-200 last:border-r-0">
-                    <span title={d} className="block max-w-[90px] truncate mx-auto">{d}</span>
+                  <th key={d} className="px-2 py-2.5 font-black text-slate-600 text-center border-b border-r border-slate-200 last:border-r-0 leading-tight">
+                    <span className="whitespace-normal break-words">{d}</span>
                   </th>
                 ))}
                 {temFaltas && (
-                  <th className="px-3 py-2.5 font-black text-slate-500 text-center border-b border-l-2 border-slate-300 bg-slate-100 whitespace-nowrap">
+                  <th className="px-2 py-2.5 font-black text-slate-500 text-center border-b border-l-2 border-slate-300 bg-slate-100 whitespace-nowrap">
                     Faltas
                   </th>
                 )}
