@@ -66,7 +66,18 @@ export const fetchWithFallback = async (url) => {
   } catch (err) {
     console.warn('Fetch direto falhou, tentando proxies...', err);
     
-    // Tenta primeiro o corsproxy.io que suporta bem arquivos binários (XLSX)
+    // Tenta primeiro o Vercel Serverless Proxy oficial (imune a CORS e bloqueios de IP compartilhados)
+    try {
+      const vercelProxy = `/api/proxy?url=${encodeURIComponent(fetchUrl)}`;
+      const resVercel = await fetch(vercelProxy, { cache: 'no-store' });
+      // Ignoramos erro 404 porque no 'npm run dev' local o /api/proxy não existe na rota sem config adicional
+      if (resVercel.ok) return resVercel;
+      if (resVercel.status !== 404) throw new Error(`Vercel Proxy falhou: ${resVercel.status}`);
+    } catch {
+      // Falhou silenciosamente, passa para o próximo
+    }
+
+    // Tenta o corsproxy.io que suporta bem arquivos binários (XLSX)
     try {
       const proxy1 = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
       const resProxy1 = await fetch(proxy1, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
