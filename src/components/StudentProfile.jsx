@@ -105,11 +105,7 @@ const getNotaStyle = (nota) => {
   return 'text-slate-600 bg-white font-bold';
 };
 
-const getFaltaStyle = (faltas) => {
-  if (!faltas || faltas === '-') return 'text-slate-300 bg-white';
-  if (faltas === '0' || faltas === '0%') return 'text-emerald-700 bg-emerald-50 font-black';
-  return 'text-red-700 bg-red-50 font-black';
-};
+
 
 const parseNumberFromText = (value) => {
   if (value === undefined || value === null) return null;
@@ -560,7 +556,7 @@ const StudentProfile = ({
     try {
       setIsExporting(true);
       const { default: html2pdf } = await import('html2pdf.js');
-      const { notasRows, disciplinas, notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
+      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
       const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
 
       const notesHtml = notasComTipo.length > 0

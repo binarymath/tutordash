@@ -55,7 +55,7 @@ export const fetchWithFallback = async (url) => {
     const urlObj = new URL(url);
     urlObj.searchParams.append('_t', Date.now().toString());
     fetchUrl = urlObj.toString();
-  } catch (e) {
+  } catch {
     // se não for uma URL válida, ignora
   }
 
