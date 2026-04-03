@@ -54,14 +54,24 @@ export const fetchWithFallback = async (url) => {
     if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
     return res;
   } catch (err) {
-    console.warn('Fetch direto falhou, tentando proxy...', err);
+    console.warn('Fetch direto falhou, tentando proxies...', err);
+    
+    // Tenta primeiro o allorigins, que costuma ser mais estável
     try {
-      const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-      const resProxy = await fetch(proxyUrl);
-      if (!resProxy.ok) throw new Error(`Erro no Proxy ${resProxy.status}`);
-      return resProxy;
+      const proxy1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const resProxy1 = await fetch(proxy1);
+      if (!resProxy1.ok) throw new Error(`Erro no Proxy 1: ${resProxy1.status}`);
+      return resProxy1;
     } catch {
-      throw new Error("O Google bloqueou o acesso. Verifique as permissões de partilha do link.");
+      // Se falhar de novo, tenta o corsproxy (como última alternativa)
+      try {
+        const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
+        const resProxy2 = await fetch(proxy2);
+        if (!resProxy2.ok) throw new Error(`Erro no Proxy 2: ${resProxy2.status}`);
+        return resProxy2;
+      } catch {
+        throw new Error("O Google bloqueou o acesso. Verifique as permissões de partilha do link.");
+      }
     }
   }
 };
