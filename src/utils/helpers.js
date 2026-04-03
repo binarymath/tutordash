@@ -49,24 +49,34 @@ export const checkIsTutor = (tutor, registrar) => {
 };
 
 export const fetchWithFallback = async (url) => {
+  // Adiciona anti-cache localmente para evitar cache de navegador/proxy
+  let fetchUrl = url;
   try {
-    const res = await fetch(url);
+    const urlObj = new URL(url);
+    urlObj.searchParams.append('_t', Date.now().toString());
+    fetchUrl = urlObj.toString();
+  } catch (e) {
+    // se não for uma URL válida, ignora
+  }
+
+  try {
+    const res = await fetch(fetchUrl, { cache: 'no-store' });
     if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
     return res;
   } catch (err) {
     console.warn('Fetch direto falhou, tentando proxies...', err);
     
-    // Tenta primeiro o allorigins, que costuma ser mais estável
+    // Tenta primeiro o allorigins, que costuma ser mais estável (forçando disableCache=true do allorigins)
     try {
-      const proxy1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const resProxy1 = await fetch(proxy1);
+      const proxy1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}&disableCache=true`;
+      const resProxy1 = await fetch(proxy1, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
       if (!resProxy1.ok) throw new Error(`Erro no Proxy 1: ${resProxy1.status}`);
       return resProxy1;
     } catch {
       // Se falhar de novo, tenta o corsproxy (como última alternativa)
       try {
-        const proxy2 = `https://corsproxy.io/?${encodeURIComponent(url)}`;
-        const resProxy2 = await fetch(proxy2);
+        const proxy2 = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
+        const resProxy2 = await fetch(proxy2, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
         if (!resProxy2.ok) throw new Error(`Erro no Proxy 2: ${resProxy2.status}`);
         return resProxy2;
       } catch {
