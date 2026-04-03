@@ -66,16 +66,16 @@ export const fetchWithFallback = async (url) => {
   } catch (err) {
     console.warn('Fetch direto falhou, tentando proxies...', err);
     
-    // Tenta primeiro o allorigins, que costuma ser mais estável (forçando disableCache=true do allorigins)
+    // Tenta primeiro o corsproxy.io que suporta bem arquivos binários (XLSX)
     try {
-      const proxy1 = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}&disableCache=true`;
+      const proxy1 = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
       const resProxy1 = await fetch(proxy1, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
       if (!resProxy1.ok) throw new Error(`Erro no Proxy 1: ${resProxy1.status}`);
       return resProxy1;
     } catch {
-      // Se falhar de novo, tenta o corsproxy (como última alternativa)
+      // Se falhar, tenta o allorigins como alternativa
       try {
-        const proxy2 = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
+        const proxy2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}&disableCache=true`;
         const resProxy2 = await fetch(proxy2, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
         if (!resProxy2.ok) throw new Error(`Erro no Proxy 2: ${resProxy2.status}`);
         return resProxy2;
