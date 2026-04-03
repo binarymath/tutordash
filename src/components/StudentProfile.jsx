@@ -278,7 +278,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
     // Fallback para dados antigos em que frequência vinha misturada no campo de faltas.
     const legacyMetrics = getFaltaMetrics(bim.faltas);
     const frequencia = freqParsed !== null
-      ? Math.max(0, Math.min(100, freqParsed))
+      ? (freqParsed <= 1 && !String(freqRaw).includes('%') ? Math.max(0, Math.min(100, freqParsed * 100)) : Math.max(0, Math.min(100, freqParsed)))
       : (legacyMetrics.isValid && legacyMetrics.isPercent
           ? Math.max(0, Math.min(100, 100 - legacyMetrics.value))
           : null);
@@ -345,7 +345,6 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
             <colgroup>
               <col className="w-20" />
               {disciplinas.map(d => <col key={d} />)}
-              {temFaltas && <col className="w-16" />}
             </colgroup>
             <thead>
               <tr className={headBg}>
@@ -357,11 +356,6 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                     <span title={d} className="whitespace-normal break-words">{formatDisciplina(d)}</span>
                   </th>
                 ))}
-                {temFaltas && (
-                  <th className="px-2 py-2.5 font-black text-slate-500 text-center border-b border-l-2 border-slate-300 bg-slate-100 whitespace-nowrap">
-                    Faltas
-                  </th>
-                )}
               </tr>
             </thead>
             <tbody>
@@ -380,13 +374,6 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                       </td>
                     );
                   })}
-                  {temFaltas && (
-                    <td className="px-2 py-1.5 text-center border-l-2 border-slate-200 bg-slate-50/50">
-                      <span className={`inline-flex items-center justify-center min-w-[36px] h-7 px-2 rounded-lg text-[10px] ${getFaltaStyle(bim.tfBimestre ?? bim.faltas)}`}>
-                        {bim.tfBimestre ?? bim.faltas ?? '-'}
-                      </span>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
@@ -406,11 +393,6 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                     )}
                   </td>
                 ))}
-                {temFaltas && (
-                  <td className="px-2 py-1.5 text-center border-l-2 border-slate-300 bg-slate-100">
-                    <span className="text-slate-500 text-[10px] font-black">-</span>
-                  </td>
-                )}
               </tr>
             </tfoot>
           </table>
@@ -456,9 +438,9 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
             <p className="text-2xl font-black text-blue-800 mt-1">{totalFaltas.toFixed(0)}</p>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">Media de Frequencia</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-700">Frequência</p>
             <p className="text-2xl font-black text-slate-800 mt-1">
-              {mediaFrequencia !== null ? `${mediaFrequencia.toFixed(1)}%` : 'S/D'}
+              {mediaFrequencia !== null ? `${mediaFrequencia.toFixed(1).replace(/\.0$/, '')}%` : 'S/D'}
             </p>
           </div>
         </div>
@@ -472,7 +454,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
                   <span className="mx-1">|</span>
                   <span>Faltas: {item.faltasRaw || '-'}</span>
                   <span className="mx-1">|</span>
-                  <span>Freq.: {item.frequencia !== null ? `${item.frequencia.toFixed(1)}%` : (item.frequenciaRaw || 'S/D')}</span>
+                  <span>Freq.: {item.frequencia !== null ? `${item.frequencia.toFixed(1).replace(/\.0$/, '')}%` : (item.frequenciaRaw || 'S/D')}</span>
                 </div>
               ))}
             </div>

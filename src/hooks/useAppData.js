@@ -192,7 +192,21 @@ export const useAppData = (config, setShowSettings) => {
             }
 
             if (headerRowIdx !== -1) {
-              const headers  = jsonData[headerRowIdx];
+              let headers  = jsonData[headerRowIdx];
+              
+              // Verifica se a linha seguinte é um sub-header (comum quando a coluna ALUNO está mesclada verticalmente)
+              const nextRow = jsonData[headerRowIdx + 1] || [];
+              if (!nextRow[0] || String(nextRow[0]).trim() === '') {
+                const maxLen = Math.max(headers.length, nextRow.length);
+                headers = Array.from({ length: maxLen }).map((_, i) => {
+                  const h = headers[i];
+                  const subH = nextRow[i];
+                  if (h && subH) return `${h}\n${subH}`;
+                  return h || subH || '';
+                });
+                headerRowIdx++; // Avança um índice para que a leitura dos alunos comece corretamente
+              }
+
               const subjects = [];
               let tfIdx = -1;
               let freqIdx = -1;
@@ -200,30 +214,34 @@ export const useAppData = (config, setShowSettings) => {
               headers.forEach((h, idx) => {
                 if (typeof h === 'string') {
                   const upperH = normalizeHeader(h);
+                  const compact = upperH.replace(/\s+/g, '');
+
+                  const isTf = compact === 'TF' ||
+                               compact === 'TOTALTF' ||
+                               compact === 'TOTALFALTAS' ||
+                               compact === 'TOTALFALTA' ||
+                               compact.includes('TOTAL:TF') ||
+                               compact.includes('TOTALDEFALTA') ||
+                               (compact.includes('TOTAL') && compact.includes('FALTA'));
+
+                  const isFreq = compact.includes('FREQ') ||
+                                 compact.includes('FRE(') ||
+                                 compact.includes('FRE%') ||
+                                 compact === 'FRE' ||
+                                 compact.includes('TOTAL:FRE');
+
+                  if (tfIdx === -1 && isTf) {
+                    tfIdx = idx;
+                  }
+
+                  if (freqIdx === -1 && isFreq) {
+                    freqIdx = idx;
+                  }
+
                   if (h.includes('\n')) {
                     const subjectName = h.split('\n')[0].trim();
-                    if (!subjectName.toUpperCase().includes('TOTAL')) {
+                    if (!subjectName.toUpperCase().includes('TOTAL') && !isTf && !isFreq) {
                       subjects.push({ index: idx, name: subjectName });
-                    }
-                  } else {
-                    const compact = upperH.replace(/\s+/g, '');
-
-                    if (tfIdx === -1 && (
-                      compact === 'TF' ||
-                      compact === 'TOTALTF' ||
-                      compact === 'TOTALFALTAS' ||
-                      compact === 'TOTALFALTA'
-                    )) {
-                      tfIdx = idx;
-                    }
-
-                    if (freqIdx === -1 && (
-                      compact === 'FRE(%)' ||
-                      compact === 'FREQ(%)' ||
-                      compact === 'FRE%' ||
-                      compact === 'FREQ%'
-                    )) {
-                      freqIdx = idx;
                     }
                   }
                 }
@@ -234,7 +252,11 @@ export const useAppData = (config, setShowSettings) => {
                 tfIdx = headers.findIndex((h) => {
                   const upperH = normalizeHeader(h);
                   const compact = upperH.replace(/\s+/g, '');
-                  return (compact.includes('TF') || compact.includes('TOTALFALTA')) && !compact.includes('AN');
+                  return compact === 'TF' || 
+                         compact.includes('TOTAL:TF') || 
+                         compact.includes('TOTALDEFALTA') || 
+                         (compact.includes('TOTAL') && compact.includes('FALTA')) ||
+                         ((compact.startsWith('TF') || compact.includes('TOTALFALTA')) && !compact.includes('AN'));
                 });
               }
 
@@ -242,7 +264,7 @@ export const useAppData = (config, setShowSettings) => {
                 freqIdx = headers.findIndex((h) => {
                   const upperH = normalizeHeader(h);
                   const compact = upperH.replace(/\s+/g, '');
-                  return compact.includes('FRE') && compact.includes('%') && !compact.includes('AN');
+                  return (compact.includes('FRE') || compact.includes('FREQ')) && !compact.includes('AN');
                 });
               }
 
