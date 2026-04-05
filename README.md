@@ -21,19 +21,19 @@ Bem-vindo ao **TutorDash**! Este documento está dividido em duas partes para at
 <summary><b>📑 Sumário</b></summary>
 <br>
 
-1. [👩‍🏫 Seção 1: Para Educadores e Gestores](#-seção-1-para-educadores-e-gestores)
-   - [O que é o TutorDash?](#-o-que-é-o-tutordash)
-   - [Recursos Essenciais](#-recursos-essenciais)
-2. [👨‍💻 Seção 2: Para Desenvolvedores e Mantenedores](#-seção-2-para-desenvolvedores-e-mantenedores)
-   - [Stack Tecnológico](#-stack-tecnológico)
-   - [Arquitetura de Dados](#-arquitetura-de-dados)
-   - [Como Executar Localmente](#-como-executar-localmente)
+1. [👩‍🏫 Seção 1: Para Educadores e Gestores](#educadores)
+   - [Recursos Essenciais](#recursos)
+2. [👨‍💻 Seção 2: Para Desenvolvedores e Mantenedores](#devs)
+   - [Stack Tecnológico](#stack)
+   - [Arquitetura de Dados](#arquitetura)
+   - [Como Executar Localmente](#executar)
 </details>
 
 <br>
 
 ---
 
+<a id="educadores"></a>
 # 👩‍🏫 Seção 1: Para Educadores e Gestores
 
 O **TutorDash** é uma plataforma inovadora criada com o objetivo principal de **centralizar** e **analisar** a vida acadêmica dos alunos e o desempenho bimestral das turmas, cruzando dados de múltiplas planilhas diretamente no seu navegador. Com ele, as ações estratégicas baseadas em dados tornam-se intuitivas.
@@ -41,6 +41,7 @@ O **TutorDash** é uma plataforma inovadora criada com o objetivo principal de *
 > [!TIP]  
 > **Não é preciso instalar nada no computador.** A plataforma opera online, processando todas as suas planilhas de forma segura e rápida diretamente na tela do seu dispositivo!
 
+<a id="recursos"></a>
 ### ✨ Recursos Essenciais
 
 | 🎯 Funcionalidade | 📝 Descrição |
@@ -62,6 +63,7 @@ O **TutorDash** é uma plataforma inovadora criada com o objetivo principal de *
 
 ---
 
+<a id="devs"></a>
 # 👨‍💻 Seção 2: Para Desenvolvedores e Mantenedores
 
 Seja bem-vindo ao coração do projeto! O TutorDash foi reescrito focado no princípio da separação de contextos e alta performance de re-renderização em painéis cheios de dados e gráficos.
@@ -69,6 +71,7 @@ Seja bem-vindo ao coração do projeto! O TutorDash foi reescrito focado no prin
 > [!IMPORTANT]  
 > Atente-se à injeção de requisições baseada no **TanStack Query**. A estrutura de cache desativa o `refetchOnWindowFocus`, minimizando a carga pesada que conversões de planilhas Excel (XLSX) infligem à single-thread do JavaScript.
 
+<a id="stack"></a>
 ### 🛠 Stack Tecnológico
 
 | Tecnologia | Função no Sistema |
@@ -80,6 +83,7 @@ Seja bem-vindo ao coração do projeto! O TutorDash foi reescrito focado no prin
 | **Recharts** | Elementar na renderização em SVG dos gráficos do `StudentProfile.jsx` |
 | **XLSX (SheetJS)** | Extrator e conversor de tabelas em arrays processáveis na memória |
 
+<a id="arquitetura"></a>
 ### 🏗 Arquitetura de Dados
 
 O carregamento das tabelas cruza informações a nível de `useMemo` na camada orquestradora:
@@ -100,6 +104,7 @@ graph TD;
     App --> UI_Dashboard(Dashboard);
 ```
 
+<a id="executar"></a>
 ### 💻 Como Executar Localmente
 
 Garanta que sua máquina possua **Node.js 18+** instalado. Aconselhamos o uso de `npm` para instalação das dependências a fim de evitar conflitos com o histórico de `package-lock.json`.
