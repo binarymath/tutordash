@@ -1,11 +1,12 @@
-// ─────────────────────────────────────────────────────────────
-// App.jsx — Orquestrador principal do TutorDash
-// ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { normalizeName, parseGrade, formatDisciplina } from './utils/helpers';
-import { useAppData } from './hooks/useAppData';
+import { useStudents } from './hooks/useStudents';
+import { useNotes } from './hooks/useNotes';
+import { useProvas } from './hooks/useProvas';
+import { useConceitos } from './hooks/useConceitos';
 
 import ConfigModal    from './components/ConfigModal';
 import Header         from './components/Header';
@@ -14,7 +15,8 @@ import Dashboard      from './components/Dashboard';
 import StudentProfile from './components/StudentProfile';
 
 const App = () => {
-  // ── Configuração persistente ───────────────────────────────
+  const queryClient = useQueryClient();
+
   const [config, setConfig] = useState(() => {
     const defaultConfig = {
       studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: ''
@@ -57,11 +59,38 @@ const App = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // ── Dados (via hook) ───────────────────────────────────────
-  const {
-    data, annotations, provaData, conceitoData,
-    isLoading, isSyncing, error, setError, loadAllData
-  } = useAppData(config, setShowSettings);
+  // ── Dados (TanStack Query) ─────────────────────────────────
+  const { data: dataRaw = [], isLoading: isLoadingStudents, isFetching: isFetchingStudents, error: errorStudents } = useStudents(config.studentsUrl);
+  const { data: annotations = [], isLoading: isLoadingNotes, isFetching: isFetchingNotes, error: errorNotes } = useNotes(config.notesUrl);
+  const { data: provaData = [], isLoading: isLoadingProvas, isFetching: isFetchingProvas, error: errorProvas } = useProvas(config.provaUrl);
+  const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(config.conceitoUrl);
+
+  const data = dataRaw;
+  const isLoading = isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos;
+  const isSyncing = isFetchingStudents || isFetchingNotes || isFetchingProvas || isFetchingConceitos;
+  
+  const [manualError, setManualError] = useState(null);
+
+  const queryError = errorStudents || errorNotes || errorProvas || errorConceitos;
+  const error = manualError || (queryError ? queryError.message : null);
+  const setError = setManualError;
+
+  useEffect(() => {
+    if (config.studentsUrl) {
+      setManualError(null);
+    }
+  }, [config.studentsUrl]);
+
+  const loadAllData = async (silent = false) => {
+    if (!config.studentsUrl) {
+      if (!silent) {
+        setManualError("O URL da Planilha de Tutoria (Base) é obrigatória.");
+        setShowSettings(true);
+      }
+      return;
+    }
+    await queryClient.invalidateQueries();
+  };
 
   // ── Derivações computadas ──────────────────────────────────
   const allStudents = useMemo(() => {
