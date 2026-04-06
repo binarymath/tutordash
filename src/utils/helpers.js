@@ -49,52 +49,27 @@ export const checkIsTutor = (tutor, registrar) => {
 };
 
 export const fetchWithFallback = async (url) => {
-  // Adiciona anti-cache localmente para evitar cache de navegador/proxy
-  let fetchUrl = url;
-  try {
-    const urlObj = new URL(url);
-    urlObj.searchParams.append('_t', Date.now().toString());
-    fetchUrl = urlObj.toString();
-  } catch {
-    // se não for uma URL válida, ignora
+  // Limpa espaços acidentais e sanitiza o ID do Google Sheets
+  const cleanUrl = url.trim();
+  let fetchUrl = cleanUrl;
+
+  const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
+  if (idMatch) {
+    const cleanId = idMatch[1].replace(/\s+/g, '');
+    // Preserva o restante da URL original após o ID
+    fetchUrl = cleanUrl.replace(idMatch[1], cleanId);
   }
 
-  try {
-    const res = await fetch(fetchUrl, { cache: 'no-store' });
-    if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-    return res;
-  } catch (err) {
-    console.warn('Fetch direto falhou, tentando proxies...', err);
-    
-    // Tenta primeiro o Vercel Serverless Proxy oficial (imune a CORS e bloqueios de IP compartilhados)
-    try {
-      const vercelProxy = `/api/proxy?url=${encodeURIComponent(fetchUrl)}`;
-      const resVercel = await fetch(vercelProxy, { cache: 'no-store' });
-      // Ignoramos erro 404 porque no 'npm run dev' local o /api/proxy não existe na rota sem config adicional
-      if (resVercel.ok) return resVercel;
-      if (resVercel.status !== 404) throw new Error(`Vercel Proxy falhou: ${resVercel.status}`);
-    } catch {
-      // Falhou silenciosamente, passa para o próximo
-    }
-
-    // Tenta o corsproxy.io que suporta bem arquivos binários (XLSX)
-    try {
-      const proxy1 = `https://corsproxy.io/?${encodeURIComponent(fetchUrl)}`;
-      const resProxy1 = await fetch(proxy1, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-      if (!resProxy1.ok) throw new Error(`Erro no Proxy 1: ${resProxy1.status}`);
-      return resProxy1;
-    } catch {
-      // Se falhar, tenta o allorigins como alternativa
-      try {
-        const proxy2 = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}&disableCache=true`;
-        const resProxy2 = await fetch(proxy2, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-        if (!resProxy2.ok) throw new Error(`Erro no Proxy 2: ${resProxy2.status}`);
-        return resProxy2;
-      } catch {
-        throw new Error("O Google bloqueou o acesso. Verifique as permissões de partilha do link.");
-      }
-    }
+  // TODAS as requisições passam pelo proxy interno — sem proxies externos
+  const proxyUrl = `/api/proxy?url=${encodeURIComponent(fetchUrl)}`;
+  const res = await fetch(proxyUrl, { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(
+      `Não foi possível carregar a planilha (status ${res.status}). ` +
+      'Verifique se o link está correto e se a planilha está pública.'
+    );
   }
+  return res;
 };
 
 export const formatDisciplina = (nome) => {

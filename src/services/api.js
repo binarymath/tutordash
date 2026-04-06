@@ -1,4 +1,5 @@
-import { normalizeName, formatBimestre, fetchWithFallback } from '../utils/helpers';
+import { normalizeName, formatBimestre } from '../utils/helpers';
+
 
 let xlsxModulePromise = null;
 
@@ -9,19 +10,46 @@ export const getXLSX = async () => {
   return xlsxModulePromise;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────────────
+// Função central de fetch: SEMPRE usa o proxy interno /api/proxy.
+// Isso contorna o CORS do browser e aceita URLs com espaços acidentais.
+// ─────────────────────────────────────────────────────────────────────────────────────
 const fetchAndParseCSV = async (url) => {
   if (!url) return [];
-  let fetchUrl = url;
-  if (fetchUrl.includes('docs.google.com/spreadsheets')) {
-    const idMatch = fetchUrl.match(/\/d\/(.*?)(\/|$)/);
-    if (idMatch) fetchUrl = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=csv`;
+
+  // 1. Limpa espaços acidentais na URL inteira
+  const cleanUrl = url.trim();
+
+  // 2. Extrai o ID da planilha e remove espaços internos que corrompem a URL
+  let fetchUrl;
+  const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
+  if (idMatch) {
+    const cleanId = idMatch[1].replace(/\s+/g, ''); // ex: "abc def" → "abcdef"
+    fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=csv`;
+  } else {
+    // URL genérica (não é Google Sheets) — usa como está
+    fetchUrl = cleanUrl;
   }
-  const res = await fetchWithFallback(fetchUrl);
-  const text = await res.text();
-  const XLSX = await getXLSX();
-  const wb = XLSX.read(text, { type: 'string' });
-  return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+
+  // 3. Requisita EXCLUSIVAMENTE pelo proxy interno (sem CORS, sem proxies externos)
+  try {
+    const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+    const res = await fetch(proxyUrl, { cache: 'no-store' });
+    if (!res.ok) {
+      throw new Error(`Proxy respondeu com status ${res.status} para: ${fetchUrl}`);
+    }
+    const text = await res.text();
+    const XLSX = await getXLSX();
+    const wb = XLSX.read(text, { type: 'string' });
+    return XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+  } catch (error) {
+    console.error('[fetchAndParseCSV] Falhou:', error.message);
+    throw new Error(
+      'Não foi possível carregar a planilha. Verifique se o link está correto e se a planilha está pública.'
+    );
+  }
 };
+
 
 const normalizeHeader = (value) =>
   String(value || '')
@@ -116,12 +144,20 @@ export const fetchProvas = async (url) => {
 export const fetchConceitos = async (url) => {
   if (!url) return [];
   
-  let fetchCUrl = url;
-  if (fetchCUrl.includes('docs.google.com/spreadsheets')) {
-    const idMatch = fetchCUrl.match(/\/d\/(.*?)(\/|$)/);
-    if (idMatch) fetchCUrl = `https://docs.google.com/spreadsheets/d/${idMatch[1]}/export?format=xlsx`;
+  // Limpa e constrói a URL de exportação XLSX via proxy interno
+  const cleanCUrl = url.trim();
+  const idMatchC = cleanCUrl.match(/\/d\/([^/\s]+)/);
+  let fetchCUrl;
+  if (idMatchC) {
+    const cleanId = idMatchC[1].replace(/\s+/g, '');
+    fetchCUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=xlsx`;
+  } else {
+    fetchCUrl = cleanCUrl;
   }
-  const res         = await fetchWithFallback(fetchCUrl);
+
+  const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchCUrl);
+  const res         = await fetch(proxyUrl, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`Proxy respondeu ${res.status} ao carregar conceitos.`);
   const arrayBuffer = await res.arrayBuffer();
   const XLSX        = await getXLSX();
   const wb          = XLSX.read(arrayBuffer, { type: 'array' });
