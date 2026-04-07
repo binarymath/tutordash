@@ -48,8 +48,9 @@ export default async function handler(req, res) {
       res.setHeader('Content-Type', contentType);
     }
 
-    // Sem cache — evita guardar erros de permissão
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    // Cache de Edge: 60 s na CDN Vercel, revalidação silenciosa até 5 min.
+    // URL estável (sem _t) é condição necessária — garantida pelo fetchWithFallback.
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
 
     const buffer = await response.arrayBuffer();
     return res.status(200).send(Buffer.from(buffer));

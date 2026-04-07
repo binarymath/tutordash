@@ -45,7 +45,7 @@ const fetchAndParseCSV = async (url) => {
       proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
     }
 
-    const res = await fetch(proxyUrl, { cache: 'no-store' });
+    const res = await fetch(proxyUrl);
     if (!res.ok) {
       throw new Error(`Proxy respondeu com status ${res.status} para: ${fetchUrl}`);
     }
@@ -167,7 +167,7 @@ export const fetchConceitos = async (url) => {
   }
 
   const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchCUrl);
-  const res         = await fetch(proxyUrl, { cache: 'no-store' });
+  const res         = await fetch(proxyUrl);
   if (!res.ok) throw new Error(`Proxy respondeu ${res.status} ao carregar conceitos.`);
   const arrayBuffer = await res.arrayBuffer();
   const XLSX        = await getXLSX();

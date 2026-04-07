@@ -60,9 +60,13 @@ export const fetchWithFallback = async (url) => {
     fetchUrl = cleanUrl.replace(idMatch[1], cleanId);
   }
 
-  // TODAS as requisições passam pelo proxy interno — sem proxies externos
+  // Passa pela Vercel Edge sem cache-busting (_t ou cache:'no-store'):
+  // o s-maxage definido no proxy permite que a CDN sirva da cache por 60 s,
+  // reduzindo latência e evitando hits desnecessários ao Google.
+  // Nota: NÃO adicionamos _t aqui — uma URL estável é condição obrigatória
+  // para o cache de Edge funcionar.
   const proxyUrl = `/api/proxy?url=${encodeURIComponent(fetchUrl)}`;
-  const res = await fetch(proxyUrl, { cache: 'no-store' });
+  const res = await fetch(proxyUrl);
   if (!res.ok) {
     throw new Error(
       `Não foi possível carregar a planilha (status ${res.status}). ` +
