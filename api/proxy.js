@@ -20,13 +20,22 @@ export default async function handler(req, res) {
     const targetUrl = decodeURIComponent(url);
 
     // redirect:'follow' é obrigatório — o Google Sheets redireciona antes de servir o CSV
+    // credentials:'omit' garante que cookies/sessão do utilizador NÃO são enviados ao Google
     const response = await fetch(targetUrl, {
       redirect: 'follow',
+      credentials: 'omit',
       headers: {
-        // Evita que o Google bloqueie por falta de User-Agent
-        'User-Agent': 'Mozilla/5.0 (compatible; TutorDash-Proxy/1.0)',
+        'User-Agent': 'TutorDash-Bot/1.0',
+        'Accept': 'text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       },
     });
+
+    // Bloco de verificação: respostas de redirecionamento ou acesso negado
+    if (response.status === 302 || response.status === 401 || response.status === 403) {
+      return res
+        .status(403)
+        .json({ error: 'Acesso Negado. Verifique se a planilha está partilhada com o link público.' });
+    }
 
     if (!response.ok) {
       return res
@@ -39,8 +48,8 @@ export default async function handler(req, res) {
       res.setHeader('Content-Type', contentType);
     }
 
-    // Cache moderado: 60 s na CDN, revalidação silenciosa até 5 min
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+    // Sem cache — evita guardar erros de permissão
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
 
     const buffer = await response.arrayBuffer();
     return res.status(200).send(Buffer.from(buffer));

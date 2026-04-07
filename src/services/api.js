@@ -20,20 +20,31 @@ const fetchAndParseCSV = async (url) => {
   // 1. Limpa espaços acidentais na URL inteira
   const cleanUrl = url.trim();
 
-  // 2. Extrai o ID da planilha e remove espaços internos que corrompem a URL
+  // 2. Constrói a fetchUrl definitiva:
+  //    - URLs do Google Sheets (contendo /d/<ID>) → converte para export CSV limpo
+  //    - Qualquer outra URL → usa como está
   let fetchUrl;
   const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
   if (idMatch) {
     const cleanId = idMatch[1].replace(/\s+/g, ''); // ex: "abc def" → "abcdef"
     fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=csv`;
   } else {
-    // URL genérica (não é Google Sheets) — usa como está
     fetchUrl = cleanUrl;
   }
 
-  // 3. Requisita EXCLUSIVAMENTE pelo proxy interno (sem CORS, sem proxies externos)
+  // 3. Garante que a requisição passa SEMPRE pelo proxy interno —
+  //    mesmo que fetchUrl já seja um URL /export ou genérico sem o prefixo proxy.
+  //    Isso evita problemas de CORS e garante que cookies/sessão do browser
+  //    nunca são enviados directamente ao Google.
   try {
-    const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+    let proxyUrl;
+    if (fetchUrl.includes('/api/proxy?url=')) {
+      // Já está encaminhado pelo proxy — usa como está
+      proxyUrl = fetchUrl;
+    } else {
+      proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+    }
+
     const res = await fetch(proxyUrl, { cache: 'no-store' });
     if (!res.ok) {
       throw new Error(`Proxy respondeu com status ${res.status} para: ${fetchUrl}`);
