@@ -17,27 +17,78 @@ import StudentProfile from './components/StudentProfile';
 const App = () => {
   const queryClient = useQueryClient();
 
-  const [config, setConfig] = useState(() => {
-    const defaultConfig = {
+  const [multiConfig, setMultiConfig] = useState(() => {
+    const defaultProfileData = {
       studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: ''
+    };
+    const defaultData = {
+      activeProfile: 'Principal',
+      profiles: {
+        'Principal': { ...defaultProfileData }
+      }
     };
 
     try {
       const saved = localStorage.getItem('tutorDashConfig');
-      if (!saved) return defaultConfig;
+      if (!saved) return defaultData;
 
       const parsed = JSON.parse(saved);
+      
+      // Migração: se for um objeto antigo que não tem activeProfile
+      if (parsed && !parsed.activeProfile) {
+        return {
+          activeProfile: 'Principal',
+          profiles: {
+            'Principal': { ...defaultProfileData, ...parsed }
+          }
+        };
+      }
       return {
-        ...defaultConfig,
-        ...(parsed && typeof parsed === 'object' ? parsed : {})
+        ...defaultData,
+        ...parsed,
+        profiles: {
+          ...defaultData.profiles,
+          ...(parsed.profiles || {})
+        }
       };
     } catch {
-      return defaultConfig;
+      return defaultData;
     }
   });
+
   useEffect(() => {
-    localStorage.setItem('tutorDashConfig', JSON.stringify(config));
-  }, [config]);
+    localStorage.setItem('tutorDashConfig', JSON.stringify(multiConfig));
+  }, [multiConfig]);
+
+  const changeProfile = (nome) => {
+    if (nome === multiConfig.activeProfile) return;
+    
+    // Prevenção de "Stale State": Limpa imediatamente o cache das queries
+    // Isso forçará o estado "Carregando" puro até que novos dados cheguem
+    queryClient.removeQueries();
+
+    setMultiConfig(prev => {
+      const profiles = { ...prev.profiles };
+      if (!profiles[nome]) {
+        // Se para algum motivo pedir perfil novo aqui
+        profiles[nome] = { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' };
+      }
+      return { ...prev, activeProfile: nome, profiles };
+    });
+  };
+
+  const saveProfile = (nome, configUrls) => {
+    setMultiConfig(prev => ({
+      ...prev,
+      profiles: {
+        ...prev.profiles,
+        [nome]: configUrls
+      }
+    }));
+  };
+
+  const activeProfile = multiConfig.activeProfile;
+  const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' };
 
   // ── Estado de navegação ────────────────────────────────────
   const [showSettings,          setShowSettings]          = useState(false);
@@ -250,10 +301,12 @@ const App = () => {
 
       {showSettings && (
         <ConfigModal
-          config={config}
-          setConfig={setConfig}
+          activeProfile={activeProfile}
+          profiles={multiConfig.profiles}
+          changeProfile={changeProfile}
+          saveProfile={saveProfile}
           onClose={() => setShowSettings(false)}
-          onLoad={loadAllData}
+          onLoad={() => loadAllData(false)}
           isLoading={isLoading}
         />
       )}
