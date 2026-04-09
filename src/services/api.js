@@ -70,23 +70,97 @@ const normalizeHeader = (value) =>
     .replace(/\s+/g, ' ')
     .trim();
 
+const normalizeHeaderToken = (value) =>
+  normalizeHeader(value).replace(/\s+/g, '');
+
+const isRefSpreadsheetError = (value) => {
+  const normalized = normalizeHeaderToken(value).replace(/!/g, '');
+  return normalized === '#REF';
+};
+
+const sanitizeCellText = (value) => {
+  const text = String(value || '').trim();
+  return isRefSpreadsheetError(text) ? '' : text;
+};
+
+export const parsePlanilhaTutoriaMedio = (csvArray) => {
+  const grupos = new Map();
+  let lastTurma = '';
+  let lastTutor = '';
+
+  csvArray.slice(1).forEach((row) => {
+    const turmaRaw = sanitizeCellText(row?.[0]);
+    const tutorRaw = sanitizeCellText(row?.[1]);
+    const tutorado = sanitizeCellText(row?.[2]);
+
+    if (!tutorado) return;
+
+    if (turmaRaw && turmaRaw !== lastTurma) {
+      lastTutor = '';
+    }
+
+    const turma = turmaRaw || lastTurma || 'Sem Turma';
+    const tutor = tutorRaw || lastTutor || 'Sem Tutor';
+
+    if (turmaRaw) lastTurma = turmaRaw;
+    if (tutorRaw) lastTutor = tutorRaw;
+
+    const key = `${turma}__${tutor}`;
+    if (!grupos.has(key)) {
+      grupos.set(key, { turma, tutor, tutorados: [] });
+    }
+
+    const grupo = grupos.get(key);
+    if (!grupo.tutorados.includes(tutorado)) {
+      grupo.tutorados.push(tutorado);
+    }
+  });
+
+  return Array.from(grupos.values()).map((item, idx) => ({
+    id: idx,
+    turma: item.turma,
+    tutor: item.tutor,
+    tutorados: item.tutorados
+  }));
+};
+
 
 export const fetchStudents = async (url) => {
   if (!url) throw new Error("A URL de Tutores não foi configurada");
-  const alunosArray = await fetchAndParseCSV(url);
-  const formattedAlunos = alunosArray.slice(1).map((row, idx) => {
-    const tutoradosRaw = row.slice(2, 16) || [];
-    const tutorados = tutoradosRaw.map(t => t ? String(t).trim() : "").filter(t => t !== "");
-    return {
-      id: idx,
-      turma: String(row[1] || 'Sem Turma').trim(),
-      tutorados,
-      tutor: String(row[16] || 'Não Atribuído').trim()
-    };
-  }).filter(item => item.tutorados.length > 0);
+  try {
+    const alunosArray = await fetchAndParseCSV(url);
+    const header = alunosArray?.[0] || [];
+    const normalizedHeader = header.map(normalizeHeaderToken);
+    const isFormatoMedio =
+      normalizedHeader.includes('TURMA') &&
+      normalizedHeader.includes('TUTOR') &&
+      normalizedHeader.includes('TUTORADO');
 
-  if (formattedAlunos.length === 0) throw new Error("Nenhum dado válido de tutoria encontrado.");
-  return formattedAlunos;
+    const formattedAlunos = isFormatoMedio
+      ? parsePlanilhaTutoriaMedio(alunosArray)
+      : alunosArray.slice(1).map((row, idx) => {
+          const tutoradosRaw = row.slice(2, 16) || [];
+          const tutorados = tutoradosRaw
+            .map(sanitizeCellText)
+            .filter(t => t !== "");
+          const turmaRaw = sanitizeCellText(row[1]);
+          const tutorRaw = sanitizeCellText(row[16]);
+          return {
+            id: idx,
+            turma: turmaRaw || 'Sem Turma',
+            tutorados,
+            tutor: tutorRaw || 'Não Atribuído'
+          };
+        }).filter(item => item.tutorados.length > 0);
+
+    if (formattedAlunos.length === 0) throw new Error("Nenhum dado válido de tutoria encontrado.");
+    return formattedAlunos;
+  } catch (error) {
+    console.error('[fetchStudents] Falhou ao processar Tutoria:', error.message);
+    throw new Error(
+      'Não foi possível processar a planilha de Tutoria. Verifique o formato e os dados do arquivo.'
+    );
+  }
 };
 
 export const fetchNotes = async (url) => {
