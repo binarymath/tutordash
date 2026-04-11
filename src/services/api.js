@@ -248,6 +248,12 @@ export const fetchConceitos = async (url) => {
   const wb          = XLSX.read(arrayBuffer, { type: 'array' });
   let todosConceitos = [];
 
+  const formatarTurma = (nomeRaw) => {
+    if (!nomeRaw) return 'Desconhecida';
+    const match = nomeRaw.match(/(\d)[ºª]?\s*(?:S[EÉ]RIE|ANO)?\s*([A-Z])/i);
+    return match ? `${match[1]}${match[2].toUpperCase()}` : nomeRaw.trim();
+  };
+
   wb.SheetNames.forEach(nomeDaGuia => {
     const ws       = wb.Sheets[nomeDaGuia];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
@@ -261,6 +267,9 @@ export const fetchConceitos = async (url) => {
         if (row[0] === 'Tipo Fechamento:') bimestreRaw   = row[1];
         if (row[0] === 'ALUNO') { headerRowIdx = i; break; }
     }
+
+    // Aplica a formatação à turma
+    turmaPlanilha = formatarTurma(String(turmaPlanilha));
 
     if (headerRowIdx !== -1) {
         let headers  = jsonData[headerRowIdx];
@@ -280,6 +289,7 @@ export const fetchConceitos = async (url) => {
         const subjects = [];
         let tfIdx = -1;
         let freqIdx = -1;
+        let situacaoIdx = -1;
 
         headers.forEach((h, idx) => {
         if (typeof h === 'string') {
@@ -308,11 +318,23 @@ export const fetchConceitos = async (url) => {
             freqIdx = idx;
             }
 
-            if (h.includes('\n')) {
-            const subjectName = h.split('\n')[0].trim();
-            if (!subjectName.toUpperCase().includes('TOTAL') && !isTf && !isFreq) {
-                subjects.push({ index: idx, name: subjectName });
+            if (situacaoIdx === -1 && (compact === 'SITUACAO' || compact.includes('SITUACAO'))) {
+            situacaoIdx = idx;
             }
+
+            const nonSubjectKeywords = ['ALUNO', 'RA', 'NÚMERO', 'Nº', 'SITUAÇÃO', 'TOTAL', 'CH'];
+            const excludeList = nonSubjectKeywords.map(w => w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
+            
+            const isExcluded = excludeList.some(w => {
+              if (w === 'Nº') return upperH.includes('Nº');
+              return new RegExp(`\\b${w}\\b`).test(upperH);
+            });
+
+            if (!isTf && !isFreq && !isExcluded) {
+              const subjectName = h.includes('\n') ? h.split('\n')[0].trim() : String(h).trim();
+              if (subjectName) {
+                subjects.push({ index: idx, name: subjectName });
+              }
             }
         }
         });
@@ -337,29 +359,48 @@ export const fetchConceitos = async (url) => {
         });
         }
 
-        const dadosDaGuia = jsonData.slice(headerRowIdx + 1).map(row => {
-        const alunoNome = row[0];
-        if (!alunoNome || String(alunoNome).trim() === '' || String(alunoNome).includes('Aulas Dadas')) return null;
-        let notas = {};
-        subjects.forEach(sub => {
-            notas[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
-        });
-        const tfBimestre = tfIdx !== -1 && row[tfIdx] !== undefined && row[tfIdx] !== null && String(row[tfIdx]).trim() !== ''
-            ? String(row[tfIdx]).trim()
-            : '-';
-        const freqBimestre = freqIdx !== -1 && row[freqIdx] !== undefined && row[freqIdx] !== null && String(row[freqIdx]).trim() !== ''
-            ? String(row[freqIdx]).trim()
-            : '-';
-        return {
-            normalizedName: normalizeName(alunoNome),
-            bimestre: formatBimestre(bimestreRaw),
-            turmaPlanilha: String(turmaPlanilha).trim(),
-            notas,
-            tfBimestre,
-            freqBimestre,
-            faltas: tfBimestre
-        };
-        }).filter(Boolean);
+        if (situacaoIdx === -1) situacaoIdx = 1;
+
+        const dadosDaGuia = [];
+        const rowsAfterHeader = jsonData.slice(headerRowIdx + 1);
+
+        for (const row of rowsAfterHeader) {
+          const alunoNome = row[0];
+          const nomeNormalizado = String(alunoNome || '').trim().toUpperCase();
+
+          if (!nomeNormalizado || nomeNormalizado.includes('LEGENDA') || nomeNormalizado === 'SITUAÇÃO' || nomeNormalizado.startsWith('C -')) {
+              break; 
+          }
+
+          if (nomeNormalizado.includes('AULAS DADAS')) continue;
+
+          let notas = {};
+          subjects.forEach(sub => {
+              notas[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
+          });
+          
+          const tfBimestre = tfIdx !== -1 && row[tfIdx] !== undefined && row[tfIdx] !== null && String(row[tfIdx]).trim() !== ''
+              ? String(row[tfIdx]).trim()
+              : '-';
+          const freqBimestre = freqIdx !== -1 && row[freqIdx] !== undefined && row[freqIdx] !== null && String(row[freqIdx]).trim() !== ''
+              ? String(row[freqIdx]).trim()
+              : '-';
+              
+          const situacaoRaw = row[situacaoIdx];
+          const situacao = situacaoRaw && String(situacaoRaw).trim() !== '' ? String(situacaoRaw).trim() : 'Ativo';
+
+          dadosDaGuia.push({
+              nomeOriginal: String(alunoNome).trim(),
+              normalizedName: normalizeName(alunoNome),
+              bimestre: formatBimestre(bimestreRaw),
+              turmaPlanilha: turmaPlanilha,
+              notas,
+              tfBimestre,
+              freqBimestre,
+              faltas: tfBimestre,
+              situacao
+          });
+        }
 
         todosConceitos = [...todosConceitos, ...dadosDaGuia];
     }

@@ -99,6 +99,7 @@ const App = () => {
   const [selectedSessionFilters, setSelectedSessionFilters] = useState([]);
   const [sortConfig,            setSortConfig]            = useState({ key: 'turma', direction: 'asc' });
   const [showStickyName,        setShowStickyName]        = useState(false);
+  const [showOnlyActive,        setShowOnlyActive]        = useState(false);
 
   // Resetar filtro de sessão ao trocar de aluno
   useEffect(() => { setSelectedSessionFilters([]); }, [selectedStudent]);
@@ -116,7 +117,35 @@ const App = () => {
   const { data: provaData = [], isLoading: isLoadingProvas, isFetching: isFetchingProvas, error: errorProvas } = useProvas(config.provaUrl);
   const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(config.conceitoUrl);
 
-  const data = dataRaw;
+  const data = useMemo(() => {
+    // Cria Set de alunos (nome normalizado) que já possuem tutor atribuído
+    const tutoredSet = new Set();
+    dataRaw.forEach(item => {
+      item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)));
+    });
+
+    // Identifica alunos "órfãos" no Mapão (conceitoData) que não tenham ligação no Array Base (tutoredSet)
+    const orphansByTurma = {};
+    conceitoData.forEach(c => {
+      if (!tutoredSet.has(c.normalizedName)) {
+        if (!orphansByTurma[c.turmaPlanilha]) {
+          orphansByTurma[c.turmaPlanilha] = new Map();
+        }
+        // Guarda apenas nomes únicos mapeando normalized -> original
+        orphansByTurma[c.turmaPlanilha].set(c.normalizedName, c.nomeOriginal || c.normalizedName);
+      }
+    });
+
+    // Constrói agrupamentos por turma para integrar junto aos dados normais
+    const orphanGroups = Object.entries(orphansByTurma).map(([turma, mapAlunos], idx) => ({
+      id: `orphan-${idx}`,
+      turma: turma,
+      tutor: 'Sem Tutor',
+      tutorados: Array.from(mapAlunos.values())
+    }));
+
+    return [...dataRaw, ...orphanGroups];
+  }, [dataRaw, conceitoData]);
   const isLoading = isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos;
   const isSyncing = isFetchingStudents || isFetchingNotes || isFetchingProvas || isFetchingConceitos;
   
@@ -172,7 +201,8 @@ const App = () => {
           historicoConceitos: conceitosDoAluno,
           ultimoMat: quickMat, ultimoPort: quickPort,
           ultimoFaltas: ultimoBimestre?.tfBimestre ?? ultimoBimestre?.faltas ?? '-',
-          ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados'
+          ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
+          situacao: ultimoBimestre?.situacao || 'Ativo'
         });
       });
     });
@@ -219,14 +249,35 @@ const App = () => {
   const optionsList = useMemo(() => {
     const field        = filterMode === 'tutor' ? 'tutor' : 'turma';
     const uniqueValues = [...new Set(data.map(item => item[field]))];
-    return ['Todos', ...uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }))];
+    const sorted = uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+    
+    if (field === 'tutor' && sorted.includes('Sem Tutor')) {
+      return ['Todos', ...sorted.filter(t => t !== 'Sem Tutor'), 'Sem Tutor'];
+    }
+    
+    return ['Todos', ...sorted];
   }, [data, filterMode]);
 
   const filteredData = useMemo(() => {
-    if (selectedValue === 'Todos') return data;
-    const field = filterMode === 'tutor' ? 'tutor' : 'turma';
-    return data.filter(item => item[field] === selectedValue);
-  }, [data, selectedValue, filterMode]);
+    let filteredGroups = data;
+    if (selectedValue !== 'Todos') {
+      const field = filterMode === 'tutor' ? 'tutor' : 'turma';
+      filteredGroups = data.filter(item => item[field] === selectedValue);
+    }
+    
+    if (showOnlyActive) {
+      filteredGroups = filteredGroups.map(group => {
+        const filteredTutorados = group.tutorados.filter(nome => {
+          const norm = normalizeName(nome);
+          const studentInfo = allStudents.find(s => s.normalizedName === norm);
+          return studentInfo && studentInfo.situacao === 'Ativo';
+        });
+        return { ...group, tutorados: filteredTutorados };
+      }).filter(group => group.tutorados.length > 0);
+    }
+    
+    return filteredGroups;
+  }, [data, selectedValue, filterMode, allStudents, showOnlyActive]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
@@ -344,6 +395,8 @@ const App = () => {
                 setSelectedStudent={setSelectedStudent}
                 sortConfig={sortConfig}
                 handleSort={handleSort}
+                showOnlyActive={showOnlyActive}
+                setShowOnlyActive={setShowOnlyActive}
               />
             ) : (
               <StudentProfile
