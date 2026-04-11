@@ -90,3 +90,34 @@ export const formatDisciplina = (nome) => {
   
   return nome;
 };
+
+export const formatTurma = (turma) => {
+  if (!turma) return '';
+  let str = String(turma).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  
+  if (!/\d/.test(str)) {
+      if (str.includes('SEM TURMA')) return 'SEM TURMA';
+      return str.trim();
+  }
+
+  // Treat cases like "3A SERIE" vs "1A"
+  str = str.replace(/(\d)[AO]\s+(SERIE|ANO)/g, '$1 $2');
+  
+  // Separate number and attached letter "1A" -> "1 A"
+  str = str.replace(/(\d)([A-Z])/g, '$1 $2');
+  
+  let cleaned = str.replace(/[ºª°]/g, ' ')
+                   .replace(/\b\d+H\b/g, ' ')
+                   .replace(/\b[A-Z]{2,}\b/g, ' '); 
+
+  const nMatch = cleaned.match(/\d+/);
+  const lMatch = cleaned.match(/\b([A-Z])\b/);
+  
+  if (nMatch && lMatch) {
+      return `${nMatch[0]}${lMatch[1]}`;
+  } else if (nMatch) {
+      return `${nMatch[0]}`;
+  }
+  
+  return str.trim();
+};

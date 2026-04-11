@@ -1,4 +1,4 @@
-import { normalizeName, formatBimestre } from '../utils/helpers';
+import { normalizeName, formatBimestre, formatTurma } from '../utils/helpers';
 
 
 let xlsxModulePromise = null;
@@ -89,7 +89,8 @@ export const parsePlanilhaTutoriaMedio = (csvArray) => {
   let lastTutor = '';
 
   csvArray.slice(1).forEach((row) => {
-    const turmaRaw = sanitizeCellText(row?.[0]);
+    const turmaSanitized = sanitizeCellText(row?.[0]);
+    const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
     const tutorRaw = sanitizeCellText(row?.[1]);
     const tutorado = sanitizeCellText(row?.[2]);
 
@@ -143,7 +144,8 @@ export const fetchStudents = async (url) => {
           const tutorados = tutoradosRaw
             .map(sanitizeCellText)
             .filter(t => t !== "");
-          const turmaRaw = sanitizeCellText(row[1]);
+          const turmaSanitized = sanitizeCellText(row[1]);
+          const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
           const tutorRaw = sanitizeCellText(row[16]);
           return {
             id: idx,
@@ -248,12 +250,6 @@ export const fetchConceitos = async (url) => {
   const wb          = XLSX.read(arrayBuffer, { type: 'array' });
   let todosConceitos = [];
 
-  const formatarTurma = (nomeRaw) => {
-    if (!nomeRaw) return 'Desconhecida';
-    const match = nomeRaw.match(/(\d)[ºª]?\s*(?:S[EÉ]RIE|ANO)?\s*([A-Z])/i);
-    return match ? `${match[1]}${match[2].toUpperCase()}` : nomeRaw.trim();
-  };
-
   wb.SheetNames.forEach(nomeDaGuia => {
     const ws       = wb.Sheets[nomeDaGuia];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
@@ -269,7 +265,7 @@ export const fetchConceitos = async (url) => {
     }
 
     // Aplica a formatação à turma
-    turmaPlanilha = formatarTurma(String(turmaPlanilha));
+    turmaPlanilha = turmaPlanilha && turmaPlanilha !== 'Desconhecida' ? formatTurma(String(turmaPlanilha)) : 'Desconhecida';
 
     if (headerRowIdx !== -1) {
         let headers  = jsonData[headerRowIdx];
