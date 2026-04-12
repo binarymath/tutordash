@@ -73,6 +73,23 @@ const normalizeHeader = (value) =>
 const normalizeHeaderToken = (value) =>
   normalizeHeader(value).replace(/\s+/g, '');
 
+const normalizeCompact = (value) =>
+  normalizeHeader(value)
+    .replace(/[\s():%._-]+/g, '')
+    .trim();
+
+const isAttendanceIndexHeader = (value) => {
+  const compact = normalizeCompact(value);
+  return compact === 'F' ||
+    compact === 'AC' ||
+    compact === 'FTAN' ||
+    compact === 'FREAN' ||
+    compact === 'FREANPERCENT' ||
+    compact === 'FREAN%' ||
+    compact === 'FREQUENCIAANUAL' ||
+    compact === 'FREQUENCIAAN';
+};
+
 const isRefSpreadsheetError = (value) => {
   const normalized = normalizeHeaderToken(value).replace(/!/g, '');
   return normalized === '#REF';
@@ -283,6 +300,7 @@ export const fetchConceitos = async (url) => {
         }
 
         const subjects = [];
+        const attendanceIndexColumns = [];
         let tfIdx = -1;
         let freqIdx = -1;
         let situacaoIdx = -1;
@@ -320,14 +338,19 @@ export const fetchConceitos = async (url) => {
 
             const nonSubjectKeywords = ['ALUNO', 'RA', 'NÚMERO', 'Nº', 'SITUAÇÃO', 'TOTAL', 'CH'];
             const excludeList = nonSubjectKeywords.map(w => w.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase());
+            const subjectName = h.includes('\n') ? h.split('\n')[0].trim() : String(h).trim();
+            const isAttendanceIndex = isAttendanceIndexHeader(subjectName) || isAttendanceIndexHeader(h);
             
             const isExcluded = excludeList.some(w => {
               if (w === 'Nº') return upperH.includes('Nº');
               return new RegExp(`\\b${w}\\b`).test(upperH);
             });
 
-            if (!isTf && !isFreq && !isExcluded) {
-              const subjectName = h.includes('\n') ? h.split('\n')[0].trim() : String(h).trim();
+            if (isAttendanceIndex) {
+              attendanceIndexColumns.push({ index: idx, name: subjectName || String(h).trim() });
+            }
+
+            if (!isTf && !isFreq && !isExcluded && !isAttendanceIndex) {
               if (subjectName) {
                 subjects.push({ index: idx, name: subjectName });
               }
@@ -374,6 +397,11 @@ export const fetchConceitos = async (url) => {
           subjects.forEach(sub => {
               notas[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
           });
+
+          const attendanceIndexes = {};
+          attendanceIndexColumns.forEach((col) => {
+            attendanceIndexes[col.name] = row[col.index] ? String(row[col.index]).trim() : '-';
+          });
           
           const tfBimestre = tfIdx !== -1 && row[tfIdx] !== undefined && row[tfIdx] !== null && String(row[tfIdx]).trim() !== ''
               ? String(row[tfIdx]).trim()
@@ -391,6 +419,7 @@ export const fetchConceitos = async (url) => {
               bimestre: formatBimestre(bimestreRaw),
               turmaPlanilha: turmaPlanilha,
               notas,
+              attendanceIndexes,
               tfBimestre,
               freqBimestre,
               faltas: tfBimestre,

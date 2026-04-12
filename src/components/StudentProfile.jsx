@@ -122,6 +122,24 @@ const getFaltaMetrics = (value) => {
   return { isValid: true, isPercent: text.includes('%'), value: numeric };
 };
 
+const normalizeAttendanceKey = (value) =>
+  String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s():%._-]+/g, '');
+
+const isAttendanceIndexDisciplina = (value) => {
+  const key = normalizeAttendanceKey(value);
+  return key === 'F' ||
+    key === 'AC' ||
+    key === 'FTAN' ||
+    key === 'FREAN' ||
+    key === 'FREANPERCENT' ||
+    key === 'FREQUENCIAANUAL' ||
+    key === 'FREQUENCIAAN';
+};
+
 const toSafeFileName = (text) =>
   String(text || 'aluno')
     .normalize('NFD')
@@ -253,7 +271,11 @@ const svgDataUriToPngBytes = async (svgDataUri, width = 1200, height = 700) => {
 const EvolutivoNumerico = ({ historicoConceitos }) => {
   // Coleta todas as disciplinas únicas
   const allDisciplinasSet = new Set();
-  historicoConceitos.forEach(bim => Object.keys(bim.notas).forEach(d => allDisciplinasSet.add(d)));
+  historicoConceitos.forEach((bim) => {
+    Object.keys(bim.notas)
+      .filter((d) => !isAttendanceIndexDisciplina(d))
+      .forEach((d) => allDisciplinasSet.add(d));
+  });
   const allDisciplinas = Array.from(allDisciplinasSet);
 
   // Agrupa por área
@@ -285,6 +307,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
       frequenciaRaw: freqRaw,
       frequencia,
       tfValue: tfParsed,
+      attendanceIndexes: bim.attendanceIndexes || {},
     };
   });
 
@@ -406,7 +429,7 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-[10px] font-black uppercase tracking-widest text-amber-700 mb-2">Pontos de Atenção</p>
         {disciplinasComRisco.length === 0 ? (
-          <p className="text-[11px] font-bold text-slate-700">Ainda não lançadas menções</p>
+          <p className="text-[11px] font-bold text-slate-700">Nenhuma disciplina abaixo de 5.0</p>
         ) : (
           <ul className="space-y-2 text-[11px] font-bold text-slate-700">
             {disciplinasComRisco.map((item) => (
@@ -481,7 +504,11 @@ const StudentProfile = ({
   const buildReportData = () => {
     const historico = studentProfile?.historicoConceitos || [];
     const disciplinas = Array.from(
-      new Set(historico.flatMap((bim) => Object.keys(bim.notas || {})))
+      new Set(
+        historico.flatMap((bim) =>
+          Object.keys(bim.notas || {}).filter((disciplina) => !isAttendanceIndexDisciplina(disciplina))
+        )
+      )
     );
 
     const notasRows = historico.map((bim) => ({
