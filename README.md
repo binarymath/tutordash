@@ -27,6 +27,7 @@ Bem-vindo ao **TutorDash**! Este documento está dividido em duas partes para at
    - [Stack Tecnológico](#stack)
    - [Arquitetura de Dados](#arquitetura)
    - [Como Executar Localmente](#executar)
+   - [🧪 Testes Automatizados](#testes)
 </details>
 
 <br>
@@ -130,3 +131,99 @@ npm run build && npm run preview
 
 > [!WARNING]  
 > Ao modificar o `/src/services/api.js`, cuidado intenso com a função `normalizeHeader`. O parsing numérico provindo da API Google Sheets via CSV e via export XLSX costuma conter quebra-linhas de formato estranho para o BOM latino. A sanitização já prevê a maioria dessas armadilhas.
+
+---
+
+<a id="testes"></a>
+### 🧪 Testes Automatizados
+
+O TutorDash possui uma suíte de testes robusta construída com **[Vitest](https://vitest.dev/)** e **[React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)**, atingindo **~92% de cobertura global** (212 testes).
+
+#### Pré-requisitos
+
+Certifique-se de que as dependências estão instaladas:
+
+```bash
+npm install
+```
+
+---
+
+#### ▶️ Executar todos os testes
+
+```bash
+npm test
+```
+
+Roda todos os arquivos `*.test.js` e `*.test.jsx` em modo single-run e exibe o resultado no terminal.
+
+---
+
+#### 📊 Gerar relatório de cobertura
+
+```bash
+npm run test:coverage
+```
+
+Exibe no terminal uma tabela detalhada de cobertura por arquivo (Statements, Branches, Functions, Lines). Também gera a pasta `/coverage` com um relatório HTML completo navegável em `coverage/index.html`.
+
+---
+
+#### 🖥️ Interface visual interativa (Watch Mode com UI)
+
+```bash
+npm run test:ui
+```
+
+Abre o navegador com a interface gráfica do Vitest. Ideal para desenvolvimento: os testes re-executam automaticamente a cada alteração de arquivo.
+
+---
+
+#### 📁 Estrutura dos arquivos de teste
+
+```
+src/
+├── test/
+│   └── setup.js                  # Configuração global (jest-dom, canvas mock, Image mock)
+├── utils/
+│   └── helpers.test.js           # Funções puras: normalizeName, formatTurma, fetchWithFallback...
+├── services/
+│   └── api.test.js               # Parsers e fetchers: fetchStudents, fetchNotes, fetchConceitos...
+└── components/
+    ├── EmptyState.test.jsx       # Tela de boas-vindas e estados de configuração (100%)
+    ├── Header.test.jsx           # Cabeçalho, sincronização e navegação (100%)
+    ├── ConfigModal.test.jsx      # Modal de configuração: inputs, perfis, prompt
+    ├── Dashboard.test.jsx        # Tabela, busca, filtros, ordenação e badges
+    └── StudentProfile.test.jsx   # Perfil 360º: notas, gráficos, evolutivo, exports PDF/DOCX
+```
+
+---
+
+#### ✅ Cobertura atual por módulo
+
+| Módulo | Stmts | Branch | Funcs | Lines |
+| :--- | :---: | :---: | :---: | :---: |
+| `EmptyState.jsx` | 100% | 100% | 100% | 100% |
+| `Header.jsx` | 100% | 100% | 100% | 100% |
+| `ConfigModal.jsx` | 100% | 91% | 100% | 100% |
+| `helpers.js` | 97.8% | 94.3% | 100% | 98.5% |
+| `api.js` | 97.2% | 82.4% | 97.5% | 97.7% |
+| `Dashboard.jsx` | 88.8% | 62.0% | 91.3% | 90.0% |
+| `StudentProfile.jsx` | 87.0% | 71.3% | 83.6% | 89.9% |
+| **Global** | **92.5%** | **78.4%** | **89.5%** | **94.1%** |
+
+---
+
+#### ➕ Como adicionar um novo teste
+
+1. Crie um arquivo `NomeDoComponente.test.jsx` na mesma pasta do componente.
+2. Importe os utilitários necessários:
+   ```js
+   import { render, screen, fireEvent } from '@testing-library/react';
+   import { describe, it, expect, vi } from 'vitest';
+   ```
+3. Use `vi.mock('nome-do-modulo', ...)` para isolar dependências externas (fetch, xlsx, recharts).
+4. Execute `npm run test:ui` para ver o resultado em tempo real enquanto escreve.
+
+> [!TIP]
+> Para testar funções que dependem de `fetch`, use `global.fetch = vi.fn().mockResolvedValue(...)` dentro do `beforeEach` e restaure com `afterEach`. Consulte `api.test.js` como referência de boas práticas.
