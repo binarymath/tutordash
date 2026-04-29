@@ -32,6 +32,22 @@ export const parseGrade = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+// Converte nota da Prova Paulista para escala 0–10.
+// O XLSX armazena células de percentual como decimal (53,75% → 0.5375).
+// Suporta: "53,75%" → 5.38 | "0.5375" → 5.38 | "5,37" → 5.37
+export const toScale10 = (raw) => {
+  if (raw === undefined || raw === null) return null;
+  const str = String(raw).trim();
+  if (!str || str === '-') return null;
+  const isPercent = str.includes('%');
+  const numeric = parseFloat(str.replace('%', '').replace(',', '.'));
+  if (Number.isNaN(numeric)) return null;
+  if (isPercent)    return numeric / 10;   // "53,75%" → 5.375
+  if (numeric <= 1) return numeric * 10;   // "0.5375" → 5.375  (decimal XLSX)
+  if (numeric > 10) return numeric / 10;   // "53,75"  → 5.375
+  return numeric;                           // "5,37"   → 5.37
+};
+
 export const checkIsTutor = (tutor, registrar) => {
   if (!tutor || !registrar) return false;
   const t = normalizeName(tutor);

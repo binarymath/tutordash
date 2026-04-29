@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { normalizeName, parseGrade, formatDisciplina } from './utils/helpers';
+import { normalizeName, parseGrade, formatDisciplina, toScale10 } from './utils/helpers';
 import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
 import { useProvas } from './hooks/useProvas';
@@ -196,7 +196,14 @@ const App = () => {
           turma: item.turma, tutor: item.tutor,
           notes: studentNotes, noteCount: studentNotes.length,
           lastNoteDate: studentNotes.length > 0 ? studentNotes[0].displayDate : null,
-          provaPaulista: provaInfo ? provaInfo.resultado : 'S/D',
+          provaPaulista: (() => {
+            const raw = provaInfo?.resultado;
+            if (!raw || raw === 'S/D' || raw === 'S/N') return raw || 'S/D';
+            const scaled = toScale10(raw);
+            return scaled != null
+              ? scaled.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+              : raw;
+          })(),
           provaPaulistaNotas: provaInfo ? provaInfo.notas : null,
           historicoConceitos: conceitosDoAluno,
           ultimoMat: quickMat, ultimoPort: quickPort,
@@ -235,21 +242,6 @@ const App = () => {
 
   const chartDataProva = useMemo(() => {
     if (!studentProfile?.provaPaulistaNotas) return [];
-
-    // Converte nota da Prova Paulista para escala 0–10
-    // Suporta: "48,8%" → 4.88 | "0,488" → 4.88 | "4,88" → 4.88
-    const toScale10 = (raw) => {
-      if (raw === undefined || raw === null) return null;
-      const str = String(raw).trim();
-      if (!str || str === '-') return null;
-      const isPercent = str.includes('%');
-      const numeric = parseFloat(str.replace('%', '').replace(',', '.'));
-      if (Number.isNaN(numeric)) return null;
-      if (isPercent)    return numeric / 10;   // "48,8%" → 4.88
-      if (numeric <= 1) return numeric * 10;   // "0,488" → 4.88
-      if (numeric > 10) return numeric / 10;   // "48,8"  → 4.88
-      return numeric;                           // "4,88"  → 4.88
-    };
 
     // Alunos da mesma turma para calcular a média
     const mesmaTurma = provaData.filter(p => {
