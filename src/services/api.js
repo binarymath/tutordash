@@ -211,38 +211,97 @@ export const fetchNotes = async (url) => {
 
 export const fetchProvas = async (url) => {
   if (!url) return [];
-  const provaArray = await fetchAndParseCSV(url);
-  if (provaArray.length > 1) {
-    const headers    = provaArray[0] || [];
-    const studentIdx = headers.findIndex(h => h && ['aluno', 'nome'].some(kw => String(h).toLowerCase().includes(kw)));
-    const notaIdx    = headers.findIndex(h => h && ['nota', 'acerto', 'resultado', 'desempenho'].some(kw => String(h).toLowerCase().includes(kw)));
-    const excludeWords = ['aluno', 'nome', 'turma', 'ra', 'situação', 'nota', 'resultado', 'desempenho', 'acerto', 'série'];
-    const ppSubjects = [];
-    headers.forEach((h, idx) => {
-      if (typeof h === 'string' && h.trim() !== '') {
-        const lowerH = h.toLowerCase().trim();
-        if (!excludeWords.some(ew => lowerH.includes(ew)) && idx !== studentIdx && idx !== notaIdx) {
-          ppSubjects.push({ index: idx, name: h.trim() });
-        }
-      }
-    });
-    const parsedProva = provaArray.slice(1).map(row => {
-      const alunoNome = studentIdx !== -1 ? row[studentIdx] : '';
-      if (!alunoNome) return null;
-      const notasIndividuais = {};
-      ppSubjects.forEach(sub => {
-        notasIndividuais[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
-      });
-      return {
-        normalizedName: normalizeName(alunoNome),
-        resultado: notaIdx !== -1 && row[notaIdx] ? String(row[notaIdx]) : 'S/N',
-        notas: notasIndividuais
-      };
-    }).filter(p => p && p.normalizedName);
-    return parsedProva;
+
+  // ── Busca o arquivo como XLSX para ler TODAS as abas ──────────────────────
+  // CSV (export?format=csv) só exporta a primeira aba — por isso usamos xlsx.
+  const cleanUrl = url.trim();
+  const idMatch  = cleanUrl.match(/\/d\/([^/\s]+)/);
+  let fetchUrl;
+  if (idMatch) {
+    const cleanId = idMatch[1].replace(/\s+/g, '');
+    fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=xlsx`;
+  } else {
+    fetchUrl = cleanUrl;
   }
-  return [];
+
+  const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+  const res = await fetch(proxyUrl);
+  if (!res.ok) throw new Error(`Proxy respondeu ${res.status} ao carregar provas.`);
+  const arrayBuffer = await res.arrayBuffer();
+  const XLSX = await getXLSX();
+  const wb   = XLSX.read(arrayBuffer, { type: 'array' });
+
+  // ── Parseador reutilizável por aba ─────────────────────────────────────────
+  const parseSheet = (sheetName) => {
+    const ws       = wb.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+    if (jsonData.length <= 1) return [];
+
+    const headers  = jsonData[0] || [];
+    const dataRows = jsonData.slice(1);
+
+    // Coluna do nome: busca 'aluno'/'nome'; fallback col A (0)
+    const studentIdx = (() => {
+      const found = headers.findIndex(
+        h => h && ['aluno', 'nome'].some(kw => String(h).toLowerCase().includes(kw))
+      );
+      return found !== -1 ? found : 0;
+    })();
+
+    const RESULT_IDX      = 3; // Coluna D → (%) de Acertos geral
+    const SUBJECT_START   = 4; // Coluna E em diante → matérias
+
+    // Matérias terminam na primeira coluna completamente vazia
+    let subjectEndIdx = SUBJECT_START - 1;
+    for (let col = SUBJECT_START; col < headers.length; col++) {
+      const hasData = dataRows.some(row => {
+        const v = row[col];
+        return v !== undefined && v !== null && String(v).trim() !== '';
+      });
+      if (hasData) { subjectEndIdx = col; } else { break; }
+    }
+
+    const ppSubjects = [];
+    for (let idx = SUBJECT_START; idx <= subjectEndIdx; idx++) {
+      const name = String(headers[idx] || '').trim();
+      if (name) ppSubjects.push({ index: idx, name });
+    }
+
+    return dataRows
+      .map(row => {
+        const alunoNome = row[studentIdx];
+        if (!alunoNome || String(alunoNome).trim() === '') return null;
+
+        const notas = {};
+        ppSubjects.forEach(sub => {
+          const raw = row[sub.index];
+          notas[sub.name] = (raw !== undefined && raw !== null && String(raw).trim() !== '')
+            ? String(raw).trim()
+            : '-';
+        });
+
+        const resultadoRaw = row[RESULT_IDX];
+        return {
+          normalizedName: normalizeName(String(alunoNome).trim()),
+          resultado: (resultadoRaw !== undefined && resultadoRaw !== null && String(resultadoRaw).trim() !== '')
+            ? String(resultadoRaw).trim()
+            : 'S/N',
+          notas,
+        };
+      })
+      .filter(Boolean);
+  };
+
+  // ── Lê TODAS as abas e combina ────────────────────────────────────────────
+  const allParsed = [];
+  wb.SheetNames.forEach(sheetName => {
+    const rows = parseSheet(sheetName);
+    allParsed.push(...rows);
+  });
+
+  return allParsed;
 };
+
 
 
 export const fetchConceitos = async (url) => {

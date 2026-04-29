@@ -53,15 +53,15 @@ vi.mock('file-saver', () => ({
 }));
 
 vi.mock('docx', () => ({
-  Document: vi.fn().mockReturnValue({}),
+  Document:  class { constructor() {} },
+  Paragraph: class { constructor() {} },
+  Table:     class { constructor() {} },
+  TableCell: class { constructor() {} },
+  TableRow:  class { constructor() {} },
+  TextRun:   class { constructor() {} },
+  ImageRun:  class { constructor() {} },
   Packer: { toBlob: vi.fn().mockResolvedValue(new Blob(['fake'])) },
-  Paragraph: vi.fn().mockImplementation((opts) => opts || {}),
-  Table: vi.fn().mockReturnValue({}),
-  TableCell: vi.fn().mockReturnValue({}),
-  TableRow: vi.fn().mockReturnValue({}),
-  TextRun: vi.fn().mockReturnValue({}),
   HeadingLevel: { HEADING_1: 'H1', HEADING_2: 'H2' },
-  ImageRun: vi.fn().mockReturnValue({}),
   WidthType: { PERCENTAGE: 'pct' },
 }));
 

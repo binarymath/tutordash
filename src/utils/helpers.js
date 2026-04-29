@@ -121,3 +121,153 @@ export const formatTurma = (turma) => {
   
   return str.trim();
 };
+
+// ─────────────────────────────────────────────────────────────
+// parseProvaPaulistaExcel
+// Lê um ArrayBuffer de um .xlsx com abas no padrão "{Turma}-{Bimestre}"
+// (ex: "6A-1Bim") e retorna dados comparativos Aluno vs Turma.
+//
+// @param {ArrayBuffer} arrayBuffer   - Bytes do arquivo .xlsx
+// @param {string}      studentName   - Nome do aluno a pesquisar
+// @param {Array}       allStudents   - Lista global de alunos [{nome, turma, ...}]
+// @param {string}      targetBimestre - Ex: "1º Bimestre", "2Bim", "Primeiro", etc.
+// @returns {Array} [{ subject, Aluno, Turma }, ...]  Aluno/Turma em escala 0–10
+// ─────────────────────────────────────────────────────────────
+export const parseProvaPaulistaExcel = (arrayBuffer, studentName, allStudents, targetBimestre) => {
+  try {
+    if (!arrayBuffer || !studentName || !allStudents?.length) return [];
+
+    // 1. Encontrar a turma do aluno em allStudents
+    const normalizedTarget = normalizeName(studentName);
+    const foundStudent = allStudents.find(
+      (s) => normalizeName(s.nome) === normalizedTarget
+    );
+    if (!foundStudent?.turma) return [];
+
+    // 2. Normalizar turma → "6A", "7B", etc.
+    const normalizedTurma = formatTurma(foundStudent.turma);
+    if (!normalizedTurma) return [];
+
+    // 3. Normalizar bimestre → "1Bim", "2Bim", "3Bim", "4Bim"
+    const bimStr = String(targetBimestre || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    let bimNum = null;
+    if (bimStr.includes('1') || bimStr.includes('PRIMEIRO') || bimStr.includes('PRIMEIR')) bimNum = 1;
+    else if (bimStr.includes('2') || bimStr.includes('SEGUNDO') || bimStr.includes('SEGUND')) bimNum = 2;
+    else if (bimStr.includes('3') || bimStr.includes('TERCEIRO') || bimStr.includes('TERCEIR')) bimNum = 3;
+    else if (bimStr.includes('4') || bimStr.includes('QUARTO') || bimStr.includes('QUART')) bimNum = 4;
+    if (!bimNum) return [];
+
+    const normalizedBimestre = `${bimNum}Bim`;
+    const targetSheetName = `${normalizedTurma}-${normalizedBimestre}`;
+
+    // 4. Ler workbook (importação dinâmica síncrona via require-style é inviável no ESM;
+    //    quem chamar esta função deve importar XLSX e passá-lo, OU usamos o import global)
+    //    A convenção do projeto é: o chamador importa XLSX e passa o arrayBuffer já lido.
+    //    Aqui usamos a referência global window.XLSX ou o XLSX importado no topo do bundle.
+    // eslint-disable-next-line no-undef
+    const XLSX = (typeof globalThis !== 'undefined' && globalThis.XLSX)
+      ? globalThis.XLSX
+      // fallback: tenta require (só em ambientes CJS/test)
+      // eslint-disable-next-line no-undef
+      : (typeof require !== 'undefined' ? require('xlsx') : null);
+
+    if (!XLSX) return [];
+
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+
+    // 4. Acesso O(1) à aba
+    const sheet = workbook.Sheets[targetSheetName];
+    if (!sheet) return [];
+
+    // 5. Converte para JSON
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+    if (!rows.length) return [];
+
+    // 6. Set de nomes dos alunos da mesma turma (normalizado)
+    const turmaSet = new Set(
+      allStudents
+        .filter((s) => formatTurma(s.turma) === normalizedTurma)
+        .map((s) => normalizeName(s.nome))
+    );
+
+    // Função para converter nota percentual ou decimal em escala 0–10
+    const toScale10 = (val) => {
+      if (val === undefined || val === null) return null;
+      const str = String(val).trim();
+      if (!str || str === '-') return null;
+      const isPercent = str.includes('%');
+      const numeric = parseFloat(str.replace('%', '').replace(',', '.'));
+      if (Number.isNaN(numeric)) return null;
+      if (isPercent) {
+        // "48,8%" → 48.8 → escala 0-10: 4.88
+        return numeric / 10;
+      }
+      if (numeric > 0 && numeric <= 1) {
+        // decimal 0.488 → 4.88
+        return numeric * 10;
+      }
+      // valor já em escala 0-10 ou 0-100
+      if (numeric > 10) return numeric / 10;
+      return numeric;
+    };
+
+    // Detecta automaticamente as colunas de disciplina
+    // (ignora "Nome", colunas de presença, etc.)
+    const IGNORE_KEYS_UPPER = new Set([
+      'NOME', 'NAME', 'ALUNO', 'TURMA', 'CLASSE', 'CLASS',
+      'F', 'AC', 'FTAN', 'FREAN', 'FREQUENCIA', 'FREQUÊNCIA',
+      'SITUACAO', 'SITUAÇÃO', 'STATUS',
+    ]);
+    const firstRow = rows[0] || {};
+    const subjectKeys = Object.keys(firstRow).filter((k) => {
+      const upper = String(k).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim();
+      return !IGNORE_KEYS_UPPER.has(upper);
+    });
+
+    // 7. Acumula notas por disciplina
+    const subjectData = {};
+    subjectKeys.forEach((key) => {
+      subjectData[key] = { somaTurma: 0, countTurma: 0, notaAluno: null };
+    });
+
+    const normalizedStudentName = normalizeName(studentName);
+
+    rows.forEach((row) => {
+      const rowName = normalizeName(String(row['Nome'] ?? row['NOME'] ?? row['Aluno'] ?? row['ALUNO'] ?? ''));
+      if (!rowName) return;
+
+      const isFromTurma = turmaSet.has(rowName);
+      const isTargetStudent = rowName === normalizedStudentName;
+
+      subjectKeys.forEach((key) => {
+        const nota = toScale10(row[key]);
+        if (nota === null) return;
+
+        if (isFromTurma) {
+          subjectData[key].somaTurma += nota;
+          subjectData[key].countTurma += 1;
+        }
+        if (isTargetStudent) {
+          subjectData[key].notaAluno = nota;
+        }
+      });
+    });
+
+    // 8. Monta resultado final
+    const result = subjectKeys.map((key) => {
+      const d = subjectData[key];
+      const mediaTurma = d.countTurma > 0
+        ? Math.round((d.somaTurma / d.countTurma) * 100) / 100
+        : null;
+      return {
+        subject: String(key).trim(),
+        Aluno: d.notaAluno !== null ? Math.round(d.notaAluno * 100) / 100 : null,
+        Turma: mediaTurma,
+      };
+    }).filter((item) => item.Aluno !== null || item.Turma !== null);
+
+    return result;
+  } catch {
+    return [];
+  }
+};

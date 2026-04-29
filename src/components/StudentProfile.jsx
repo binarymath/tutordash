@@ -10,7 +10,7 @@ import {
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip as RechartsTooltip, Legend
+  CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
 import { formatDisciplina, parseGrade } from '../utils/helpers';
 
@@ -532,7 +532,8 @@ const StudentProfile = ({
 
     const provaRows = (chartDataProva || []).map((item) => ({
       disciplina: item.fullSubject || item.subject || '-',
-      desempenho: item.Desempenho ?? '-',
+      aluno:      item.Aluno != null ? Number(item.Aluno).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
+      turma:      item.Turma != null ? Number(item.Turma).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-',
     }));
 
     const radarMapaoUri = buildRadarSvgDataUri({
@@ -557,9 +558,14 @@ const StudentProfile = ({
       labels: provaRows.map((row) => row.disciplina),
       datasets: [
         {
-          name: 'Desempenho',
+          name: 'Média da Turma',
+          color: '#94a3b8',
+          values: provaRows.map((row) => parseFloat(String(row.turma).replace(',', '.')) || 0),
+        },
+        {
+          name: 'Aluno',
           color: '#0ea5e9',
-          values: provaRows.map((row) => Number(row.desempenho) || 0),
+          values: provaRows.map((row) => parseFloat(String(row.aluno).replace(',', '.')) || 0),
         },
       ],
     });
@@ -611,10 +617,11 @@ const StudentProfile = ({
         ? provaRows.map((row) => `
           <tr>
             <td>${escapeHtml(row.disciplina)}</td>
-            <td>${escapeHtml(row.desempenho)}</td>
+            <td>${escapeHtml(String(row.aluno))}</td>
+            <td>${escapeHtml(String(row.turma))}</td>
           </tr>
         `).join('')
-        : `<tr><td colspan="2">Sem dados para o Radar de Desempenho (Prova Paulista).</td></tr>`;
+        : `<tr><td colspan="3">Sem dados para o Radar de Desempenho (Prova Paulista).</td></tr>`;
 
       container = document.createElement('div');
       container.innerHTML = `
@@ -681,7 +688,8 @@ const StudentProfile = ({
               <thead>
                 <tr>
                   <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Disciplina</th>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Desempenho</th>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Aluno</th>
+                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Média Turma</th>
                 </tr>
               </thead>
               <tbody>${provaHtml}</tbody>
@@ -831,7 +839,7 @@ const StudentProfile = ({
 
       const provaTableRows = [
         new TableRow({
-          children: ['Disciplina', 'Desempenho'].map((title) =>
+          children: ['Disciplina', 'Aluno', 'Média Turma'].map((title) =>
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
           ),
         }),
@@ -840,14 +848,16 @@ const StudentProfile = ({
               new TableRow({
                 children: [
                   new TableCell({ children: [new Paragraph(String(row.disciplina))] }),
-                  new TableCell({ children: [new Paragraph(String(row.desempenho))] }),
+                  new TableCell({ children: [new Paragraph(String(row.aluno))] }),
+                  new TableCell({ children: [new Paragraph(String(row.turma))] }),
                 ],
               })
             )
           : [
               new TableRow({
                 children: [
-                  new TableCell({ children: [new Paragraph('Sem dados para o Radar da Prova Paulista.')], columnSpan: 2 }),
+                  new TableCell({ children: [new Paragraph('Sem dados para o Radar da Prova Paulista.')], columnSpan: 3 }),
+                  new TableCell({ children: [new Paragraph('')] }),
                   new TableCell({ children: [new Paragraph('')] }),
                 ],
               }),
@@ -1116,10 +1126,64 @@ const StudentProfile = ({
           </div>
 
           {showProvaPaulista && (
-            <>
-              <div className="text-4xl font-black text-blue-600 mb-1">{studentProfile.provaPaulista}</div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">Desempenho Geral</p>
-            </>
+            <div className="space-y-4">
+              {/* Badge de Desempenho Geral */}
+              <div className="flex items-center gap-4 p-4 bg-sky-50 rounded-2xl border border-sky-100">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-0.5">Desempenho Geral</span>
+                  <span className="text-3xl font-black text-sky-700 leading-none">{studentProfile.provaPaulista || 'S/D'}</span>
+                </div>
+                <div className="h-12 w-px bg-sky-200 mx-2" />
+                <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                  Resultado consolidado da<br />Prova Paulista do aluno
+                </p>
+              </div>
+
+              {/* Tabela por matéria */}
+              {chartDataProva.length > 0 ? (
+                <div className="rounded-2xl overflow-hidden border border-slate-200">
+                  <table className="w-full text-[11px] border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200">
+                        <th className="text-left px-4 py-3 font-black text-slate-500 uppercase tracking-wider">Matéria</th>
+                        <th className="px-4 py-3 font-black text-sky-600 uppercase tracking-wider text-center">Aluno</th>
+                        <th className="px-4 py-3 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {chartDataProva.map((item, idx) => {
+                        const alunoVal  = item.Aluno  != null ? Number(item.Aluno)  : null;
+                        const turmaVal  = item.Turma  != null ? Number(item.Turma)  : null;
+                        const isAbove   = alunoVal != null && turmaVal != null && alunoVal >= turmaVal;
+                        const notaColor = alunoVal == null ? 'text-slate-300'
+                          : alunoVal >= 7 ? 'text-emerald-700'
+                          : alunoVal >= 5 ? 'text-amber-600'
+                          : 'text-red-600';
+                        return (
+                          <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-sky-50/40 transition-colors`}>
+                            <td className="px-4 py-2.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className={`inline-flex items-center justify-center min-w-[48px] h-7 px-2 rounded-lg font-black text-[12px] ${alunoVal == null ? 'text-slate-300 bg-slate-50' : alunoVal >= 7 ? 'text-emerald-700 bg-emerald-50' : alunoVal >= 5 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'}`}>
+                                {alunoVal != null ? alunoVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2.5 text-center">
+                              <span className="inline-flex items-center justify-center min-w-[48px] h-7 px-2 rounded-lg font-bold text-[11px] text-slate-500 bg-slate-100">
+                                {turmaVal != null ? turmaVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-dashed border-slate-200 p-8 rounded-2xl text-center">
+                  <p className="text-slate-400 font-bold uppercase text-[10px]">Sem notas detalhadas por matéria disponíveis</p>
+                </div>
+              )}
+            </div>
           )}
         </div>
     </div>
@@ -1211,7 +1275,8 @@ const StudentProfile = ({
                     <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} />
                     <RechartsTooltip content={<CustomTooltip />} />
                     <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} />
-                    <Radar name="Prova Paulista" dataKey="Desempenho" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
+                    <Radar name="Média da Turma" dataKey="Turma" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
+                    <Radar name="Aluno" dataKey="Aluno" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.5} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -1223,9 +1288,12 @@ const StudentProfile = ({
           </div>
         </div>
 
-        {/* Barras comparativas */}
+        {/* Barras comparativas — Mapão */}
         <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">Comparação Detalhada: Aluno vs Média da Turma ({bimestreRadarLabel})</h4>
+          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
+            <span className="text-blue-500">Mapão</span> — Comparação: Aluno vs Média da Turma
+            <span className="ml-1 text-slate-300 normal-case font-bold">({bimestreRadarLabel})</span>
+          </h4>
           {chartDataMapao.length > 0 ? (
             <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
@@ -1235,14 +1303,48 @@ const StudentProfile = ({
                   <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
                   <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
-                  <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30} />
-                  <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={30} />
+                  <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                  </Bar>
+                  <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
             <div className="flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
               <p className="text-slate-400 text-xs font-bold uppercase">Sem dados comparativos suficientes</p>
+            </div>
+          )}
+        </div>
+
+        {/* Barras comparativas — Prova Paulista */}
+        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
+            <span className="text-sky-500">Prova Paulista</span> — Comparação: Aluno vs Média da Turma
+          </h4>
+          {chartDataProva.length > 0 ? (
+            <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+                <BarChart data={chartDataProva} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+                  <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
+                  <Bar name="Nota do Aluno" dataKey="Aluno" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                  </Bar>
+                  <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={30}>
+                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
+              <p className="text-slate-400 text-xs font-bold uppercase">Sem dados comparativos da Prova Paulista</p>
             </div>
           )}
           </div>

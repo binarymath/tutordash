@@ -235,16 +235,51 @@ const App = () => {
 
   const chartDataProva = useMemo(() => {
     if (!studentProfile?.provaPaulistaNotas) return [];
+
+    // Converte nota da Prova Paulista para escala 0–10
+    // Suporta: "48,8%" → 4.88 | "0,488" → 4.88 | "4,88" → 4.88
+    const toScale10 = (raw) => {
+      if (raw === undefined || raw === null) return null;
+      const str = String(raw).trim();
+      if (!str || str === '-') return null;
+      const isPercent = str.includes('%');
+      const numeric = parseFloat(str.replace('%', '').replace(',', '.'));
+      if (Number.isNaN(numeric)) return null;
+      if (isPercent)    return numeric / 10;   // "48,8%" → 4.88
+      if (numeric <= 1) return numeric * 10;   // "0,488" → 4.88
+      if (numeric > 10) return numeric / 10;   // "48,8"  → 4.88
+      return numeric;                           // "4,88"  → 4.88
+    };
+
+    // Alunos da mesma turma para calcular a média
+    const mesmaTurma = provaData.filter(p => {
+      const s = allStudents.find(a => a.normalizedName === p.normalizedName);
+      return s && s.turma === studentProfile.turma;
+    });
+
     return Object.entries(studentProfile.provaPaulistaNotas)
       .map(([disciplina, notaRaw]) => {
-        const val = parseGrade(notaRaw);
-        if (val === 0 && notaRaw === '-') return null;
+        const notaAluno = toScale10(notaRaw);
+        if (notaAluno === null) return null; // Sem nota válida para o aluno
+
+        // Média da turma para essa disciplina
+        let soma = 0, count = 0;
+        mesmaTurma.forEach(colega => {
+          const n = toScale10(colega.notas?.[disciplina]);
+          if (n !== null) { soma += n; count++; }
+        });
+
         const displaySub = formatDisciplina(disciplina);
         const shortName  = displaySub.length > 12 ? displaySub.substring(0, 10) + '.' : displaySub;
-        return { subject: shortName, fullSubject: displaySub, Desempenho: val };
+        return {
+          subject:     shortName,
+          fullSubject: displaySub,
+          Aluno:       Math.round(notaAluno * 100) / 100,
+          Turma:       count > 0 ? Math.round((soma / count) * 100) / 100 : 0,
+        };
       })
       .filter(Boolean);
-  }, [studentProfile]);
+  }, [studentProfile, provaData, allStudents]);
 
   const optionsList = useMemo(() => {
     const field        = filterMode === 'tutor' ? 'tutor' : 'turma';
