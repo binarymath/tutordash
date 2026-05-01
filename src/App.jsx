@@ -99,7 +99,7 @@ const App = () => {
   const [selectedSessionFilters, setSelectedSessionFilters] = useState([]);
   const [sortConfig,            setSortConfig]            = useState({ key: 'turma', direction: 'asc' });
   const [showStickyName,        setShowStickyName]        = useState(false);
-  const [showOnlyActive,        setShowOnlyActive]        = useState(false);
+  const [showOnlyActive,        setShowOnlyActive]        = useState(true);
 
   // Resetar filtro de sessão ao trocar de aluno
   useEffect(() => { setSelectedSessionFilters([]); }, [selectedStudent]);
@@ -118,34 +118,58 @@ const App = () => {
   const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(config.conceitoUrl);
 
   const data = useMemo(() => {
-    // Cria Set de alunos (nome normalizado) que já possuem tutor atribuído
+    // 1. Set de nomes que já possuem tutor atribuído
     const tutoredSet = new Set();
-    dataRaw.forEach(item => {
-      item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)));
-    });
+    dataRaw.forEach(item =>
+      item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)))
+    );
 
-    // Identifica alunos "órfãos" no Mapão (conceitoData) que não tenham ligação no Array Base (tutoredSet)
-    const orphansByTurma = {};
+    // 2. Mapa de órfãos: normalizedName → { nomeOriginal, turma }
+    //    Prioridade de turma: Mapão (conceitos) > Prova Paulista
+    const orphanMap = new Map();
+
+    // 2a. Varredura do Mapão (conceitos bimestrais)
     conceitoData.forEach(c => {
-      if (!tutoredSet.has(c.normalizedName)) {
-        if (!orphansByTurma[c.turmaPlanilha]) {
-          orphansByTurma[c.turmaPlanilha] = new Map();
-        }
-        // Guarda apenas nomes únicos mapeando normalized -> original
-        orphansByTurma[c.turmaPlanilha].set(c.normalizedName, c.nomeOriginal || c.normalizedName);
+      if (!tutoredSet.has(c.normalizedName) && !orphanMap.has(c.normalizedName)) {
+        orphanMap.set(c.normalizedName, {
+          nomeOriginal: c.nomeOriginal || c.normalizedName,
+          turma: c.turmaPlanilha || 'Sem Turma',
+        });
       }
     });
 
-    // Constrói agrupamentos por turma para integrar junto aos dados normais
-    const orphanGroups = Object.entries(orphansByTurma).map(([turma, mapAlunos], idx) => ({
-      id: `orphan-${idx}`,
-      turma: turma,
-      tutor: 'Sem Tutor',
-      tutorados: Array.from(mapAlunos.values())
-    }));
+    // 2b. Varredura da Prova Paulista (somente alunos ainda não mapeados)
+    provaData.forEach(p => {
+      if (!tutoredSet.has(p.normalizedName) && !orphanMap.has(p.normalizedName)) {
+        orphanMap.set(p.normalizedName, {
+          nomeOriginal: p.nomeOriginal || p.normalizedName,
+          turma: p.turmaPlanilha || 'Sem Turma',
+        });
+      }
+    });
+
+    // 3. Agrupa órfãos por turma
+    const byTurma = new Map();
+    for (const { nomeOriginal, turma } of orphanMap.values()) {
+      if (!byTurma.has(turma)) byTurma.set(turma, []);
+      byTurma.get(turma).push(nomeOriginal);
+    }
+
+    // 4. Gera grupos "Sem Tutor" por turma
+    const orphanGroups = [];
+    let orphanIdx = 0;
+    for (const [turma, tutorados] of byTurma.entries()) {
+      orphanGroups.push({
+        id: `orphan-${orphanIdx++}`,
+        turma,
+        tutor: 'Sem Tutor',
+        tutorados,
+      });
+    }
 
     return [...dataRaw, ...orphanGroups];
-  }, [dataRaw, conceitoData]);
+  }, [dataRaw, conceitoData, provaData]);
+
   const isLoading = isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos;
   const isSyncing = isFetchingStudents || isFetchingNotes || isFetchingProvas || isFetchingConceitos;
   

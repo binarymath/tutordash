@@ -233,6 +233,8 @@ export const fetchProvas = async (url) => {
 
   // ── Parseador reutilizável por aba ─────────────────────────────────────────
   const parseSheet = (sheetName) => {
+    // Extrai a turma do nome da aba (ex: "6A-1Bim" → "6A", "6A" → "6A")
+    const turmaDaAba = formatTurma(sheetName.split('-')[0].trim());
     const ws       = wb.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
     if (jsonData.length <= 1) return [];
@@ -251,20 +253,15 @@ export const fetchProvas = async (url) => {
     const RESULT_IDX      = 3; // Coluna D → (%) de Acertos geral
     const SUBJECT_START   = 4; // Coluna E em diante → matérias
 
-    // Matérias terminam na primeira coluna completamente vazia
-    let subjectEndIdx = SUBJECT_START - 1;
-    for (let col = SUBJECT_START; col < headers.length; col++) {
-      const hasData = dataRows.some(row => {
-        const v = row[col];
-        return v !== undefined && v !== null && String(v).trim() !== '';
-      });
-      if (hasData) { subjectEndIdx = col; } else { break; }
-    }
-
+    // Matérias: todas as colunas a partir de SUBJECT_START que possuam um
+    // cabeçalho não-vazio. Colunas sem cabeçalho encerram o intervalo, mas
+    // colunas com cabeçalho e sem dados para uma turma específica são
+    // mantidas (ex.: SOC/BIO/FIS vazios mas TEC preenchido).
     const ppSubjects = [];
-    for (let idx = SUBJECT_START; idx <= subjectEndIdx; idx++) {
-      const name = String(headers[idx] || '').trim();
-      if (name) ppSubjects.push({ index: idx, name });
+    for (let col = SUBJECT_START; col < headers.length; col++) {
+      const name = String(headers[col] || '').trim();
+      if (!name) break; // cabeçalho vazio → fim real do bloco de matérias
+      ppSubjects.push({ index: col, name });
     }
 
     return dataRows
@@ -272,6 +269,7 @@ export const fetchProvas = async (url) => {
         const alunoNome = row[studentIdx];
         if (!alunoNome || String(alunoNome).trim() === '') return null;
 
+        const nomeStr = String(alunoNome).trim();
         const notas = {};
         ppSubjects.forEach(sub => {
           const raw = row[sub.index];
@@ -282,11 +280,13 @@ export const fetchProvas = async (url) => {
 
         const resultadoRaw = row[RESULT_IDX];
         return {
-          normalizedName: normalizeName(String(alunoNome).trim()),
+          nomeOriginal:   nomeStr,
+          normalizedName: normalizeName(nomeStr),
           resultado: (resultadoRaw !== undefined && resultadoRaw !== null && String(resultadoRaw).trim() !== '')
             ? String(resultadoRaw).trim()
             : 'S/N',
           notas,
+          turmaPlanilha: turmaDaAba,
         };
       })
       .filter(Boolean);
