@@ -1063,7 +1063,7 @@ const StudentProfile = ({
             onClick={() => setShowPrintSelection(true)}
             className="flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300 transition-colors"
           >
-            <Printer className="w-4 h-4" /> Imprimir
+            <Printer className="w-4 h-4" /> Imprimir Gráficos
           </button>
         </div>
       </div>
