@@ -983,7 +983,7 @@ const StudentProfile = ({
           <div className="flex items-center justify-between mb-4 ml-2">
             <button
               onClick={() => setShowAnotacoes(!showAnotacoes)}
-              className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+              className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
               title={showAnotacoes ? "Recolher" : "Expandir"}
             >
               <History className="w-4 h-4" /> Anotações e Sessões
@@ -1111,7 +1111,7 @@ const StudentProfile = ({
           <div className="flex items-center justify-between mb-4">
             <button
               onClick={() => setShowProvaPaulista(!showProvaPaulista)}
-              className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
+              className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
               title={showProvaPaulista ? "Recolher" : "Expandir"}
             >
               <TrendingUp className="w-4 h-4" /> Prova Paulista

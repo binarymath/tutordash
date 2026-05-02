@@ -208,12 +208,22 @@ const App = () => {
         conceitosDoAluno.sort((a, b) => a.bimestre.localeCompare(b.bimestre));
         const ultimoBimestre = conceitosDoAluno.length > 0 ? conceitosDoAluno[conceitosDoAluno.length - 1] : null;
         let quickMat = '-', quickPort = '-';
+        // Calcula CC: média de todas as notas do último bimestre (Conselho Bimestral)
+        let consilhoBimestral = 'S/D';
         if (ultimoBimestre?.notas) {
           const chaves  = Object.keys(ultimoBimestre.notas);
           const matKey  = chaves.find(k => k.toUpperCase().includes('MATEM'));
           const portKey = chaves.find(k => k.toUpperCase().includes('PORTUG'));
           if (matKey)  quickMat  = ultimoBimestre.notas[matKey];
           if (portKey) quickPort = ultimoBimestre.notas[portKey];
+          // Média geral de todas as notas válidas (igual ao Mapão no perfil)
+          const notasValidas = chaves
+            .map(k => parseGrade(ultimoBimestre.notas[k]))
+            .filter(n => n > 0);
+          if (notasValidas.length > 0) {
+            const media = notasValidas.reduce((s, n) => s + n, 0) / notasValidas.length;
+            consilhoBimestral = media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+          }
         }
         list.push({
           nome: nomeOriginal, normalizedName: normName,
@@ -230,8 +240,7 @@ const App = () => {
           })(),
           provaPaulistaNotas: provaInfo ? provaInfo.notas : null,
           historicoConceitos: conceitosDoAluno,
-          ultimoMat: quickMat, ultimoPort: quickPort,
-          ultimoFaltas: ultimoBimestre?.tfBimestre ?? ultimoBimestre?.faltas ?? '-',
+          consilhoBimestral,
           ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
           situacao: ultimoBimestre?.situacao || 'Ativo'
         });
@@ -358,6 +367,20 @@ const App = () => {
     totalGroups:   new Set(filteredData.map(d => d.turma)).size
   }), [filteredData]);
 
+  // Alunos visíveis no filtro atual, para o RankingPanel
+  const rankingStudents = useMemo(() => {
+    const names = new Set();
+    filteredData.forEach(item => item.tutorados.forEach(n => names.add(n)));
+    return allStudents.filter(s => names.has(s.nome));
+  }, [filteredData, allStudents]);
+
+  // Título contextual do ranking
+  const filterLabel = useMemo(() => {
+    if (selectedValue === 'Todos') return 'Ranking Geral';
+    if (filterMode === 'tutor') return `Ranking — Tutor: ${selectedValue}`;
+    return `Ranking — Turma: ${selectedValue}`;
+  }, [filterMode, selectedValue]);
+
   const currentStudentList = useMemo(() => {
     if (searchTerm) {
       return allStudents.filter(s => s.nome.toLowerCase().includes(searchTerm.toLowerCase())).map(s => s.nome).sort((a, b) => a.localeCompare(b, 'pt-BR'));
@@ -448,6 +471,8 @@ const App = () => {
                 handleSort={handleSort}
                 showOnlyActive={showOnlyActive}
                 setShowOnlyActive={setShowOnlyActive}
+                rankingStudents={rankingStudents}
+                filterLabel={filterLabel}
               />
             ) : (
               <StudentProfile

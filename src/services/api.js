@@ -100,6 +100,66 @@ const sanitizeCellText = (value) => {
   return isRefSpreadsheetError(text) ? '' : text;
 };
 
+// Converte serial numérico do Excel (ex: 46027.54268518519) ou texto de data para
+// 'dd/mm/aaaa HH:MM' no padrão brasileiro.
+// A parte inteira do serial = data; a parte fracionária = horário local (fuso da planilha).
+const excelSerialToDate = (value) => {
+  if (value === undefined || value === null || value === '') return 'S/ Data';
+  const str = String(value).trim();
+  if (!str) return 'S/ Data';
+
+  const pad = (n) => String(n).padStart(2, '0');
+
+  // ── Caso 1: texto dd/mm/aaaa (com ou sem horário HH:MM) ──
+  const dmyMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (dmyMatch) {
+    const datePart = `${pad(dmyMatch[1])}/${pad(dmyMatch[2])}/${dmyMatch[3]}`;
+    if (dmyMatch[4] !== undefined) {
+      return `${datePart} ${pad(dmyMatch[4])}:${pad(dmyMatch[5])}`;
+    }
+    return datePart;
+  }
+
+  // ── Caso 2: texto ISO aaaa-mm-dd (com ou sem horário T/espaço HH:MM) ──
+  const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+  if (isoMatch) {
+    const datePart = `${pad(isoMatch[3])}/${pad(isoMatch[2])}/${isoMatch[1]}`;
+    if (isoMatch[4] !== undefined) {
+      return `${datePart} ${pad(isoMatch[4])}:${pad(isoMatch[5])}`;
+    }
+    return datePart;
+  }
+
+  // ── Caso 3: serial numérico do Excel ──
+  // Parte inteira → data; parte fracionária → horário local da planilha (já em UTC-3).
+  const serial = parseFloat(str);
+  if (!isNaN(serial) && serial > 1000) {
+    const intPart  = Math.floor(serial);
+    const fracPart = serial - intPart;
+
+    // Data via componentes UTC (a conversão intPart-25569 já mapeia para o calendário local)
+    const utcMs = intPart * 86400 * 1000 - 25569 * 86400 * 1000;
+    const date  = new Date(utcMs);
+    if (isNaN(date.getTime())) return str;
+    const datePart = `${pad(date.getUTCDate())}/${pad(date.getUTCMonth() + 1)}/${date.getUTCFullYear()}`;
+
+    // Horário: parte fracionária × minutos do dia, arredondado ao minuto
+    if (fracPart > 0) {
+      const totalMin = Math.round(fracPart * 1440); // 1440 = 24 × 60
+      const hh = Math.floor(totalMin / 60) % 24;
+      const mm = totalMin % 60;
+      return `${datePart} ${pad(hh)}:${pad(mm)}`;
+    }
+
+    return datePart;
+  }
+
+  return str; // fallback: devolve como está
+};
+
+
+
+
 export const parsePlanilhaTutoriaMedio = (csvArray) => {
   const grupos = new Map();
   let lastTurma = '';
@@ -196,7 +256,7 @@ export const fetchNotes = async (url) => {
       const studentNameRaw   = row.slice(2, 18).find(name => name && String(name).trim() !== '') || '';
       return {
         id: Math.random().toString(),
-        displayDate: row[0] ? String(row[0]) : 'S/ Data',
+        displayDate: excelSerialToDate(row[0]),
         studentName: studentNameRaw ? String(studentNameRaw).trim() : '',
         normalizedName: normalizeName(studentNameRaw ? String(studentNameRaw).trim() : ''),
         teacher: teacherRaw || 'Prof Desconhecido',

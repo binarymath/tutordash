@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // ─────────────────────────────────────────────────────────────
-import React from 'react';
+import React, { useState } from 'react';
 import { Search, X, UserCheck, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { checkIsTutor } from '../utils/helpers';
+import RankingPanel from './RankingPanel';
 
 const SortIcon = ({ columnKey, sortConfig }) => {
   if (sortConfig.key !== columnKey) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
@@ -16,8 +17,10 @@ const Dashboard = ({
   allStudents, sortedData, filterMode, setFilterMode,
   selectedValue, setSelectedValue, optionsList, stats,
   searchTerm, setSearchTerm, setSelectedStudent, sortConfig, handleSort,
-  showOnlyActive, setShowOnlyActive
-}) => (
+  showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel
+}) => {
+  const [showRanking, setShowRanking] = useState(false);
+  return (
   <div className="space-y-6 animate-in fade-in duration-300">
     {/* Barra de busca */}
     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4 focus-within:ring-2 focus-within:ring-blue-100 transition-all">
@@ -46,7 +49,11 @@ const Dashboard = ({
             className="text-left p-6 rounded-3xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-md transition-all group flex flex-col justify-between"
           >
             <div>
-              <p className="font-bold text-slate-800 text-lg group-hover:text-blue-600">{s.nome}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-bold text-slate-800 text-lg group-hover:text-blue-600 flex-1 min-w-0 truncate">{s.nome}</p>
+                {s.provaPaulista !== 'S/D' && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">PP: {s.provaPaulista}</span>}
+                {s.consilhoBimestral !== 'S/D' && <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 shrink-0">CC: {s.consilhoBimestral}</span>}
+              </div>
               <div className="flex gap-3 mt-3 flex-wrap">
                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase">Turma {s.turma}</span>
                 <span className={`text-[10px] font-bold uppercase flex items-center gap-1 px-2 py-1 rounded ${s.tutor === 'Sem Tutor' ? 'text-red-600 bg-red-50' : 'text-slate-500 bg-slate-50'}`}>
@@ -67,26 +74,23 @@ const Dashboard = ({
                   </span>
                 );
               })()}
-              <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded border border-slate-100">🎓 PP: {s.provaPaulista}</span>
-              {s.ultimoMat !== '-' && (
-                <span className="text-[10px] font-bold bg-slate-50 text-slate-600 px-2 py-1 rounded border border-slate-100 mt-1 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-blue-600 font-black">{s.ultimoBimNome}</span>
-                  <span className="text-emerald-600">📊 Mat: {s.ultimoMat}</span>
-                  <span className="text-indigo-600">Port: {s.ultimoPort}</span>
-                  {s.ultimoFaltas !== '-' && (
-                    <span className={s.ultimoFaltas === '0' || s.ultimoFaltas === '0%' ? 'text-emerald-600' : 'text-red-600'}>
-                      🚨 Faltas: {s.ultimoFaltas}
-                    </span>
-                  )}
-                </span>
-              )}
             </div>
           </button>
         ))}
       </div>
     ) : (
       /* Vista principal com filtro lateral + tabela */
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+      <div className="space-y-6">
+        {/* Ranking Top 5 */}
+        <RankingPanel
+          students={rankingStudents}
+          filterLabel={filterLabel}
+          onSelectStudent={setSelectedStudent}
+          show={showRanking}
+          onToggle={() => setShowRanking(v => !v)}
+        />
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         <aside className="lg:col-span-1 space-y-4">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Filtrar por</p>
@@ -169,40 +173,27 @@ const Dashboard = ({
                             onClick={() => setSelectedStudent(nome)}
                             className="text-left bg-white border border-slate-200 p-2 rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md transition-all w-full"
                           >
-                            <div className="flex justify-between items-start mb-1.5 gap-2">
-                              <span className="text-[11px] font-bold text-slate-700 truncate">{nome}</span>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              <span className="text-[11px] font-bold text-slate-700 truncate flex-1 min-w-0">{nome}</span>
+                              {studentInfo?.provaPaulista !== 'S/D' && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">PP: {studentInfo.provaPaulista}</span>}
+                              {studentInfo?.consilhoBimestral !== 'S/D' && <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 shrink-0">CC: {studentInfo.consilhoBimestral}</span>}
                               {studentInfo && (
                                 <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${studentInfo.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
                                   {studentInfo.situacao}
                                 </span>
                               )}
                             </div>
-                            {studentInfo && (
-                              <div className="flex gap-1 flex-wrap text-[9px] font-bold text-slate-500">
-                                {studentInfo.noteCount > 0 && (() => {
-                                  const isTutorMatch = checkIsTutor(studentInfo.tutor, studentInfo.notes[0].teacher);
-                                  return (
-                                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${isTutorMatch ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
-                                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTutorMatch ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
-                                      📝 {studentInfo.notes[0].teacher} • Total: {studentInfo.noteCount} • Última: {studentInfo.lastNoteDate}
-                                    </span>
-                                  );
-                                })()}
-                                {studentInfo.provaPaulista !== 'S/D' && <span className="bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">PP: {studentInfo.provaPaulista}</span>}
-                                {studentInfo.ultimoMat !== '-' && (
-                                  <span className="bg-slate-50 text-slate-600 px-1.5 py-0.5 rounded border border-slate-100 w-full mt-1 flex items-center gap-1.5 flex-wrap text-[9px] font-bold">
-                                    <span className="text-blue-600 font-black">{studentInfo.ultimoBimNome}</span>
-                                    <span className="text-emerald-600">Mat: {studentInfo.ultimoMat}</span>
-                                    <span className="text-indigo-600">Port: {studentInfo.ultimoPort}</span>
-                                    {studentInfo.ultimoFaltas !== '-' && (
-                                      <span className={studentInfo.ultimoFaltas === '0' || studentInfo.ultimoFaltas === '0%' ? 'text-emerald-600' : 'text-red-600'}>
-                                        🚨 {studentInfo.ultimoFaltas} faltas
-                                      </span>
-                                    )}
+                            {studentInfo && studentInfo.noteCount > 0 && (() => {
+                              const isTutorMatch = checkIsTutor(studentInfo.tutor, studentInfo.notes[0].teacher);
+                              return (
+                                <div className="flex gap-1 flex-wrap text-[9px] font-bold mt-1">
+                                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${isTutorMatch ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
+                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTutorMatch ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
+                                    📝 {studentInfo.notes[0].teacher} • Total: {studentInfo.noteCount} • Última: {studentInfo.lastNoteDate}
                                   </span>
-                                )}
-                              </div>
-                            )}
+                                </div>
+                              );
+                            })()}
                           </button>
                         </td>
                       </tr>
@@ -213,9 +204,13 @@ const Dashboard = ({
             </table>
           </div>
         </div>
+        </div>
       </div>
     )}
+
   </div>
-);
+  );
+};
 
 export default Dashboard;
+
