@@ -463,7 +463,7 @@ const PrintSelectionModal = ({
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Printer className="w-4 h-4" />
-            {isPrinting ? 'Preparando...' : 'Imprimir'}
+            {isPrinting ? 'Preparando...' : 'Imprimir Gráficos'}
           </button>
         </div>
       </div>
