@@ -257,6 +257,31 @@ const PrintSelectionModal = ({
       // Criar container para React
       const printContainer = printWindow.document.createElement('div');
       printContainer.id = 'print-root';
+      
+      // Adicionar estilos de impressão em modo paisagem e remover margens
+      const styleSheet = printWindow.document.createElement('style');
+      styleSheet.textContent = `
+        @page {
+          size: landscape;
+          margin: 0;
+        }
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          margin: 0;
+          padding: 0;
+          background: white;
+        }
+        html, body {
+          width: 100%;
+          height: 100%;
+        }
+      `;
+      printWindow.document.head.appendChild(styleSheet);
+      
       printWindow.document.body.innerHTML = '';
       printWindow.document.body.appendChild(printContainer);
       const printRoot = createRoot(printContainer);
