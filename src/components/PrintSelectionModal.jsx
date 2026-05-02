@@ -372,7 +372,7 @@ const PrintSelectionModal = ({
               disabled={isPrinting}
               className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700 disabled:opacity-50"
             >
-              Todos
+              Todos os alunos
             </button>
             <button
               onClick={() => {
