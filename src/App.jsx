@@ -3,6 +3,7 @@ import { AlertCircle, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { normalizeName, parseGrade, formatDisciplina, toScale10 } from './utils/helpers';
+import { buildChartDataMapao, buildChartDataProva } from './utils/buildChartData';
 import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
 import { useProvas } from './hooks/useProvas';
@@ -254,57 +255,15 @@ const App = () => {
     return allStudents.find(s => s.nome === selectedStudent) || null;
   }, [selectedStudent, allStudents]);
 
-  const chartDataMapao = useMemo(() => {
-    if (!studentProfile?.historicoConceitos?.length) return [];
-    const ultimoBimestre = studentProfile.historicoConceitos[studentProfile.historicoConceitos.length - 1];
-    const turmaAlunos    = conceitoData.filter(c => c.bimestre === ultimoBimestre.bimestre && c.turmaPlanilha === ultimoBimestre.turmaPlanilha);
-    return Object.entries(ultimoBimestre.notas).map(([disciplina, notaRaw]) => {
-      const notaAluno = parseGrade(notaRaw);
-      let soma = 0, count = 0;
-      turmaAlunos.forEach(aluno => {
-        if (aluno.notas?.[disciplina] !== undefined) {
-          const n = parseGrade(aluno.notas[disciplina]);
-          if (n > 0 || aluno.notas[disciplina] !== '-') { soma += n; count++; }
-        }
-      });
-      const displaySub = formatDisciplina(disciplina);
-      const shortName  = displaySub.length > 12 ? displaySub.substring(0, 10) + '.' : displaySub;
-      return { subject: shortName, fullSubject: displaySub, Aluno: notaAluno, Turma: count > 0 ? parseFloat((soma / count).toFixed(1)) : 0 };
-    });
-  }, [studentProfile, conceitoData]);
+  const chartDataMapao = useMemo(
+    () => buildChartDataMapao(studentProfile, conceitoData, provaData, allStudents),
+    [studentProfile, conceitoData, provaData, allStudents]
+  );
 
-  const chartDataProva = useMemo(() => {
-    if (!studentProfile?.provaPaulistaNotas) return [];
-
-    // Alunos da mesma turma para calcular a média
-    const mesmaTurma = provaData.filter(p => {
-      const s = allStudents.find(a => a.normalizedName === p.normalizedName);
-      return s && s.turma === studentProfile.turma;
-    });
-
-    return Object.entries(studentProfile.provaPaulistaNotas)
-      .map(([disciplina, notaRaw]) => {
-        const notaAluno = toScale10(notaRaw);
-        if (notaAluno === null) return null; // Sem nota válida para o aluno
-
-        // Média da turma para essa disciplina
-        let soma = 0, count = 0;
-        mesmaTurma.forEach(colega => {
-          const n = toScale10(colega.notas?.[disciplina]);
-          if (n !== null) { soma += n; count++; }
-        });
-
-        const displaySub = formatDisciplina(disciplina);
-        const shortName  = displaySub.length > 12 ? displaySub.substring(0, 10) + '.' : displaySub;
-        return {
-          subject:     shortName,
-          fullSubject: displaySub,
-          Aluno:       Math.round(notaAluno * 100) / 100,
-          Turma:       count > 0 ? Math.round((soma / count) * 100) / 100 : 0,
-        };
-      })
-      .filter(Boolean);
-  }, [studentProfile, provaData, allStudents]);
+  const chartDataProva = useMemo(
+    () => buildChartDataProva(studentProfile, conceitoData, provaData, allStudents),
+    [studentProfile, conceitoData, provaData, allStudents]
+  );
 
   const optionsList = useMemo(() => {
     const field        = filterMode === 'tutor' ? 'tutor' : 'turma';
@@ -338,6 +297,14 @@ const App = () => {
     
     return filteredGroups;
   }, [data, selectedValue, filterMode, allStudents, showOnlyActive]);
+
+  const filteredStudents = useMemo(() => {
+    const names = new Set();
+    filteredData.forEach(item => item.tutorados.forEach(nome => names.add(nome)));
+    return allStudents
+      .filter(student => names.has(student.nome))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [filteredData, allStudents]);
 
   const handleSort = (key) => {
     setSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
@@ -487,6 +454,10 @@ const App = () => {
                 setSelectedStudent={setSelectedStudent}
                 chartDataMapao={chartDataMapao}
                 chartDataProva={chartDataProva}
+                filteredStudents={filteredStudents}
+                conceitoData={conceitoData}
+                provaData={provaData}
+                allStudents={allStudents}
               />
             )}
           </div>

@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, UserCheck, TrendingUp,
   LineChart as LineChartIcon, History, BarChart2,
-  User, Calendar, ChevronDown, ChevronUp, Download
+  User, Calendar, ChevronDown, ChevronUp, Download, Printer
 } from 'lucide-react';
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
@@ -13,6 +13,7 @@ import {
   CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
 import { formatDisciplina, parseGrade } from '../utils/helpers';
+import PrintSelectionModal from './PrintSelectionModal';
 
 // ── Tooltip personalizado dos gráficos ──────────────────────
 const CustomTooltip = ({ active, payload, label }) => {
@@ -490,13 +491,97 @@ const StudentProfile = ({
   studentProfile, filteredNotes, studentSessions, studentSessionCounts,
   selectedSessionFilters, setSelectedSessionFilters,
   prevStudent, nextStudent, setSelectedStudent,
-  chartDataMapao, chartDataProva
+  chartDataMapao, chartDataProva,
+  filteredStudents = [], conceitoData = [], provaData = [], allStudents = []
 }) => {
   const [showAnotacoes, setShowAnotacoes] = useState(true);
   const [showProvaPaulista, setShowProvaPaulista] = useState(false);
   const [showEvolutivo, setShowEvolutivo] = useState(false);
   const [showGrafico, setShowGrafico] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [showPrintSelection, setShowPrintSelection] = useState(false);
+  const [studentSelections, setStudentSelections] = useState({});
+
+  // ── Impressão de gráfico individual ─────────────────────────
+  const printChart = async (chartRef, title) => {
+    if (!chartRef) return;
+
+    const nome  = escapeHtml(studentProfile?.nome  || '');
+    const turma = escapeHtml(studentProfile?.turma || '');
+    const tutor = escapeHtml(studentProfile?.tutor || '');
+
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+
+      // Oculta o botão de impressora para não aparecer na captura
+      const btn = chartRef.querySelector('button[title="Imprimir este gráfico"]');
+      if (btn) btn.style.visibility = 'hidden';
+
+      const canvas = await html2canvas(chartRef, {
+        backgroundColor: '#ffffff',
+        scale: 2,
+        useCORS: true,
+      });
+
+      if (btn) btn.style.visibility = '';
+
+      const imgDataUrl = canvas.toDataURL('image/png');
+
+      const printWindow = window.open('', '_blank', 'width=960,height=720');
+      if (!printWindow) return;
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <title>${escapeHtml(title)}</title>
+            <style>
+              * { box-sizing: border-box; }
+              body { margin: 0; padding: 28px 32px; font-family: Arial, sans-serif; background: #fff; color: #0f172a; }
+              .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px; }
+              .header-title { font-size: 13px; font-weight: 800; color: #1e3a8a;
+                              text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0; }
+              .header-info { display: flex; gap: 24px; flex-wrap: wrap; }
+              .info-item { display: flex; flex-direction: column; }
+              .info-label { font-size: 9px; font-weight: 800; color: #94a3b8;
+                            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+              .info-value { font-size: 13px; font-weight: 700; color: #1e293b; }
+              .chart-img { width: 100%; height: auto; display: block; }
+              @media print {
+                body { padding: 12px 16px; }
+                @page { margin: 10mm; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <p class="header-title">${escapeHtml(title)}</p>
+              <div class="header-info">
+                <div class="info-item">
+                  <span class="info-label">Turma</span>
+                  <span class="info-value">${turma}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Aluno</span>
+                  <span class="info-value">${nome}</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">Tutor</span>
+                  <span class="info-value">${tutor}</span>
+                </div>
+              </div>
+            </div>
+            <img class="chart-img" src="${imgDataUrl}" alt="${escapeHtml(title)}" />
+            <script>window.onload = () => { window.print(); window.close(); };<\/script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    } catch (err) {
+      console.error('Erro ao imprimir gráfico:', err);
+    }
+  };
+
   const bimestreRadarLabel = studentProfile?.ultimoBimNome && String(studentProfile.ultimoBimNome).trim() !== 'Sem Dados'
     ? studentProfile.ultimoBimNome
     : 'Bimestre atual';
@@ -974,8 +1059,28 @@ const StudentProfile = ({
           >
             <Download className="w-4 h-4" /> Baixar DOCX
           </button>
+          <button
+            onClick={() => setShowPrintSelection(true)}
+            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300 transition-colors"
+          >
+            <Printer className="w-4 h-4" /> Imprimir
+          </button>
         </div>
       </div>
+
+      {showPrintSelection && (
+        <PrintSelectionModal
+          student={studentProfile}
+          studentName={studentProfile.nome}
+          studentsToFilter={filteredStudents.length > 0 ? filteredStudents : [studentProfile]}
+          conceitoData={conceitoData}
+          provaData={provaData}
+          allStudents={allStudents}
+          studentSelections={studentSelections}
+          setStudentSelections={setStudentSelections}
+          onClose={() => setShowPrintSelection(false)}
+        />
+      )}
 
       {/* Anotações e Sessões */}
       <div className="space-y-6">
@@ -1240,7 +1345,14 @@ const StudentProfile = ({
           <>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Radar Mapão */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center relative" data-chart>
+            <button
+              onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Radar de Equilíbrio (${bimestreRadarLabel})`); }}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+              title="Imprimir este gráfico"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio ({bimestreRadarLabel})</h4>
             {chartDataMapao.length > 0 ? (
               <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
@@ -1264,7 +1376,14 @@ const StudentProfile = ({
           </div>
 
           {/* Radar Prova Paulista */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center">
+          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center relative" data-chart>
+            <button
+              onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Radar de Desempenho (Prova Paulista)'); }}
+              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+              title="Imprimir este gráfico"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
             <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Desempenho (Prova Paulista)</h4>
             {chartDataProva.length > 0 ? (
               <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
@@ -1289,7 +1408,14 @@ const StudentProfile = ({
         </div>
 
         {/* Barras comparativas — Mapão */}
-        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+          <button
+            onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Mapão — Aluno vs Média da Turma (${bimestreRadarLabel})`); }}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+            title="Imprimir este gráfico"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
           <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
             <span className="text-blue-500">Mapão</span> — Comparação: Aluno vs Média da Turma
             <span className="ml-1 text-slate-300 normal-case font-bold">({bimestreRadarLabel})</span>
@@ -1320,7 +1446,14 @@ const StudentProfile = ({
         </div>
 
         {/* Barras comparativas — Prova Paulista */}
-        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+          <button
+            onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Prova Paulista — Aluno vs Média da Turma'); }}
+            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+            title="Imprimir este gráfico"
+          >
+            <Printer className="w-4 h-4" />
+          </button>
           <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
             <span className="text-sky-500">Prova Paulista</span> — Comparação: Aluno vs Média da Turma
           </h4>

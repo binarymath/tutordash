@@ -2,7 +2,7 @@
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // ─────────────────────────────────────────────────────────────
 import React, { useState } from 'react';
-import { Search, X, UserCheck, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { checkIsTutor } from '../utils/helpers';
 import RankingPanel from './RankingPanel';
 
@@ -20,6 +20,7 @@ const Dashboard = ({
   showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel
 }) => {
   const [showRanking, setShowRanking] = useState(false);
+
   return (
   <div className="space-y-6 animate-in fade-in duration-300">
     {/* Barra de busca */}

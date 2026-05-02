@@ -22,6 +22,7 @@ vi.mock('recharts', () => ({
   CartesianGrid: () => null,
   Tooltip: () => null,
   Legend: () => null,
+  LabelList: () => null,
 }));
 
 const mockHtml2pdf = {
@@ -122,6 +123,13 @@ const defaultProps = {
   setSelectedStudent: vi.fn(),
   chartDataMapao: [],
   chartDataProva: [],
+  filteredStudents: [makeProfile(), makeProfile({ nome: 'Maria Oliveira' })],
+  conceitoData: [],
+  provaData: [],
+  allStudents: [
+    { nome: 'João Silva', normalizedName: 'joao silva', turma: '1A', tutor: 'Prof Ana' },
+    { nome: 'Maria Oliveira', normalizedName: 'maria oliveira', turma: '2B', tutor: 'Prof Carlos' },
+  ],
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,6 +154,11 @@ describe('StudentProfile — cabeçalho', () => {
   it('retorna null quando studentProfile é null', () => {
     const { container } = render(<StudentProfile {...defaultProps} studentProfile={null} />);
     expect(container.firstChild).toBeNull();
+  });
+
+  it('exibe o botão de impressão no perfil individual', () => {
+    render(<StudentProfile {...defaultProps} />);
+    expect(screen.getByText(/imprimir/i)).toBeInTheDocument();
   });
 });
 
