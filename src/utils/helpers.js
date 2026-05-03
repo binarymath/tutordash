@@ -138,6 +138,20 @@ export const formatTurma = (turma) => {
   return str.trim();
 };
 
+export const getSerieFromTurma = (turma) => {
+  if (!turma) return 'Sem Nível';
+  const str = String(turma).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+  const nMatch = str.match(/\d+/);
+  if (!nMatch) {
+    if (str.includes('SEM TURMA')) return 'Sem Nível';
+    return str.trim();
+  }
+  const num = parseInt(nMatch[0], 10);
+  if (num >= 6 && num <= 9) return `${num}º Ano`;
+  if (num >= 1 && num <= 3) return `${num}ª Série`;
+  return `${num}º Ano/Série`;
+};
+
 // ─────────────────────────────────────────────────────────────
 // parseProvaPaulistaExcel
 // Lê um ArrayBuffer de um .xlsx com abas no padrão "{Turma}-{Bimestre}"

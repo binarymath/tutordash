@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { normalizeName, parseGrade, formatDisciplina, toScale10 } from './utils/helpers';
+import { normalizeName, parseGrade, formatDisciplina, toScale10, getSerieFromTurma } from './utils/helpers';
 import { buildChartDataMapao, buildChartDataProva } from './utils/buildChartData';
 import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
@@ -295,6 +295,11 @@ const App = () => {
   );
 
   const optionsList = useMemo(() => {
+    if (filterMode === 'serie') {
+      const uniqueValues = [...new Set(data.map(item => getSerieFromTurma(item.turma)))];
+      const sorted = uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
+      return ['Todos', ...sorted];
+    }
     const field        = filterMode === 'tutor' ? 'tutor' : 'turma';
     const uniqueValues = [...new Set(data.map(item => item[field]))];
     const sorted = uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
@@ -309,8 +314,12 @@ const App = () => {
   const filteredData = useMemo(() => {
     let filteredGroups = data;
     if (selectedValue !== 'Todos') {
-      const field = filterMode === 'tutor' ? 'tutor' : 'turma';
-      filteredGroups = data.filter(item => item[field] === selectedValue);
+      if (filterMode === 'serie') {
+        filteredGroups = data.filter(item => getSerieFromTurma(item.turma) === selectedValue);
+      } else {
+        const field = filterMode === 'tutor' ? 'tutor' : 'turma';
+        filteredGroups = data.filter(item => item[field] === selectedValue);
+      }
     }
     
     if (showOnlyActive) {
@@ -489,6 +498,48 @@ const App = () => {
           ccAvg: myTutorInfo.ccAvg >= 0 ? myTutorInfo.ccAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
           ppRank: null,
           ccRank: null
+        };
+      }
+    } else if (filterMode === 'serie') {
+      const allSeries = new Set(allStudents.map(s => getSerieFromTurma(s.turma)));
+      const serieAverages = [];
+
+      for (const serie of allSeries) {
+        if (!serie || serie === 'Sem Série') continue;
+
+        const studentsInSerie = allStudents.filter(s => getSerieFromTurma(s.turma) === serie);
+        let ppSum = 0, ppCount = 0;
+        let ccSum = 0, ccCount = 0;
+
+        studentsInSerie.forEach(s => {
+          const pp = parseToFloat(s.provaPaulista);
+          if (pp >= 0) { ppSum += pp; ppCount++; }
+          const cc = parseToFloat(s.consilhoBimestral);
+          if (cc >= 0) { ccSum += cc; ccCount++; }
+        });
+
+        serieAverages.push({
+          serie,
+          ppAvg: ppCount > 0 ? ppSum / ppCount : -1,
+          ccAvg: ccCount > 0 ? ccSum / ccCount : -1
+        });
+      }
+
+      const sortedByPP = [...serieAverages].filter(s => s.ppAvg >= 0).sort((a, b) => b.ppAvg - a.ppAvg);
+      const sortedByCC = [...serieAverages].filter(s => s.ccAvg >= 0).sort((a, b) => b.ccAvg - a.ccAvg);
+      const mySerieInfo = serieAverages.find(s => s.serie === selectedValue);
+      
+      if (mySerieInfo) {
+        const ppRank = sortedByPP.findIndex(s => s.serie === selectedValue) + 1;
+        const ccRank = sortedByCC.findIndex(s => s.serie === selectedValue) + 1;
+
+        performanceStats = {
+          titlePP: 'Média do Nível: Prova Paulista',
+          titleCC: 'Média do Nível: Conselho (CC)',
+          ppAvg: mySerieInfo.ppAvg >= 0 ? mySerieInfo.ppAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ccAvg: mySerieInfo.ccAvg >= 0 ? mySerieInfo.ccAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ppRank: ppRank > 0 ? `${ppRank}º lugar de ${sortedByPP.length}` : '-',
+          ccRank: ccRank > 0 ? `${ccRank}º lugar de ${sortedByCC.length}` : '-'
         };
       }
     }

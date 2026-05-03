@@ -2,8 +2,9 @@
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // ─────────────────────────────────────────────────────────────
 import React, { useState } from 'react';
-import { Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown, Table, Download } from 'lucide-react';
 import { checkIsTutor } from '../utils/helpers';
+import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
 
 const SortIcon = ({ columnKey, sortConfig }) => {
@@ -21,6 +22,37 @@ const Dashboard = ({
 }) => {
   const [showRanking, setShowRanking] = useState(false);
   const [gradeViewMode, setGradeViewMode] = useState('geral');
+
+  const handleExportExcel = async () => {
+    try {
+      const XLSX = await getXLSX();
+      
+      const exportData = sortedData.map(s => ({
+        "Aluno": s.nome,
+        "Turma": s.turma,
+        "Tutor": s.tutor,
+        "Situação": s.situacao,
+        "PP - Geral": s.provaPaulista,
+        "PP - Matemática": s.ppMat,
+        "PP - Português": s.ppPort,
+        "CC - Geral": s.consilhoBimestral,
+        "CC - Matemática": s.ccMat,
+        "CC - Português": s.ccPort,
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Alunos");
+
+      const safeValue = String(selectedValue).replace(/[^a-z0-9]/gi, '_');
+      const filename = `TutorDash_${filterMode}_${safeValue}.xlsx`;
+
+      XLSX.writeFile(workbook, filename);
+    } catch (err) {
+      console.error("Erro ao exportar excel:", err);
+      alert("Não foi possível gerar o arquivo Excel.");
+    }
+  };
 
   return (
   <div className="space-y-6 animate-in fade-in duration-300">
@@ -99,11 +131,15 @@ const Dashboard = ({
             <div className="flex p-1 bg-slate-100 rounded-xl mb-4 gap-1 overflow-x-auto">
               <button
                 onClick={() => { setFilterMode('tutor'); setSelectedValue('Todos'); }}
-                className={`flex-1 min-w-[70px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'tutor' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'tutor' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >TUTOR</button>
               <button
+                onClick={() => { setFilterMode('serie'); setSelectedValue('Todos'); }}
+                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'serie' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+              >NÍVEL</button>
+              <button
                 onClick={() => { setFilterMode('turma'); setSelectedValue('Todos'); }}
-                className={`flex-1 min-w-[70px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'turma' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'turma' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >TURMA</button>
             </div>
             <select
@@ -177,6 +213,15 @@ const Dashboard = ({
                   Português
                 </button>
               </div>
+              <div className="flex-1"></div>
+              <button
+                onClick={handleExportExcel}
+                title="Baixar Tabela em Excel"
+                className="p-1.5 mr-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-1.5 group"
+              >
+                <Table className="w-4 h-4" />
+                <span className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap overflow-hidden max-w-0 group-hover:max-w-xs">Baixar Excel</span>
+              </button>
             </div>
 
             <table className="w-full text-left">
