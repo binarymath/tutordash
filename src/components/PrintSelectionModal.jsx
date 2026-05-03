@@ -13,7 +13,6 @@ import {
   PolarRadiusAxis,
   Radar,
   RadarChart,
-  ResponsiveContainer,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -38,14 +37,13 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
   return (
     <div style={{ width: '100%', background: '#fff' }}>
       {hasMapaoRadar && (
-        <section data-print-chart="mapao-radar" style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: (hasProvaRadar || hasMapaoBars || hasProvaBars) ? '24px' : '0' }}>
+        <section data-print-chart="mapao-radar" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: (hasProvaRadar || hasMapaoBars || hasProvaBars) ? '24px' : '0' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', textAlign: 'center' }}>
             Radar de Equilíbrio ({bimestreLabel})
           </h4>
           {mapaoData.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '280px', minHeight: '280px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <RadarChart cx="50%" cy="50%" outerRadius="60%" data={mapaoData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <div style={{ position: 'relative', width: '100%', height: '280px', display: 'flex', justifyContent: 'center' }}>
+                <RadarChart width={800} height={280} cx="50%" cy="50%" outerRadius="60%" data={mapaoData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                   <PolarGrid stroke="#e2e8f0" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} />
@@ -53,7 +51,6 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
                   <Radar isAnimationActive={false} name="Aluno" dataKey="Aluno" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
                   <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} />
                 </RadarChart>
-              </ResponsiveContainer>
             </div>
           ) : (
             <div style={{ padding: '32px 0', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>Sem dados para o Radar de Equilíbrio.</div>
@@ -62,14 +59,13 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
       )}
 
       {hasProvaRadar && (
-        <section data-print-chart="prova-radar" style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: (hasMapaoBars || hasProvaBars) ? '24px' : '0' }}>
+        <section data-print-chart="prova-radar" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: (hasMapaoBars || hasProvaBars) ? '24px' : '0' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', textAlign: 'center' }}>
             Radar de Desempenho (Prova Paulista)
           </h4>
           {provaData.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '280px', minHeight: '280px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <RadarChart cx="50%" cy="50%" outerRadius="60%" data={provaData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
+            <div style={{ position: 'relative', width: '100%', height: '280px', display: 'flex', justifyContent: 'center' }}>
+                <RadarChart width={800} height={280} cx="50%" cy="50%" outerRadius="60%" data={provaData} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
                   <PolarGrid stroke="#e2e8f0" />
                   <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
                   <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} />
@@ -77,7 +73,6 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
                   <Radar isAnimationActive={false} name="Aluno" dataKey="Aluno" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.5} />
                   <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} />
                 </RadarChart>
-              </ResponsiveContainer>
             </div>
           ) : (
             <div style={{ padding: '32px 0', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>Sem dados para o Radar de Desempenho.</div>
@@ -86,14 +81,13 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
       )}
 
       {hasMapaoBars && (
-        <section data-print-chart="mapao-bars" style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: hasProvaBars ? '24px' : '0' }}>
+        <section data-print-chart="mapao-bars" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px', marginBottom: hasProvaBars ? '24px' : '0' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', textAlign: 'center' }}>
             Mapão - Aluno vs Média da Turma
           </h4>
           {mapaoData.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '320px', minHeight: '320px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={mapaoData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
+            <div style={{ position: 'relative', width: '100%', height: '320px', display: 'flex', justifyContent: 'center' }}>
+                <BarChart width={800} height={320} data={mapaoData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -105,7 +99,6 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
                     <LabelList dataKey="Turma" position="top" style={{ fontSize: 12, fontFamily: 'Times New Roman', fontWeight: 700, fill: '#94a3b8' }} formatter={(value) => value != null ? Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
             </div>
           ) : (
             <div style={{ padding: '32px 0', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>Sem dados comparativos suficientes.</div>
@@ -114,14 +107,13 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
       )}
 
       {hasProvaBars && (
-        <section data-print-chart="prova-bars" style={{ border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px' }}>
+        <section data-print-chart="prova-bars" style={{ pageBreakInside: 'avoid', breakInside: 'avoid', border: '1px solid #e2e8f0', borderRadius: '24px', padding: '24px' }}>
           <h4 style={{ margin: '0 0 16px', fontSize: '12px', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#94a3b8', textAlign: 'center' }}>
             Prova Paulista - Aluno vs Média da Turma
           </h4>
           {provaData.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '320px', minHeight: '320px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={provaData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
+            <div style={{ position: 'relative', width: '100%', height: '320px', display: 'flex', justifyContent: 'center' }}>
+                <BarChart width={800} height={320} data={provaData} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
@@ -133,7 +125,6 @@ const PrintChartRenderer = ({ student, charts, mapaoData, provaData }) => {
                     <LabelList dataKey="Turma" position="top" style={{ fontSize: 12, fontFamily: 'Times New Roman', fontWeight: 700, fill: '#64748b' }} formatter={(value) => value != null ? Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>
             </div>
           ) : (
             <div style={{ padding: '32px 0', textAlign: 'center', color: '#64748b', fontSize: '12px' }}>Sem dados comparativos da Prova Paulista.</div>
@@ -246,109 +237,153 @@ const PrintSelectionModal = ({
         return;
       }
 
-      // Criar janela de impressão
-      const printWindow = window.open('', '_blank', 'width=960,height=720');
-      if (!printWindow) {
-        setError('O navegador bloqueou a janela de impressão. Permita pop-ups e tente novamente.');
-        setIsPrinting(false);
-        return;
-      }
+      // Implementação Nativa para Evitar Popup Blockers e about:blank
+      const containerId = 'multiple-print-container';
+      let printContainer = document.getElementById(containerId);
+      if (printContainer) printContainer.remove();
 
-      // Criar container para React
-      const printContainer = printWindow.document.createElement('div');
-      printContainer.id = 'print-root';
-      
-      // Adicionar estilos de impressão em modo paisagem e remover margens
-      const styleSheet = printWindow.document.createElement('style');
-      styleSheet.textContent = `
-        @page {
-          size: landscape;
-          margin: 0;
+      printContainer = document.createElement('div');
+      printContainer.id = containerId;
+      document.body.appendChild(printContainer);
+
+      // Injeta estilos temporários para esconder a interface principal durante a impressão
+      const styleId = 'multiple-print-style';
+      let styleTag = document.getElementById(styleId);
+      if (styleTag) styleTag.remove();
+
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      styleTag.innerHTML = `
+        @media screen {
+          #${containerId} { 
+            position: absolute !important;
+            top: -9999px !important;
+            left: -9999px !important;
+            width: 1000px !important; /* Necessário para o ResponsiveContainer medir e renderizar o gráfico */
+            visibility: hidden !important;
+          }
         }
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          margin: 0;
-          padding: 0;
-          background: white;
-        }
-        html, body {
-          width: 100%;
-          height: 100%;
+        @media print {
+          body > *:not(#${containerId}):not(script):not(style) {
+            display: none !important;
+          }
+          #${containerId} {
+            display: block !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            z-index: 999999;
+          }
+          @page { margin: 0; }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
         }
       `;
-      printWindow.document.head.appendChild(styleSheet);
-      
-      printWindow.document.body.innerHTML = '';
-      printWindow.document.body.appendChild(printContainer);
+      document.head.appendChild(styleTag);
+
       const printRoot = createRoot(printContainer);
 
       // Componente para impressão
       const PrintDocument = () => (
         <div>
           {pagesToRender.map((page, pageIdx) => (
-            <div
+            <table
               key={pageIdx}
               style={{
                 pageBreakAfter: 'always',
-                padding: '24px 28px',
+                width: '100%',
+                borderCollapse: 'collapse',
                 background: '#fff',
-                minHeight: '100vh',
-                boxSizing: 'border-box',
               }}
             >
-              <div style={{ borderBottom: '2px solid #1e3a8a', paddingBottom: '12px', marginBottom: '18px' }}>
-                <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#1e3a8a' }}>
-                  TutorDash • Impressão de gráfico
-                </p>
-                <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                  <div>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Turma</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.turma || '-'}</span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Aluno</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.nome || '-'}</span>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Tutor</span>
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.tutor || '-'}</span>
-                  </div>
-                </div>
-              </div>
-              <PrintChartRenderer
-                student={page.student}
-                charts={page.charts}
-                mapaoData={page.mapaoData}
-                provaData={page.chartDataProva}
-              />
-            </div>
+              <thead style={{ display: 'table-header-group' }}>
+                <tr>
+                  <td style={{ padding: '24px 28px 0' }}>
+                    <div style={{ borderBottom: '2px solid #1e3a8a', paddingBottom: '12px', marginBottom: '18px' }}>
+                      <p style={{ margin: '0 0 10px', fontSize: '13px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: '#1e3a8a' }}>
+                        TutorDash • Impressão de gráfico
+                      </p>
+                      <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+                        <div>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Turma</span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.turma || '-'}</span>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Aluno</span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.nome || '-'}</span>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '9px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', display: 'block', marginBottom: '2px' }}>Tutor</span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>{page.student.tutor || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '0 28px 24px' }}>
+                    <PrintChartRenderer
+                      student={page.student}
+                      charts={page.charts}
+                      mapaoData={page.mapaoData}
+                      provaData={page.chartDataProva}
+                    />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           ))}
         </div>
       );
 
-      // Renderizar e imprimir
+      // Renderizar sincronicamente no container
       flushSync(() => printRoot.render(<PrintDocument />));
 
-      requestAnimationFrame(() => {
-        printWindow.focus();
-        printWindow.print();
-        printRoot.unmount();
-        onClose();
-        setIsPrinting(false);
+      // Como o ResponsiveContainer foi removido, os SVGs já estão no DOM!
+      // Pegamos todos os SVGs, mas aplicamos a escala APENAS aos SVGs principais (largura grande)
+      // para evitar esticar os ícones da legenda (que geralmente têm 14x14).
+      const svgs = printContainer.querySelectorAll('svg');
+      svgs.forEach(svg => {
+        const wStr = svg.getAttribute('width');
+        const hStr = svg.getAttribute('height');
+        const w = parseInt(wStr || '0', 10);
+        const h = parseInt(hStr || '0', 10);
+        
+        if (w > 100 && h > 100) {
+          if (!svg.getAttribute('viewBox')) {
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+          }
+          svg.style.width = '100%';
+          svg.style.height = 'auto';
+          svg.style.maxWidth = '100%';
+        }
       });
 
-      printWindowRef.current = printWindow;
+      // Acionar a impressão nativa
+      setTimeout(() => {
+        window.print();
+        
+        // Limpeza após impressão
+        setTimeout(() => {
+          printRoot.unmount();
+          if (printContainer.parentNode) printContainer.remove();
+          if (styleTag.parentNode) styleTag.remove();
+          onClose();
+          setIsPrinting(false);
+        }, 1000);
+      }, 500);
+
     } catch (err) {
       console.error('Erro ao imprimir:', err);
       setError('Não foi possível preparar a impressão.');
       setIsPrinting(false);
-      if (printWindowRef.current && !printWindowRef.current.closed) {
-        printWindowRef.current.close();
-      }
     }
   };
 

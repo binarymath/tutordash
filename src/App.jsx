@@ -213,8 +213,14 @@ const App = () => {
         let consilhoBimestral = 'S/D';
         if (ultimoBimestre?.notas) {
           const chaves  = Object.keys(ultimoBimestre.notas);
-          const matKey  = chaves.find(k => k.toUpperCase().includes('MATEM'));
-          const portKey = chaves.find(k => k.toUpperCase().includes('PORTUG'));
+          const matKey = chaves.find(k => {
+            const norm = k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s/g, '');
+            return norm.includes('MATEM') || norm === 'MAT' || norm === 'MAT.';
+          });
+          const portKey = chaves.find(k => {
+            const norm = k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s/g, '');
+            return norm.includes('PORTUG') || norm.includes('LINGUAPORT') || norm === 'LP' || norm === 'PORT' || norm.includes('LINGUAG');
+          });
           if (matKey)  quickMat  = ultimoBimestre.notas[matKey];
           if (portKey) quickPort = ultimoBimestre.notas[portKey];
           // Média geral de todas as notas válidas (igual ao Mapão no perfil)
@@ -226,25 +232,48 @@ const App = () => {
             consilhoBimestral = media.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
           }
         }
-        list.push({
-          nome: nomeOriginal, normalizedName: normName,
-          turma: item.turma, tutor: item.tutor,
-          notes: studentNotes, noteCount: studentNotes.length,
-          lastNoteDate: studentNotes.length > 0 ? studentNotes[0].displayDate : null,
-          provaPaulista: (() => {
-            const raw = provaInfo?.resultado;
-            if (!raw || raw === 'S/D' || raw === 'S/N') return raw || 'S/D';
-            const scaled = toScale10(raw);
-            return scaled != null
-              ? scaled.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-              : raw;
-          })(),
-          provaPaulistaNotas: provaInfo ? provaInfo.notas : null,
-          historicoConceitos: conceitosDoAluno,
-          consilhoBimestral,
-          ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
-          situacao: ultimoBimestre?.situacao || 'Ativo'
-        });
+          let ppMat = 'S/D', ppPort = 'S/D';
+          if (provaInfo && provaInfo.notas) {
+            const ppChaves = Object.keys(provaInfo.notas);
+            const ppMatKey = ppChaves.find(k => {
+              const norm = k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s/g, '');
+              return norm.includes('MATEM') || norm === 'MAT' || norm === 'MAT.';
+            });
+            const ppPortKey = ppChaves.find(k => {
+              const norm = k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s/g, '');
+              return norm.includes('PORTUG') || norm.includes('LINGUAPORT') || norm === 'LP' || norm === 'PORT' || norm.includes('LINGUAG');
+            });
+            if (ppMatKey && provaInfo.notas[ppMatKey] !== 'S/D' && provaInfo.notas[ppMatKey] !== 'S/N') {
+              const val = toScale10(provaInfo.notas[ppMatKey]);
+              if (val != null) ppMat = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+            if (ppPortKey && provaInfo.notas[ppPortKey] !== 'S/D' && provaInfo.notas[ppPortKey] !== 'S/N') {
+              const val = toScale10(provaInfo.notas[ppPortKey]);
+              if (val != null) ppPort = val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+          }
+
+          list.push({
+            nome: nomeOriginal, normalizedName: normName,
+            turma: item.turma, tutor: item.tutor,
+            notes: studentNotes, noteCount: studentNotes.length,
+            lastNoteDate: studentNotes.length > 0 ? studentNotes[0].displayDate : null,
+            provaPaulista: (() => {
+              const raw = provaInfo?.resultado;
+              if (!raw || raw === 'S/D' || raw === 'S/N') return raw || 'S/D';
+              const scaled = toScale10(raw);
+              return scaled != null
+                ? scaled.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                : raw;
+            })(),
+            provaPaulistaNotas: provaInfo ? provaInfo.notas : null,
+            ppMat, ppPort,
+            ccMat: quickMat, ccPort: quickPort,
+            historicoConceitos: conceitosDoAluno,
+            consilhoBimestral,
+            ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
+            situacao: ultimoBimestre?.situacao || 'Ativo'
+          });
       });
     });
     return list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
@@ -311,28 +340,165 @@ const App = () => {
   };
 
   const sortedData = useMemo(() => {
-    return [...filteredData].sort((a, b) => {
-      if (sortConfig.key === 'alunos') {
-        const aStudents = [...a.tutorados].sort((x, y) => x.localeCompare(y, 'pt-BR')).join(' | ').toLowerCase();
-        const bStudents = [...b.tutorados].sort((x, y) => x.localeCompare(y, 'pt-BR')).join(' | ').toLowerCase();
-        if (aStudents < bStudents) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aStudents > bStudents) return sortConfig.direction === 'asc' ? 1 : -1;
-      } else {
-        const aVal = String(a[sortConfig.key] || '').toLowerCase();
-        const bVal = String(b[sortConfig.key] || '').toLowerCase();
-        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1  : -1;
-      }
-      const aTurma = String(a.turma).toLowerCase();
-      const bTurma = String(b.turma).toLowerCase();
-      return aTurma < bTurma ? -1 : aTurma > bTurma ? 1 : 0;
-    });
-  }, [filteredData, sortConfig]);
+    const parseToFloat = (val) => {
+      if (!val || val === 'S/D' || val === 'S/N' || val === '-') return -1;
+      if (typeof val === 'number') return val;
+      const str = String(val).toUpperCase().trim();
+      if (str === 'MB') return 10;
+      if (str === 'B') return 8;
+      if (str === 'R') return 6;
+      if (str === 'I') return 4;
+      const parsed = parseFloat(str.replace(',', '.'));
+      return isNaN(parsed) ? -1 : parsed;
+    };
 
-  const stats = useMemo(() => ({
-    totalStudents: filteredData.reduce((acc, curr) => acc + curr.tutorados.length, 0),
-    totalGroups:   new Set(filteredData.map(d => d.turma)).size
-  }), [filteredData]);
+    return [...filteredStudents].sort((a, b) => {
+      if (['pp', 'cc', 'pp_mat', 'pp_port', 'cc_mat', 'cc_port'].includes(sortConfig.key)) {
+        let aVal = -1, bVal = -1;
+        if (sortConfig.key === 'pp') { aVal = parseToFloat(a.provaPaulista); bVal = parseToFloat(b.provaPaulista); }
+        else if (sortConfig.key === 'cc') { aVal = parseToFloat(a.consilhoBimestral); bVal = parseToFloat(b.consilhoBimestral); }
+        else if (sortConfig.key === 'pp_mat') { aVal = parseToFloat(a.ppMat); bVal = parseToFloat(b.ppMat); }
+        else if (sortConfig.key === 'pp_port') { aVal = parseToFloat(a.ppPort); bVal = parseToFloat(b.ppPort); }
+        else if (sortConfig.key === 'cc_mat') { aVal = parseToFloat(a.ccMat); bVal = parseToFloat(b.ccMat); }
+        else if (sortConfig.key === 'cc_port') { aVal = parseToFloat(a.ccPort); bVal = parseToFloat(b.ccPort); }
+
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      } else {
+        const key = sortConfig.key === 'alunos' ? 'nome' : sortConfig.key;
+        const aVal = String(a[key] || '').toLowerCase();
+        const bVal = String(b[key] || '').toLowerCase();
+        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      }
+      
+      // Desempate por nome
+      const aName = String(a.nome || '').toLowerCase();
+      const bName = String(b.nome || '').toLowerCase();
+      return aName < bName ? -1 : aName > bName ? 1 : 0;
+    });
+  }, [filteredStudents, sortConfig]);
+
+  const stats = useMemo(() => {
+    const totalStudents = filteredData.reduce((acc, curr) => acc + curr.tutorados.length, 0);
+    const totalGroups = new Set(filteredData.map(d => d.turma)).size;
+
+    let performanceStats = null;
+    const parseToFloat = (val) => {
+      if (!val || val === 'S/D' || val === 'S/N') return -1;
+      if (typeof val === 'number') return val;
+      return parseFloat(String(val).replace(',', '.'));
+    };
+
+    if (selectedValue === 'Todos') {
+      let ppSum = 0, ppCount = 0;
+      let ccSum = 0, ccCount = 0;
+
+      filteredStudents.forEach(s => {
+        const pp = parseToFloat(s.provaPaulista);
+        if (pp >= 0) { ppSum += pp; ppCount++; }
+        const cc = parseToFloat(s.consilhoBimestral);
+        if (cc >= 0) { ccSum += cc; ccCount++; }
+      });
+
+      performanceStats = {
+        titlePP: 'Média da Escola: Prova Paulista',
+        titleCC: 'Média da Escola: Conselho (CC)',
+        ppAvg: ppCount > 0 ? (ppSum / ppCount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+        ccAvg: ccCount > 0 ? (ccSum / ccCount).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+        ppRank: null,
+        ccRank: null
+      };
+
+    } else if (filterMode === 'turma') {
+      const allTurmas = new Set(allStudents.map(s => s.turma));
+      const turmaAverages = [];
+
+      for (const t of allTurmas) {
+        if (!t || t === 'Sem Turma') continue;
+
+        const studentsInTurma = allStudents.filter(s => s.turma === t);
+        let ppSum = 0, ppCount = 0;
+        let ccSum = 0, ccCount = 0;
+
+        studentsInTurma.forEach(s => {
+          const pp = parseToFloat(s.provaPaulista);
+          if (pp >= 0) { ppSum += pp; ppCount++; }
+          const cc = parseToFloat(s.consilhoBimestral);
+          if (cc >= 0) { ccSum += cc; ccCount++; }
+        });
+
+        turmaAverages.push({
+          turma: t,
+          ppAvg: ppCount > 0 ? ppSum / ppCount : -1,
+          ccAvg: ccCount > 0 ? ccSum / ccCount : -1
+        });
+      }
+
+      const sortedByPP = [...turmaAverages].filter(t => t.ppAvg >= 0).sort((a, b) => b.ppAvg - a.ppAvg);
+      const sortedByCC = [...turmaAverages].filter(t => t.ccAvg >= 0).sort((a, b) => b.ccAvg - a.ccAvg);
+      const myTurmaInfo = turmaAverages.find(t => t.turma === selectedValue);
+      
+      if (myTurmaInfo) {
+        const ppRank = sortedByPP.findIndex(t => t.turma === selectedValue) + 1;
+        const ccRank = sortedByCC.findIndex(t => t.turma === selectedValue) + 1;
+
+        performanceStats = {
+          titlePP: 'Média Turma: Prova Paulista',
+          titleCC: 'Média Turma: Conselho (CC)',
+          ppAvg: myTurmaInfo.ppAvg >= 0 ? myTurmaInfo.ppAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ccAvg: myTurmaInfo.ccAvg >= 0 ? myTurmaInfo.ccAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ppRank: ppRank > 0 ? `${ppRank}º lugar de ${sortedByPP.length}` : '-',
+          ccRank: ccRank > 0 ? `${ccRank}º lugar de ${sortedByCC.length}` : '-'
+        };
+      }
+    } else if (filterMode === 'tutor') {
+      const allTutores = new Set(allStudents.map(s => s.tutor));
+      const tutorAverages = [];
+
+      for (const t of allTutores) {
+        if (!t || t === 'Sem Tutor') continue;
+
+        const studentsInTutor = allStudents.filter(s => s.tutor === t);
+        let ppSum = 0, ppCount = 0;
+        let ccSum = 0, ccCount = 0;
+
+        studentsInTutor.forEach(s => {
+          const pp = parseToFloat(s.provaPaulista);
+          if (pp >= 0) { ppSum += pp; ppCount++; }
+          const cc = parseToFloat(s.consilhoBimestral);
+          if (cc >= 0) { ccSum += cc; ccCount++; }
+        });
+
+        tutorAverages.push({
+          tutor: t,
+          ppAvg: ppCount > 0 ? ppSum / ppCount : -1,
+          ccAvg: ccCount > 0 ? ccSum / ccCount : -1
+        });
+      }
+
+      const sortedByPP = [...tutorAverages].filter(t => t.ppAvg >= 0).sort((a, b) => b.ppAvg - a.ppAvg);
+      const sortedByCC = [...tutorAverages].filter(t => t.ccAvg >= 0).sort((a, b) => b.ccAvg - a.ccAvg);
+      const myTutorInfo = tutorAverages.find(t => t.tutor === selectedValue);
+      
+      if (myTutorInfo) {
+        performanceStats = {
+          titlePP: 'Média do Tutor: Prova Paulista',
+          titleCC: 'Média do Tutor: Conselho (CC)',
+          ppAvg: myTutorInfo.ppAvg >= 0 ? myTutorInfo.ppAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ccAvg: myTutorInfo.ccAvg >= 0 ? myTutorInfo.ccAvg.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D',
+          ppRank: null,
+          ccRank: null
+        };
+      }
+    }
+
+    return {
+      totalStudents,
+      totalGroups,
+      performanceStats
+    };
+  }, [filteredData, filterMode, selectedValue, allStudents, filteredStudents]);
 
   // Alunos visíveis no filtro atual, para o RankingPanel
   const rankingStudents = useMemo(() => {
@@ -494,12 +660,14 @@ const App = () => {
             target="_blank"
             rel="noopener noreferrer"
             title="Suporte via WhatsApp"
-            className="fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-white/90 backdrop-blur text-slate-500 hover:text-slate-800 border border-slate-200/70 rounded-full px-4 py-2.5 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 group"
+            className="fixed bottom-6 left-6 z-50 flex items-center bg-white/90 backdrop-blur text-slate-500 hover:text-slate-800 border border-slate-200/70 rounded-full p-3 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1 group"
           >
-            <svg className="w-5 h-5 text-slate-400 group-hover:text-[#25D366] transition-colors fill-current shrink-0" viewBox="0 0 24 24">
+            <svg className="w-6 h-6 text-slate-400 group-hover:text-[#25D366] transition-colors fill-current shrink-0" viewBox="0 0 24 24">
               <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/>
             </svg>
-            <span className="text-sm font-medium">Precisa de ajuda ou encontrou um problema?</span>
+            <span className="text-sm font-medium max-w-0 opacity-0 overflow-hidden whitespace-nowrap transition-all duration-500 ease-in-out group-hover:max-w-xs group-hover:opacity-100 group-hover:ml-3">
+              Precisa de ajuda ou encontrou um problema?
+            </span>
           </a>
         )}
       </main>

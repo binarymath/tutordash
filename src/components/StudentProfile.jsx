@@ -511,72 +511,128 @@ const StudentProfile = ({
     const tutor = escapeHtml(studentProfile?.tutor || '');
 
     try {
-      const { default: html2canvas } = await import('html2canvas');
+      // Cria um clone do elemento do gráfico para impressão
+      const clone = chartRef.cloneNode(true);
+      
+      // Oculta o botão de impressora do clone
+      const btn = clone.querySelector('button[title="Imprimir este gráfico"]');
+      if (btn) btn.remove();
 
-      // Oculta o botão de impressora para não aparecer na captura
-      const btn = chartRef.querySelector('button[title="Imprimir este gráfico"]');
-      if (btn) btn.style.visibility = 'hidden';
-
-      const canvas = await html2canvas(chartRef, {
-        backgroundColor: '#ffffff',
-        scale: 2,
-        useCORS: true,
+      // Ajusta o SVG principal do Recharts para escalar proporcionalmente e ficar nítido.
+      // O seletor pela largura (> 100px) garante que não vamos afetar os pequenos SVGs das legendas!
+      const svgs = clone.querySelectorAll('svg');
+      svgs.forEach(svg => {
+        const wStr = svg.getAttribute('width');
+        const hStr = svg.getAttribute('height');
+        const w = parseInt(wStr || '0', 10);
+        const h = parseInt(hStr || '0', 10);
+        
+        // Se houver largura/altura > 100 (ou seja, é o gráfico e não a legenda)
+        if (w > 100 && h > 100) {
+          if (!svg.getAttribute('viewBox')) {
+            svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+          }
+          svg.style.width = '100%';
+          svg.style.height = 'auto';
+          svg.style.maxWidth = '100%';
+        }
       });
 
-      if (btn) btn.style.visibility = '';
+      // Cria container de impressão nativa diretamente no body (solução 100% Mobile)
+      const containerId = 'mobile-print-container';
+      let printContainer = document.getElementById(containerId);
+      if (printContainer) printContainer.remove();
 
-      const imgDataUrl = canvas.toDataURL('image/png');
+      printContainer = document.createElement('div');
+      printContainer.id = containerId;
+      
+      printContainer.innerHTML = `
+        <table style="width: 100%; border-collapse: collapse; background: #fff;">
+          <thead style="display: table-header-group;">
+            <tr>
+              <td style="padding: 24px 28px 0;">
+                <div class="header" style="border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px;">
+                  <p style="font-size: 13px; font-weight: 800; color: #1e3a8a; text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0;">${escapeHtml(title)}</p>
+                  <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                    <div style="display: flex; flex-direction: column;">
+                      <span style="font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Turma</span>
+                      <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${turma}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                      <span style="font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Aluno</span>
+                      <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${nome}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column;">
+                      <span style="font-size: 9px; font-weight: 800; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px;">Tutor</span>
+                      <span style="font-size: 13px; font-weight: 700; color: #1e293b;">${tutor}</span>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 0 28px 24px;">
+                <div style="width: 100%; display: flex; justify-content: center; page-break-inside: avoid; break-inside: avoid;">
+                  <div style="width: 100%; max-width: 800px;">
+                    ${clone.outerHTML}
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      `;
 
-      const printWindow = window.open('', '_blank', 'width=960,height=720');
-      if (!printWindow) return;
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8" />
-            <title>${escapeHtml(title)}</title>
-            <style>
-              * { box-sizing: border-box; }
-              body { margin: 0; padding: 28px 32px; font-family: Arial, sans-serif; background: #fff; color: #0f172a; }
-              .header { border-bottom: 2px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 20px; }
-              .header-title { font-size: 13px; font-weight: 800; color: #1e3a8a;
-                              text-transform: uppercase; letter-spacing: 1px; margin: 0 0 10px 0; }
-              .header-info { display: flex; gap: 24px; flex-wrap: wrap; }
-              .info-item { display: flex; flex-direction: column; }
-              .info-label { font-size: 9px; font-weight: 800; color: #94a3b8;
-                            text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
-              .info-value { font-size: 13px; font-weight: 700; color: #1e293b; }
-              .chart-img { width: 100%; height: auto; display: block; }
-              @media print {
-                body { padding: 12px 16px; }
-                @page { margin: 10mm; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="header">
-              <p class="header-title">${escapeHtml(title)}</p>
-              <div class="header-info">
-                <div class="info-item">
-                  <span class="info-label">Turma</span>
-                  <span class="info-value">${turma}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Aluno</span>
-                  <span class="info-value">${nome}</span>
-                </div>
-                <div class="info-item">
-                  <span class="info-label">Tutor</span>
-                  <span class="info-value">${tutor}</span>
-                </div>
-              </div>
-            </div>
-            <img class="chart-img" src="${imgDataUrl}" alt="${escapeHtml(title)}" />
-            <script>window.onload = () => { window.print(); window.close(); };<\/script>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
+      document.body.appendChild(printContainer);
+
+      // Injeta estilos temporários para esconder o resto do site na impressão
+      const styleId = 'mobile-print-style';
+      let styleTag = document.getElementById(styleId);
+      if (styleTag) styleTag.remove();
+
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      styleTag.innerHTML = `
+        @media screen {
+          #${containerId} { display: none !important; }
+        }
+        @media print {
+          body > *:not(#${containerId}):not(script):not(style) {
+            display: none !important;
+          }
+          #${containerId} {
+            display: block !important;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            z-index: 999999;
+          }
+          @page { margin: 0; }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `;
+      document.head.appendChild(styleTag);
+
+      // Timeout para garantir que o navegador aplique os estilos e renderize o SVG clonado
+      setTimeout(() => {
+        window.print();
+        
+        // Remove os elementos de impressão do DOM após acionar a impressão.
+        // Damos um tempo razoável para a caixa de diálogo abrir.
+        setTimeout(() => {
+          if (printContainer.parentNode) printContainer.remove();
+          if (styleTag.parentNode) styleTag.remove();
+        }, 1000);
+      }, 300);
+
     } catch (err) {
       console.error('Erro ao imprimir gráfico:', err);
     }

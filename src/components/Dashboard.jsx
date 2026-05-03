@@ -20,6 +20,7 @@ const Dashboard = ({
   showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel
 }) => {
   const [showRanking, setShowRanking] = useState(false);
+  const [gradeViewMode, setGradeViewMode] = useState('geral');
 
   return (
   <div className="space-y-6 animate-in fade-in duration-300">
@@ -130,10 +131,54 @@ const Dashboard = ({
             <p className="text-slate-400 text-[10px] font-bold uppercase">Turmas</p>
             <div className="text-3xl font-black text-slate-800">{stats.totalGroups}</div>
           </div>
+          
+          {stats.performanceStats && (
+            <div className="space-y-4 pt-4 border-t border-slate-200">
+              <div className="bg-sky-50 rounded-3xl p-6 border border-sky-100 shadow-sm relative overflow-hidden group">
+                <p className="text-sky-600 text-[10px] font-bold uppercase mb-1">{stats.performanceStats.titlePP}</p>
+                <div className="text-3xl font-black text-sky-800">{stats.performanceStats.ppAvg}</div>
+                {stats.performanceStats.ppRank && (
+                  <div className="mt-2 text-xs font-bold text-sky-600/80">Ranking: {stats.performanceStats.ppRank}</div>
+                )}
+              </div>
+              <div className="bg-purple-50 rounded-3xl p-6 border border-purple-100 shadow-sm relative overflow-hidden group">
+                <p className="text-purple-600 text-[10px] font-bold uppercase mb-1">{stats.performanceStats.titleCC}</p>
+                <div className="text-3xl font-black text-purple-800">{stats.performanceStats.ccAvg}</div>
+                {stats.performanceStats.ccRank && (
+                  <div className="mt-2 text-xs font-bold text-purple-600/80">Ranking: {stats.performanceStats.ccRank}</div>
+                )}
+              </div>
+            </div>
+          )}
         </aside>
 
         <div className="lg:col-span-3">
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+            
+            <div className="flex items-center gap-2 p-4 border-b border-slate-200 bg-slate-50/50 overflow-x-auto">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-2 shrink-0">Visão de Notas:</span>
+              <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0">
+                <button 
+                  onClick={() => setGradeViewMode('geral')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${gradeViewMode === 'geral' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                >
+                  Média Geral
+                </button>
+                <button 
+                  onClick={() => setGradeViewMode('matematica')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${gradeViewMode === 'matematica' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                >
+                  Matemática
+                </button>
+                <button 
+                  onClick={() => setGradeViewMode('portugues')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${gradeViewMode === 'portugues' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                >
+                  Português
+                </button>
+              </div>
+            </div>
+
             <table className="w-full text-left">
               <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b border-slate-200">
                 <tr>
@@ -146,61 +191,84 @@ const Dashboard = ({
                   <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('alunos')}>
                     <div className="flex items-center gap-2">Alunos <SortIcon columnKey="alunos" sortConfig={sortConfig} /></div>
                   </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp')}>
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      {gradeViewMode === 'geral' ? 'PP' : gradeViewMode === 'matematica' ? 'PP (Mat)' : 'PP (Port)'} 
+                      <SortIcon columnKey={gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp'} sortConfig={sortConfig} />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc')}>
+                    <div className="flex items-center gap-2 whitespace-nowrap">
+                      {gradeViewMode === 'geral' ? 'CC' : gradeViewMode === 'matematica' ? 'CC (Mat)' : 'CC (Port)'} 
+                      <SortIcon columnKey={gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc'} sortConfig={sortConfig} />
+                    </div>
+                  </th>
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('situacao')}>
+                    <div className="flex items-center gap-2">Status <SortIcon columnKey="situacao" sortConfig={sortConfig} /></div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sortedData.flatMap(item => {
-                  const sortedTutorados = [...item.tutorados]
-                    .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-                    .sort((a, b) => {
-                      if (sortConfig.key !== 'alunos') return 0;
-                      return sortConfig.direction === 'asc'
-                        ? a.localeCompare(b, 'pt-BR')
-                        : b.localeCompare(a, 'pt-BR');
-                    });
-
-                  return sortedTutorados.map((nome, i) => {
-                    const studentInfo = allStudents.find(s => s.nome === nome);
-                    return (
-                      <tr key={`${item.id}-${nome}-${i}`} className="hover:bg-slate-50 transition-colors group">
-                        <td className="px-6 py-4 font-black text-slate-800 whitespace-nowrap">{item.turma}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-block text-[11px] px-2 py-1 rounded-md font-bold whitespace-nowrap ${item.tutor === 'Sem Tutor' ? 'bg-red-50 text-red-600' : 'text-slate-500'}`}>
-                            {item.tutor}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={() => setSelectedStudent(nome)}
-                            className="text-left bg-white border border-slate-200 p-2 rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md transition-all w-full"
-                          >
-                            <div className="flex items-center gap-1 flex-wrap">
-                              <span className="text-[11px] font-bold text-slate-700 truncate flex-1 min-w-0">{nome}</span>
-                              {studentInfo?.provaPaulista !== 'S/D' && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">PP: {studentInfo.provaPaulista}</span>}
-                              {studentInfo?.consilhoBimestral !== 'S/D' && <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 shrink-0">CC: {studentInfo.consilhoBimestral}</span>}
-                              {studentInfo && (
-                                <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${studentInfo.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
-                                  {studentInfo.situacao}
-                                </span>
-                              )}
+                {sortedData.map((student, i) => (
+                  <tr key={`${student.turma}-${student.nome}-${i}`} className="hover:bg-slate-50 transition-colors group">
+                    <td className="px-6 py-4 font-black text-slate-800 whitespace-nowrap">{student.turma}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-block text-[11px] px-2 py-1 rounded-md font-bold whitespace-nowrap ${student.tutor === 'Sem Tutor' ? 'bg-red-50 text-red-600' : 'text-slate-500'}`}>
+                        {student.tutor}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 w-full">
+                      <button
+                        onClick={() => setSelectedStudent(student.nome)}
+                        className="text-left bg-white border border-slate-200 p-2 rounded-xl shadow-sm hover:border-blue-400 hover:shadow-md transition-all w-full"
+                      >
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[11px] font-bold text-slate-700 truncate flex-1 min-w-0">{student.nome}</span>
+                        </div>
+                        {student.noteCount > 0 && (() => {
+                          const isTutorMatch = checkIsTutor(student.tutor, student.notes[0].teacher);
+                          return (
+                            <div className="flex gap-1 flex-wrap text-[9px] font-bold mt-1">
+                              <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${isTutorMatch ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
+                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTutorMatch ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
+                                📝 {student.notes[0].teacher} • Total: {student.noteCount} • Última: {student.lastNoteDate}
+                              </span>
                             </div>
-                            {studentInfo && studentInfo.noteCount > 0 && (() => {
-                              const isTutorMatch = checkIsTutor(studentInfo.tutor, studentInfo.notes[0].teacher);
-                              return (
-                                <div className="flex gap-1 flex-wrap text-[9px] font-bold mt-1">
-                                  <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${isTutorMatch ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-amber-50 text-amber-800 border-amber-300'}`}>
-                                    <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isTutorMatch ? 'bg-blue-500' : 'bg-amber-500'}`}></div>
-                                    📝 {studentInfo.notes[0].teacher} • Total: {studentInfo.noteCount} • Última: {studentInfo.lastNoteDate}
-                                  </span>
-                                </div>
-                              );
-                            })()}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  });
-                })}
+                          );
+                        })()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(() => {
+                        const val = gradeViewMode === 'geral' ? student.provaPaulista : gradeViewMode === 'matematica' ? student.ppMat : student.ppPort;
+                        return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
+                          <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
+                            {val}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(() => {
+                        const val = gradeViewMode === 'geral' ? student.consilhoBimestral : gradeViewMode === 'matematica' ? student.ccMat : student.ccPort;
+                        return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
+                          <span className="text-[11px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100">
+                            {val}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${student.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+                        {student.situacao}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
