@@ -119,56 +119,98 @@ const App = () => {
   const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(config.conceitoUrl);
 
   const data = useMemo(() => {
-    // 1. Set de nomes que já possuem tutor atribuído
+    // Redistribui alunos de turmas inválidas (405, 406) usando os dados do Mapão ou Prova Paulista
+    const resolvedDataRaw = [];
+    const orphanStudentsToReassign = [];
+
+    dataRaw.forEach(item => {
+      const t = String(item.turma || '').trim();
+      if (t.startsWith('405') || t.startsWith('406')) {
+        item.tutorados.forEach(nome => {
+           orphanStudentsToReassign.push({ nome, tutor: item.tutor });
+        });
+      } else {
+        resolvedDataRaw.push(item);
+      }
+    });
+
+    // 1. Set de nomes que já possuem tutor atribuído e estão em turmas válidas
     const tutoredSet = new Set();
-    dataRaw.forEach(item =>
+    resolvedDataRaw.forEach(item =>
       item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)))
     );
 
-    // 2. Mapa de órfãos: normalizedName → { nomeOriginal, turma }
-    //    Prioridade de turma: Mapão (conceitos) > Prova Paulista
+    // 2. Mapa de órfãos E alunos realocados: normalizedName → { nomeOriginal, turma, tutor }
     const orphanMap = new Map();
 
     // 2a. Varredura do Mapão (conceitos bimestrais)
     conceitoData.forEach(c => {
-      if (!tutoredSet.has(c.normalizedName) && !orphanMap.has(c.normalizedName)) {
-        orphanMap.set(c.normalizedName, {
-          nomeOriginal: c.nomeOriginal || c.normalizedName,
-          turma: c.turmaPlanilha || 'Sem Turma',
-        });
+      const t = String(c.turmaPlanilha || '').trim();
+      if (!t.startsWith('405') && !t.startsWith('406')) {
+         if (!tutoredSet.has(c.normalizedName) && !orphanMap.has(c.normalizedName)) {
+           orphanMap.set(c.normalizedName, {
+             nomeOriginal: c.nomeOriginal || c.normalizedName,
+             turma: c.turmaPlanilha || 'Sem Turma',
+             tutor: 'Sem Tutor'
+           });
+         }
       }
     });
 
     // 2b. Varredura da Prova Paulista (somente alunos ainda não mapeados)
     provaData.forEach(p => {
-      if (!tutoredSet.has(p.normalizedName) && !orphanMap.has(p.normalizedName)) {
-        orphanMap.set(p.normalizedName, {
-          nomeOriginal: p.nomeOriginal || p.normalizedName,
-          turma: p.turmaPlanilha || 'Sem Turma',
-        });
+      const t = String(p.turmaPlanilha || '').trim();
+      if (!t.startsWith('405') && !t.startsWith('406')) {
+         if (!tutoredSet.has(p.normalizedName) && !orphanMap.has(p.normalizedName)) {
+           orphanMap.set(p.normalizedName, {
+             nomeOriginal: p.nomeOriginal || p.normalizedName,
+             turma: p.turmaPlanilha || 'Sem Turma',
+             tutor: 'Sem Tutor'
+           });
+         }
       }
     });
 
-    // 3. Agrupa órfãos por turma
-    const byTurma = new Map();
-    for (const { nomeOriginal, turma } of orphanMap.values()) {
-      if (!byTurma.has(turma)) byTurma.set(turma, []);
-      byTurma.get(turma).push(nomeOriginal);
+    // 2c. Tenta encaixar os alunos das turmas 405/406 nas turmas corretas
+    orphanStudentsToReassign.forEach(aluno => {
+      const norm = normalizeName(aluno.nome);
+      if (!tutoredSet.has(norm)) {
+         if (orphanMap.has(norm)) {
+            // Achou a turma dele no Mapão/Prova; apenas restaura o tutor original
+            orphanMap.get(norm).tutor = aluno.tutor;
+         } else {
+            // Não achou em lugar nenhum, põe em Sem Turma com o tutor dele
+            orphanMap.set(norm, {
+               nomeOriginal: aluno.nome,
+               turma: 'Sem Turma',
+               tutor: aluno.tutor
+            });
+         }
+         tutoredSet.add(norm); // Marca como resolvido
+      }
+    });
+
+    // 3. Agrupa órfãos e alunos realocados por turma + tutor
+    const byTurmaTutor = new Map(); // key: "turma|tutor"
+    for (const { nomeOriginal, turma, tutor } of orphanMap.values()) {
+      const key = `${turma}|${tutor}`;
+      if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
+      byTurmaTutor.get(key).tutorados.push(nomeOriginal);
     }
 
-    // 4. Gera grupos "Sem Tutor" por turma
-    const orphanGroups = [];
-    let orphanIdx = 0;
-    for (const [turma, tutorados] of byTurma.entries()) {
-      orphanGroups.push({
-        id: `orphan-${orphanIdx++}`,
-        turma,
-        tutor: 'Sem Tutor',
-        tutorados,
+    // 4. Gera os novos grupos
+    const additionalGroups = [];
+    let groupIdx = 0;
+    for (const group of byTurmaTutor.values()) {
+      additionalGroups.push({
+        id: `reassigned-${groupIdx++}`,
+        turma: group.turma,
+        tutor: group.tutor,
+        tutorados: group.tutorados,
       });
     }
 
-    return [...dataRaw, ...orphanGroups];
+    return [...resolvedDataRaw, ...additionalGroups];
   }, [dataRaw, conceitoData, provaData]);
 
   const isLoading = isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos;
