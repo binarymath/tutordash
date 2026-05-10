@@ -239,7 +239,92 @@ const buildRadarSvgDataUri = ({ title, labels, datasets, maxValue = 10 }) => {
     </svg>
   `;
 
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
+};
+
+const buildBarSvgDataUri = ({ title, labels, datasets, maxValue = 10 }) => {
+  if (!labels || labels.length === 0) return null;
+
+  const width = 900;
+  const height = 700;
+  const chartWidth = 700;
+  const chartHeight = 350;
+  const margin = { top: 80, right: 150, bottom: 150, left: 50 };
+
+  const barCount = labels.length;
+  const datasetCount = datasets.length;
+  const groupWidth = (chartWidth / barCount) * 0.8;
+  const barWidth = groupWidth / datasetCount;
+
+  const getX = (barIdx, datasetIdx) => {
+    const groupX = margin.left + (barIdx * (chartWidth / barCount)) + (chartWidth / barCount - groupWidth) / 2;
+    return groupX + (datasetIdx * barWidth);
+  };
+
+  const getY = (value) => {
+    const ratio = Math.max(0, Math.min(maxValue, Number(value || 0))) / maxValue;
+    return margin.top + chartHeight - (ratio * chartHeight);
+  };
+
+  const bars = datasets.flatMap((dataset, dIdx) => 
+    labels.map((_, bIdx) => {
+      const val = dataset.values[bIdx];
+      const y = getY(val);
+      const h = margin.top + chartHeight - y;
+      return `<rect x="${getX(bIdx, dIdx)}" y="${y}" width="${barWidth * 0.9}" height="${h}" fill="${dataset.color}" rx="2" />`;
+    })
+  ).join('');
+
+  const barLabels = datasets.flatMap((dataset, dIdx) =>
+    labels.map((_, bIdx) => {
+      const val = dataset.values[bIdx];
+      if (val == null) return '';
+      const x = getX(bIdx, dIdx) + (barWidth * 0.9) / 2;
+      const y = getY(val) - 5;
+      const formattedVal = Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+      return `<text x="${x}" y="${y}" fill="#000000" font-size="11" font-weight="700" text-anchor="middle">${formattedVal}</text>`;
+    }).filter(v => v)
+  ).join('');
+
+  const gridLines = Array.from({ length: 6 }).map((_, i) => {
+    const y = margin.top + (i * chartHeight / 5);
+    const val = (maxValue - (i * maxValue / 5)).toFixed(0);
+    return `
+      <line x1="${margin.left}" y1="${y}" x2="${margin.left + chartWidth}" y2="${y}" stroke="#e2e8f0" stroke-width="1" />
+      <text x="${margin.left - 10}" y="${y + 5}" fill="#64748b" font-size="10" text-anchor="end">${val}</text>
+    `;
+  }).join('');
+
+  const xLabels = labels.map((label, i) => {
+    const x = margin.left + (i * chartWidth / barCount) + (chartWidth / barCount) / 2;
+    const short = String(label).length > 12 ? `${String(label).slice(0, 10)}...` : String(label);
+    return `<g transform="translate(${x}, ${margin.top + chartHeight + 35}) rotate(45)">
+      <text x="0" y="0" fill="#334155" font-size="11" font-weight="700" text-anchor="start" dominant-baseline="middle">${escapeHtml(short)}</text>
+    </g>`;
+  }).join('');
+
+  const legend = datasets.map((dataset, idx) => `
+    <g transform="translate(${margin.left + chartWidth + 20}, ${margin.top + idx * 25})">
+      <rect width="14" height="14" fill="${dataset.color}" rx="3" />
+      <text x="22" y="11" fill="#1e293b" font-size="12" font-weight="700">${escapeHtml(dataset.name)}</text>
+    </g>
+  `).join('');
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <rect width="100%" height="100%" fill="#ffffff" />
+      <text x="40" y="45" fill="#1e3a8a" font-size="20" font-weight="800">${escapeHtml(title)}</text>
+      <g>
+        ${gridLines}
+        ${bars}
+        ${barLabels}
+        ${xLabels}
+      </g>
+      ${legend}
+    </svg>
+  `;
+
+  return `data:image/svg+xml;base64,${btoa(unescape(encodeURIComponent(svg)))}`;
 };
 
 const svgDataUriToPngBytes = async (svgDataUri, width = 1200, height = 700) => {
@@ -502,6 +587,17 @@ const StudentProfile = ({
   const [showPrintSelection, setShowPrintSelection] = useState(false);
   const [studentSelections, setStudentSelections] = useState({});
 
+  // ── Cálculo da média do Conselho Bimestral ─────────────────
+  const parseToNum = (v) => {
+    if (v === undefined || v === null) return null;
+    const n = parseFloat(String(v).replace(',', '.'));
+    return Number.isNaN(n) ? null : n;
+  };
+
+  const conselhoNumbers = (chartDataMapao || []).map(item => parseToNum(item.Aluno)).filter(n => n != null);
+  const conselhoMean = conselhoNumbers.length ? (conselhoNumbers.reduce((s, x) => s + x, 0) / conselhoNumbers.length) : null;
+  const conselhoMeanStr = conselhoMean !== null ? conselhoMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D';
+
   // ── Impressão de gráfico individual ─────────────────────────
   const printChart = async (chartRef, title) => {
     if (!chartRef) return;
@@ -711,6 +807,24 @@ const StudentProfile = ({
       ],
     });
 
+    const barMapaoUri = buildBarSvgDataUri({
+      title: 'Desempenho por Disciplina (Conselho)',
+      labels: mapaoRows.map(r => r.disciplina),
+      datasets: [
+        { name: 'Média Turma', color: '#cbd5e1', values: mapaoRows.map(r => parseFloat(String(r.turma).replace(',','.')) || 0) },
+        { name: 'Aluno', color: '#3b82f6', values: mapaoRows.map(r => parseFloat(String(r.aluno).replace(',','.')) || 0) }
+      ]
+    });
+
+    const barProvaUri = buildBarSvgDataUri({
+      title: 'Desempenho por Disciplina (Prova Paulista)',
+      labels: provaRows.map(r => r.disciplina),
+      datasets: [
+        { name: 'Média Turma', color: '#cbd5e1', values: provaRows.map(r => parseFloat(String(r.turma).replace(',','.')) || 0) },
+        { name: 'Aluno', color: '#3b82f6', values: provaRows.map(r => parseFloat(String(r.aluno).replace(',','.')) || 0) }
+      ]
+    });
+
     return {
       historico,
       disciplinas,
@@ -720,6 +834,8 @@ const StudentProfile = ({
       provaRows,
       radarMapaoUri,
       radarProvaUri,
+      barMapaoUri,
+      barProvaUri
     };
   };
 
@@ -730,8 +846,23 @@ const StudentProfile = ({
     try {
       setIsExporting(true);
       const { default: html2pdf } = await import('html2pdf.js');
-      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
+      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri, barMapaoUri, barProvaUri } = buildReportData();
       const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
+
+      // Calcula médias para exibição no PDF
+      const parseToNum = (v) => {
+        if (v === undefined || v === null) return null;
+        const n = parseFloat(String(v).replace(',', '.'));
+        return Number.isNaN(n) ? null : n;
+      };
+
+      const conselhoNumbers = (mapaoRows || []).map(r => parseToNum(r.aluno)).filter(n => n != null);
+      const conselhoMean = conselhoNumbers.length ? (conselhoNumbers.reduce((s, x) => s + x, 0) / conselhoNumbers.length) : null;
+      const conselhoMeanStr = conselhoMean !== null ? conselhoMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D';
+
+      const provaNumbers = (provaRows || []).map(r => parseToNum(r.aluno)).filter(n => n != null);
+      const provaMean = provaNumbers.length ? (provaNumbers.reduce((s, x) => s + x, 0) / provaNumbers.length) : null;
+      const provaMeanStr = provaMean !== null ? provaMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (studentProfile.provaPaulista || 'S/D');
 
       const notesHtml = notasComTipo.length > 0
         ? notasComTipo.map((note) => `
@@ -748,8 +879,8 @@ const StudentProfile = ({
         ? mapaoRows.map((row) => `
           <tr>
             <td>${escapeHtml(row.disciplina)}</td>
-            <td>${escapeHtml(row.aluno)}</td>
-            <td>${escapeHtml(row.turma)}</td>
+            <td style="text-align: center;">${escapeHtml(row.aluno)}</td>
+            <td style="text-align: center;">${escapeHtml(row.turma)}</td>
           </tr>
         `).join('')
         : `<tr><td colspan="3">Sem dados para o Radar de Equilíbrio.</td></tr>`;
@@ -758,84 +889,148 @@ const StudentProfile = ({
         ? provaRows.map((row) => `
           <tr>
             <td>${escapeHtml(row.disciplina)}</td>
-            <td>${escapeHtml(String(row.aluno))}</td>
-            <td>${escapeHtml(String(row.turma))}</td>
+            <td style="text-align: center;">${escapeHtml(String(row.aluno))}</td>
+            <td style="text-align: center;">${escapeHtml(String(row.turma))}</td>
           </tr>
         `).join('')
         : `<tr><td colspan="3">Sem dados para o Radar de Desempenho (Prova Paulista).</td></tr>`;
 
       container = document.createElement('div');
       container.innerHTML = `
-        <div style="font-family: Arial, sans-serif; color: #0f172a; padding: 0 12px; max-width: 190mm; margin: 0 auto; box-sizing: border-box;">
-          <section style="height: 260mm; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; border: 2px solid #1e3a8a; border-radius: 12px; padding: 24px; box-sizing: border-box;">
-            <p style="margin:0; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#1e3a8a; font-weight:bold;">TutorDash • Relatório Oficial</p>
-            <h1 style="margin:16px 0 8px 0; font-size:32px; line-height:1.2; color:#0f172a;">Relatório Individual do Aluno</h1>
-            <p style="margin:0; font-size:15px; color:#334155;"><strong>${escapeHtml(studentProfile.nome)}</strong></p>
-            <p style="margin:10px 0 0; font-size:13px; color:#475569;">Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
-            <p style="margin:10px 0 0; font-size:12px; color:#64748b;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; padding: 0 10px; max-width: 190mm; margin: 0 auto; box-sizing: border-box;">
+          <style>
+            .pdf-page { margin: 0; padding: 0; }
+            .pdf-page-break { page-break-before: always; break-before: page; }
+            .pdf-panel {
+              border: 1px solid #d6deea;
+              border-radius: 14px;
+              background: #ffffff;
+              box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+              box-sizing: border-box;
+            }
+            .pdf-title {
+              margin: 0 0 8px 0;
+              font-size: 13px;
+              color: #1e3a8a;
+              text-transform: uppercase;
+              letter-spacing: .6px;
+              font-weight: 800;
+            }
+            .avoid-break {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+          </style>
+
+          <!-- PÁGINA 1: CAPA + DADOS + ANOTAÇÕES -->
+          <section class="pdf-page">
+            <div class="pdf-panel avoid-break" style="padding: 20px; margin-bottom: 10px; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 60%, #f8fafc 100%); border-color:#bfdbfe;">
+              <p style="margin:0; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#1d4ed8; font-weight:800;">TutorDash • Relatório de Consulta</p>
+              <h1 style="margin:10px 0 6px 0; font-size:29px; line-height:1.15; color:#0f172a;">Relatório Individual do Aluno</h1>
+              <p style="margin:0; font-size:15px; color:#1e293b;"><strong>${escapeHtml(studentProfile.nome)}</strong></p>
+              <p style="margin:8px 0 0; font-size:12px; color:#475569;">Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
+              <p style="margin:6px 0 0; font-size:11px; color:#64748b;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+            </div>
+
+            <div class="pdf-panel avoid-break" style="padding: 12px; margin-bottom: 10px;">
+              <h2 style="margin:0 0 10px 0; font-size:15px; color:#0f172a;">Dados Gerais</h2>
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color:#334155;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Aluno:</strong> ${escapeHtml(studentProfile.nome)}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Turma:</strong> ${escapeHtml(studentProfile.turma)}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Tutor:</strong> ${escapeHtml(studentProfile.tutor)}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Prova Paulista:</strong> ${escapeHtml(studentProfile.provaPaulista || 'S/D')}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Qtde Faltas:</strong> ${studentProfile.totalFaltas != null ? studentProfile.totalFaltas : 'S/D'}<br /><strong>Freq(%):</strong> ${studentProfile.frequenciaMedia != null ? studentProfile.frequenciaMedia.toFixed(1) + '%' : 'S/D'}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Conselho Bimestral:</strong> ${escapeHtml(conselhoMeanStr)}</div>
+                <div style="grid-column:1 / -1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Total de anotações:</strong> ${notasComTipo.length}</div>
+              </div>
+            </div>
+
+            <div class="pdf-panel" style="padding: 10px;">
+              <h3 class="pdf-title" style="margin-bottom: 8px;">Anotações e Sessões</h3>
+              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+                <thead>
+                  <tr>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Data</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Tipo</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Quem Registrou</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Anotação</th>
+                  </tr>
+                </thead>
+                <tbody>${notesHtml}</tbody>
+              </table>
+            </div>
           </section>
 
-          <div style="page-break-before: always;"></div>
+          <!-- PÁGINA 2: RADAR CONSELHO -->
+          <section class="pdf-page pdf-page-break">
+            <h3 class="pdf-title">Radar de Equilíbrio (Conselho)</h3>
+            <div class="pdf-panel" style="padding: 12px;">
+              <div class="avoid-break" style="height: 108mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; background:#fafcff;">
+                ${radarMapaoUri ? `<img src="${radarMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+              </div>
+              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+                <thead>
+                  <tr>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Disciplina</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Aluno</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Média Turma</th>
+                  </tr>
+                </thead>
+                <tbody>${mapaoHtml}</tbody>
+              </table>
+            </div>
+          </section>
 
-          <header style="border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; margin: 8px 0 16px;">
-            <h2 style="margin:0; font-size:16px; color:#1e293b;">Relatório Individual do Aluno</h2>
-            <p style="margin:4px 0 0; font-size:11px; color:#64748b;">Aluno: ${escapeHtml(studentProfile.nome)} • Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
-          </header>
+          <!-- PÁGINA 3: RADAR PROVA PAULISTA -->
+          <section class="pdf-page pdf-page-break">
+            <h3 class="pdf-title">Radar de Desempenho (Prova Paulista)</h3>
+            <div class="pdf-panel" style="padding: 12px;">
+              <div class="avoid-break" style="height: 108mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; background:#fafcff;">
+                ${radarProvaUri ? `<img src="${radarProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+              </div>
 
-          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Dados Gerais</h3>
-          <ul style="margin: 0 0 12px 18px; padding: 0; font-size: 12px;">
-            <li><strong>Aluno:</strong> ${escapeHtml(studentProfile.nome)}</li>
-            <li><strong>Turma:</strong> ${escapeHtml(studentProfile.turma)}</li>
-            <li><strong>Tutor:</strong> ${escapeHtml(studentProfile.tutor)}</li>
-            <li><strong>Prova Paulista:</strong> ${escapeHtml(studentProfile.provaPaulista || 'S/D')}</li>
-            <li><strong>Total de anotações:</strong> ${notasComTipo.length}</li>
-          </ul>
+              <div style="display:flex; gap:12px; justify-content:center; align-items:center; margin:8px 0 12px 0;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:8px; min-width:160px; text-align:center;">
+                  <div style="font-size:11px; color:#64748b; font-weight:700;">Média Prova Paulista</div>
+                  <div style="font-size:16px; color:#0f172a; font-weight:800;">${escapeHtml(String(provaMeanStr))}</div>
+                </div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:8px; min-width:160px; text-align:center;">
+                  <div style="font-size:11px; color:#64748b; font-weight:700;">Média Conselho Bimestral</div>
+                  <div style="font-size:16px; color:#0f172a; font-weight:800;">${escapeHtml(String(conselhoMeanStr))}</div>
+                </div>
+              </div>
 
-          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Anotações e Sessões</h3>
-          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:16px; box-sizing:border-box; page-break-inside:avoid;">
-          <table style="width:100%; border-collapse: collapse; font-size: 11px;">
-            <thead>
-              <tr>
-                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Data</th>
-                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Tipo</th>
-                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Quem Registrou</th>
-                <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Anotação</th>
-              </tr>
-            </thead>
-            <tbody>${notesHtml}</tbody>
-          </table>
-          </div>
+              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+                <thead>
+                  <tr>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Disciplina</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Aluno</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Média Turma</th>
+                  </tr>
+                </thead>
+                <tbody>${provaHtml}</tbody>
+              </table>
+            </div>
+          </section>
 
-          <h3 style="font-size:13px; margin: 16px 0 8px; color:#1e3a8a; text-transform:uppercase; letter-spacing:.5px;">Análise Gráfica e Comparativa</h3>
-          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:12px; box-sizing:border-box; page-break-inside:avoid;">
-            <p style="margin:0 0 8px 0; font-size:11px; font-weight:bold; color:#334155;">Radar de Equilíbrio (${escapeHtml(bimestreRadarLabel)})</p>
-            ${radarMapaoUri ? `<img src="${radarMapaoUri}" alt="Radar de Equilibrio" style="width:100%; max-width:100%; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px;" />` : ''}
-            <table style="width:100%; border-collapse: collapse; font-size: 10px;">
-              <thead>
-                <tr>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Disciplina</th>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Aluno</th>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Média Turma</th>
-                </tr>
-              </thead>
-              <tbody>${mapaoHtml}</tbody>
-            </table>
-          </div>
+          <!-- PÁGINA 4: BARRAS COMPARATIVAS -->
+          <section class="pdf-page pdf-page-break avoid-break" style="height: 275mm; display:flex; flex-direction:column;">
+            <h3 class="pdf-title" style="margin-bottom:6px;">Análise Comparativa por Disciplina</h3>
 
-          <div style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px; margin-bottom:12px; box-sizing:border-box; page-break-inside:avoid;">
-            <p style="margin:0 0 8px 0; font-size:11px; font-weight:bold; color:#334155;">Radar de Desempenho (Prova Paulista)</p>
-            ${radarProvaUri ? `<img src="${radarProvaUri}" alt="Radar de Desempenho" style="width:100%; max-width:100%; border:1px solid #e2e8f0; border-radius:8px; margin-bottom:10px;" />` : ''}
-            <table style="width:100%; border-collapse: collapse; font-size: 10px;">
-              <thead>
-                <tr>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Disciplina</th>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Aluno</th>
-                  <th style="border:1px solid #cbd5e1; background:#f8fafc; padding:6px;">Média Turma</th>
-                </tr>
-              </thead>
-              <tbody>${provaHtml}</tbody>
-            </table>
-          </div>
+            <div class="pdf-panel avoid-break" style="flex:1 1 0; min-height:0; padding:10px; margin-bottom:8px; display:flex; flex-direction:column;">
+              <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Conselho Bimestral</p>
+              <div style="flex:1 1 0; min-height:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; display:flex; justify-content:center; align-items:center; background:#fafcff;">
+                ${barMapaoUri ? `<img src="${barMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+              </div>
+            </div>
+
+            <div class="pdf-panel avoid-break" style="flex:1 1 0; min-height:0; padding:10px; display:flex; flex-direction:column;">
+              <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Prova Paulista</p>
+              <div style="flex:1 1 0; min-height:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; display:flex; justify-content:center; align-items:center; background:#fafcff;">
+                ${barProvaUri ? `<img src="${barProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+              </div>
+            </div>
+          </section>
         </div>
       `;
 
@@ -919,6 +1114,9 @@ const StudentProfile = ({
         `Turma: ${studentProfile.turma}`,
         `Tutor: ${studentProfile.tutor}`,
         `Prova Paulista: ${studentProfile.provaPaulista || 'S/D'}`,
+        `Qtde Faltas: ${studentProfile.totalFaltas != null ? studentProfile.totalFaltas : 'S/D'}`,
+        `Frequência: ${studentProfile.frequenciaMedia != null ? studentProfile.frequenciaMedia.toFixed(1) + '%' : 'S/D'}`,
+        `Conselho Bimestral: ${conselhoMeanStr}`,
         `Total de anotações: ${notasComTipo.length}`,
       ];
 
@@ -1099,6 +1297,16 @@ const StudentProfile = ({
         <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase flex-wrap">
           <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
           <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
+        </div>
+        {/* Badge de situação atual */}
+        <div className="flex items-center gap-2 mt-3 flex-wrap">
+          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg border ${
+            studentProfile.situacao === 'Ativo'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-rose-50 text-rose-600 border-rose-200'
+          }`}>
+            {studentProfile.situacao}
+          </span>
         </div>
         <div className="flex gap-2 mt-4 flex-wrap">
           <button
@@ -1300,6 +1508,18 @@ const StudentProfile = ({
                 </p>
               </div>
 
+              {/* Conselho Bimestral - Média */}
+              <div className="flex items-center gap-4 p-4 bg-purple-50 rounded-2xl border border-purple-100">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-0.5">Média Conselho</span>
+                  <span className="text-3xl font-black text-purple-700 leading-none">{conselhoMeanStr}</span>
+                </div>
+                <div className="h-12 w-px bg-purple-200 mx-2" />
+                <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
+                  Média consolidada do<br />Conselho Bimestral do aluno
+                </p>
+              </div>
+
               {/* Tabela por matéria */}
               {chartDataProva.length > 0 ? (
                 <div className="rounded-2xl overflow-hidden border border-slate-200">
@@ -1477,19 +1697,19 @@ const StudentProfile = ({
             <span className="ml-1 text-slate-300 normal-case font-bold">({bimestreRadarLabel})</span>
           </h4>
           {chartDataMapao.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
+            <div style={{ position: 'relative', width: '100%', height: '480px', minHeight: '480px' }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={chartDataMapao} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
+                <BarChart data={chartDataMapao} margin={{ top: 20, right: 10, left: -20, bottom: 100 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={100} />
                   <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
                   <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                   <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                   <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -1514,19 +1734,19 @@ const StudentProfile = ({
             <span className="text-sky-500">Prova Paulista</span> — Comparação: Aluno vs Média da Turma
           </h4>
           {chartDataProva.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '384px', minHeight: '384px' }}>
+            <div style={{ position: 'relative', width: '100%', height: '480px', minHeight: '480px' }}>
               <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={chartDataProva} margin={{ top: 20, right: 10, left: -20, bottom: 60 }}>
+                <BarChart data={chartDataProva} margin={{ top: 20, right: 10, left: -20, bottom: 100 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} />
+                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={100} />
                   <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
                   <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
                   <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
                   <Bar name="Nota do Aluno" dataKey="Aluno" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                   <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 9, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
+                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

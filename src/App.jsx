@@ -295,6 +295,53 @@ const App = () => {
             }
           }
 
+          // ── Faltas e Frequência (acumulado de todos os bimestres) ─────────────
+          const _parseNum = (v) => {
+            if (v == null) return null;
+            const n = parseFloat(String(v).replace('%','').replace(',','.'));
+            return isNaN(n) ? null : n;
+          };
+          let _faltasTotal = 0;
+          const _freqVals = [];
+          conceitosDoAluno.forEach(bim => {
+            const tf = _parseNum(bim.tfBimestre ?? bim.faltas);
+            if (tf !== null) _faltasTotal += tf;
+            const freqRaw = bim.freqBimestre ?? '-';
+            const freqParsed = _parseNum(freqRaw);
+            if (freqParsed !== null) {
+              const freq = freqParsed <= 1 && !String(freqRaw).includes('%')
+                ? Math.max(0, Math.min(100, freqParsed * 100))
+                : Math.max(0, Math.min(100, freqParsed));
+              _freqVals.push(freq);
+            }
+          });
+          const totalFaltas = conceitosDoAluno.length > 0 ? _faltasTotal : null;
+          const frequenciaMedia = _freqVals.length > 0
+            ? _freqVals.reduce((s, v) => s + v, 0) / _freqVals.length
+            : null;
+
+          // ── Status: prioridade para o bimestre mais recente ──────────────────
+          // No mesmo bimestre, se houver "Ativo" entre os status, prevalece "Ativo"
+          const ultimoBimNome = ultimoBimestre ? ultimoBimestre.bimestre : null;
+          const situacoesUltimoBim = ultimoBimNome
+            ? conceitosDoAluno
+                .filter(c => c.bimestre === ultimoBimNome)
+                .map(c => c.situacao || 'Ativo')
+            : (ultimoBimestre?.situacao ? [ultimoBimestre.situacao] : ['Ativo']);
+
+          const situacaoAtual = situacoesUltimoBim.includes('Ativo')
+            ? 'Ativo'
+            : situacoesUltimoBim[0] || 'Ativo';
+
+          // Histórico: status únicos de todos os bimestres
+          const todasSituacoes = Array.from(
+            new Set(conceitosDoAluno.map(c => c.situacao || 'Ativo'))
+          ).sort((a, b) => {
+            if (a === 'Ativo') return -1;
+            if (b === 'Ativo') return 1;
+            return a.localeCompare(b, 'pt-BR');
+          });
+
           list.push({
             nome: nomeOriginal, normalizedName: normName,
             turma: item.turma, tutor: item.tutor,
@@ -314,9 +361,13 @@ const App = () => {
             historicoConceitos: conceitosDoAluno,
             consilhoBimestral,
             ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
-            situacao: ultimoBimestre?.situacao || 'Ativo'
+            situacao: situacaoAtual,
+            todasSituacoes,
+            totalFaltas,
+            frequenciaMedia,
           });
       });
+
     });
     return list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [data, annotations, provaData, conceitoData]);
@@ -404,7 +455,7 @@ const App = () => {
     };
 
     return [...filteredStudents].sort((a, b) => {
-      if (['pp', 'cc', 'pp_mat', 'pp_port', 'cc_mat', 'cc_port'].includes(sortConfig.key)) {
+      if (['pp', 'cc', 'pp_mat', 'pp_port', 'cc_mat', 'cc_port', 'faltas', 'frequencia'].includes(sortConfig.key)) {
         let aVal = -1, bVal = -1;
         if (sortConfig.key === 'pp') { aVal = parseToFloat(a.provaPaulista); bVal = parseToFloat(b.provaPaulista); }
         else if (sortConfig.key === 'cc') { aVal = parseToFloat(a.consilhoBimestral); bVal = parseToFloat(b.consilhoBimestral); }
@@ -412,6 +463,8 @@ const App = () => {
         else if (sortConfig.key === 'pp_port') { aVal = parseToFloat(a.ppPort); bVal = parseToFloat(b.ppPort); }
         else if (sortConfig.key === 'cc_mat') { aVal = parseToFloat(a.ccMat); bVal = parseToFloat(b.ccMat); }
         else if (sortConfig.key === 'cc_port') { aVal = parseToFloat(a.ccPort); bVal = parseToFloat(b.ccPort); }
+        else if (sortConfig.key === 'faltas') { aVal = a.totalFaltas ?? -1; bVal = b.totalFaltas ?? -1; }
+        else if (sortConfig.key === 'frequencia') { aVal = a.frequenciaMedia ?? -1; bVal = b.frequenciaMedia ?? -1; }
 
         if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
         if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;

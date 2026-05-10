@@ -22,6 +22,7 @@ const Dashboard = ({
 }) => {
   const [showRanking, setShowRanking] = useState(false);
   const [gradeViewMode, setGradeViewMode] = useState('geral');
+  const showAttendance = gradeViewMode === 'frequencia';
 
   const handleExportExcel = async () => {
     try {
@@ -38,6 +39,8 @@ const Dashboard = ({
         "CC - Geral": s.consilhoBimestral,
         "CC - Matemática": s.ccMat,
         "CC - Português": s.ccPort,
+        "Faltas (total)": s.totalFaltas != null ? s.totalFaltas : '-',
+        "Frequência (%)": s.frequenciaMedia != null ? `${s.frequenciaMedia.toFixed(1)}%` : '-',
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -88,15 +91,15 @@ const Dashboard = ({
                 {s.provaPaulista !== 'S/D' && <span className="text-[9px] font-bold bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 shrink-0">PP: {s.provaPaulista}</span>}
                 {s.consilhoBimestral !== 'S/D' && <span className="text-[9px] font-bold bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-100 shrink-0">CC: {s.consilhoBimestral}</span>}
               </div>
-              <div className="flex gap-3 mt-3 flex-wrap">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase">Turma {s.turma}</span>
-                <span className={`text-[10px] font-bold uppercase flex items-center gap-1 px-2 py-1 rounded ${s.tutor === 'Sem Tutor' ? 'text-red-600 bg-red-50' : 'text-slate-500 bg-slate-50'}`}>
-                  <UserCheck className="w-3 h-3" /> {s.tutor}
-                </span>
-                <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${s.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
-                  {s.situacao}
-                </span>
-              </div>
+                <div className="flex gap-3 mt-3 flex-wrap">
+                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase">Turma {s.turma}</span>
+                  <span className={`text-[10px] font-bold uppercase flex items-center gap-1 px-2 py-1 rounded ${s.tutor === 'Sem Tutor' ? 'text-red-600 bg-red-50' : 'text-slate-500 bg-slate-50'}`}>
+                    <UserCheck className="w-3 h-3" /> {s.tutor}
+                  </span>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded border ${s.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
+                    {s.situacao}
+                  </span>
+                </div>
             </div>
             <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2 flex-wrap">
               {s.noteCount > 0 && (() => {
@@ -124,22 +127,22 @@ const Dashboard = ({
           onToggle={() => setShowRanking(v => !v)}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <aside className="lg:col-span-1 space-y-4">
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Filtrar por</p>
-            <div className="flex p-1 bg-slate-100 rounded-xl mb-4 gap-1 overflow-x-auto">
+            <div className="flex p-1 bg-slate-100 rounded-xl mb-4 gap-1">
               <button
                 onClick={() => { setFilterMode('tutor'); setSelectedValue('Todos'); }}
-                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'tutor' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`flex-1 min-w-fit py-2 text-[10px] font-black rounded-lg whitespace-nowrap ${filterMode === 'tutor' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >TUTOR</button>
               <button
                 onClick={() => { setFilterMode('serie'); setSelectedValue('Todos'); }}
-                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'serie' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`flex-1 min-w-fit py-2 text-[10px] font-black rounded-lg whitespace-nowrap ${filterMode === 'serie' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >NÍVEL</button>
               <button
                 onClick={() => { setFilterMode('turma'); setSelectedValue('Todos'); }}
-                className={`flex-1 min-w-[60px] py-2 text-[10px] font-black rounded-lg ${filterMode === 'turma' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
+                className={`flex-1 min-w-fit py-2 text-[10px] font-black rounded-lg whitespace-nowrap ${filterMode === 'turma' ? 'bg-white shadow-sm text-blue-600' : 'text-slate-500'}`}
               >TURMA</button>
             </div>
             <select
@@ -188,12 +191,12 @@ const Dashboard = ({
           )}
         </aside>
 
-        <div className="lg:col-span-3">
+        <div className="lg:col-span-4">
           <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
             
-            <div className="flex items-center gap-2 p-4 border-b border-slate-200 bg-slate-50/50 overflow-x-auto">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-2 shrink-0">Visão de Notas:</span>
-              <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0">
+            <div className="flex items-center gap-2 p-4 border-b border-slate-200 bg-slate-50/50 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-2 shrink-0">Visão:</span>
+              <div className="flex bg-slate-200/50 p-1 rounded-lg shrink-0 flex-wrap gap-0.5">
                 <button 
                   onClick={() => setGradeViewMode('geral')}
                   className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${gradeViewMode === 'geral' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
@@ -212,8 +215,14 @@ const Dashboard = ({
                 >
                   Português
                 </button>
+                <button 
+                  onClick={() => setGradeViewMode('frequencia')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all ${gradeViewMode === 'frequencia' ? 'bg-indigo-50 text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+                >
+                  Faltas e Freq.
+                </button>
               </div>
-              <div className="flex-1"></div>
+              <div className="flex-1" />
               <button
                 onClick={handleExportExcel}
                 title="Baixar Tabela em Excel"
@@ -224,6 +233,7 @@ const Dashboard = ({
               </button>
             </div>
 
+            <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b border-slate-200">
                 <tr>
@@ -236,20 +246,33 @@ const Dashboard = ({
                   <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('alunos')}>
                     <div className="flex items-center gap-2">Alunos <SortIcon columnKey="alunos" sortConfig={sortConfig} /></div>
                   </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp')}>
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      {gradeViewMode === 'geral' ? 'PP' : gradeViewMode === 'matematica' ? 'PP (Mat)' : 'PP (Port)'} 
-                      <SortIcon columnKey={gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp'} sortConfig={sortConfig} />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc')}>
-                    <div className="flex items-center gap-2 whitespace-nowrap">
-                      {gradeViewMode === 'geral' ? 'CC' : gradeViewMode === 'matematica' ? 'CC (Mat)' : 'CC (Port)'} 
-                      <SortIcon columnKey={gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc'} sortConfig={sortConfig} />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort('situacao')}>
-                    <div className="flex items-center gap-2">Status <SortIcon columnKey="situacao" sortConfig={sortConfig} /></div>
+                  {!showAttendance ? (
+                    <>
+                      <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors text-center" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp')}>
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                          {gradeViewMode === 'geral' ? 'PP' : gradeViewMode === 'matematica' ? 'PP (Mat)' : 'PP (Port)'}
+                          <SortIcon columnKey={gradeViewMode === 'matematica' ? 'pp_mat' : gradeViewMode === 'portugues' ? 'pp_port' : 'pp'} sortConfig={sortConfig} />
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors text-center" onClick={() => handleSort(gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc')}>
+                        <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                          {gradeViewMode === 'geral' ? 'CC' : gradeViewMode === 'matematica' ? 'CC (Mat)' : 'CC (Port)'}
+                          <SortIcon columnKey={gradeViewMode === 'matematica' ? 'cc_mat' : gradeViewMode === 'portugues' ? 'cc_port' : 'cc'} sortConfig={sortConfig} />
+                        </div>
+                      </th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors text-center" onClick={() => handleSort('faltas')}>
+                        <div className="flex items-center justify-center gap-2">Faltas <SortIcon columnKey="faltas" sortConfig={sortConfig} /></div>
+                      </th>
+                      <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors text-center" onClick={() => handleSort('frequencia')}>
+                        <div className="flex items-center justify-center gap-2">Freq <SortIcon columnKey="frequencia" sortConfig={sortConfig} /></div>
+                      </th>
+                    </>
+                  )}
+                  <th className="px-6 py-4 cursor-pointer hover:bg-slate-100 transition-colors text-center" onClick={() => handleSort('situacao')}>
+                    <div className="flex items-center justify-center gap-2">Status <SortIcon columnKey="situacao" sortConfig={sortConfig} /></div>
                   </th>
                 </tr>
               </thead>
@@ -283,31 +306,93 @@ const Dashboard = ({
                         })()}
                       </button>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const val = gradeViewMode === 'geral' ? student.provaPaulista : gradeViewMode === 'matematica' ? student.ppMat : student.ppPort;
-                        return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
-                          <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">
-                            {val}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                    {!showAttendance ? (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {(() => {
+                            const val = gradeViewMode === 'geral' ? student.provaPaulista : gradeViewMode === 'matematica' ? student.ppMat : student.ppPort;
+                            return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
+                              <span className="text-[11px] font-bold bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100">{val}</span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                            );
+                          })()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          {(() => {
+                            const val = gradeViewMode === 'geral' ? student.consilhoBimestral : gradeViewMode === 'matematica' ? student.ccMat : student.ccPort;
+                            return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
+                              <span className="text-[11px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100">{val}</span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                            );
+                          })()}
+                        </td>
+                      </>
+                    ) : (
+                      (() => {
+                        const parseN = (v) => {
+                          if (v == null) return null;
+                          const n = parseFloat(String(v).replace('%','').replace(',','.'));
+                          return isNaN(n) ? null : n;
+                        };
+                        const hist = student.historicoConceitos || [];
+                        let faltasTotal = 0;
+                        const freqVals = [];
+                        hist.forEach(bim => {
+                          const tf = parseN(bim.tfBimestre ?? bim.faltas ?? '-');
+                          if (tf !== null) faltasTotal += tf;
+                          const freqRaw = bim.freqBimestre ?? '-';
+                          const fp = parseN(freqRaw);
+                          if (fp !== null) {
+                            const freq = fp <= 1 && !String(freqRaw).includes('%')
+                              ? Math.max(0, Math.min(100, fp * 100))
+                              : Math.max(0, Math.min(100, fp));
+                            freqVals.push(freq);
+                          }
+                        });
+                        const freqMedia = freqVals.length > 0
+                          ? freqVals.reduce((s, v) => s + v, 0) / freqVals.length
+                          : null;
+                        return (
+                          <>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              {hist.length > 0 ? (
+                                <span className={`text-[11px] font-bold px-2 py-1 rounded border ${
+                                  faltasTotal === 0
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                                    : faltasTotal <= 5
+                                      ? 'bg-slate-50 text-slate-600 border-slate-200'
+                                      : faltasTotal <= 10
+                                        ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                        : 'bg-rose-50 text-rose-600 border-rose-200'
+                                }`}>
+                                  {faltasTotal}
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              {freqMedia !== null ? (
+                                <span className={`text-[11px] font-bold px-2 py-1 rounded border ${
+                                  freqMedia >= 90
+                                    ? 'bg-slate-50 text-slate-600 border-slate-200'
+                                    : freqMedia >= 75
+                                      ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                      : 'bg-rose-50 text-rose-600 border-rose-200'
+                                }`}>
+                                  {freqMedia.toFixed(1)}%
+                                </span>
+                              ) : (
+                                <span className="text-[11px] font-bold text-slate-400">S/D</span>
+                              )}
+                            </td>
+                          </>
                         );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {(() => {
-                        const val = gradeViewMode === 'geral' ? student.consilhoBimestral : gradeViewMode === 'matematica' ? student.ccMat : student.ccPort;
-                        return val && val !== 'S/D' && val !== 'S/N' && val !== '-' ? (
-                          <span className="text-[11px] font-bold bg-purple-50 text-purple-700 px-2 py-1 rounded border border-purple-100">
-                            {val}
-                          </span>
-                        ) : (
-                          <span className="text-[11px] font-bold text-slate-400">S/D</span>
-                        );
-                      })()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                      })()
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${student.situacao === 'Ativo' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-200'}`}>
                         {student.situacao}
                       </span>
@@ -316,6 +401,7 @@ const Dashboard = ({
                 ))}
               </tbody>
             </table>
+            </div>{/* /overflow-x-auto */}
           </div>
         </div>
         </div>
