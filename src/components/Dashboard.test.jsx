@@ -32,11 +32,7 @@ const defaultAllStudents = [
   makeStudent('Pedro Santos', { turma: '1A', tutor: 'Sem Tutor', situacao: 'Inativo' }),
 ];
 
-const defaultSortedData = [
-  makeGroup(0, '1A', 'Prof Ana', ['João Silva']),
-  makeGroup(1, '2B', 'Prof Carlos', ['Maria Oliveira']),
-  makeGroup(2, '1A', 'Sem Tutor', ['Pedro Santos']),
-];
+const defaultSortedData = defaultAllStudents;
 
 const defaultProps = {
   allStudents: defaultAllStudents,
@@ -286,7 +282,7 @@ describe('Dashboard — dados extras do aluno', () => {
     const students = [
       makeStudent('Ana Lima', { ultimoMat: '8.5', ultimoPort: '7.0', ultimoBimNome: '1º Bi' }),
     ];
-    const sorted = [makeGroup(0, '1A', 'Prof Ana', ['Ana Lima'])];
+    const sorted = students;
     render(<Dashboard {...defaultProps} allStudents={students} sortedData={sorted} />);
     expect(screen.getByText('Ana Lima')).toBeInTheDocument();
   });
@@ -295,7 +291,7 @@ describe('Dashboard — dados extras do aluno', () => {
     const students = [
       makeStudent('Carlos Souza', { ultimoFaltas: '3' }),
     ];
-    const sorted = [makeGroup(0, '1A', 'Prof Ana', ['Carlos Souza'])];
+    const sorted = students;
     render(<Dashboard {...defaultProps} allStudents={students} sortedData={sorted} />);
     expect(screen.getByText('Carlos Souza')).toBeInTheDocument();
   });

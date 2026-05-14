@@ -247,7 +247,17 @@ const App = () => {
         const normName       = normalizeName(nomeOriginal);
         const studentNotes   = annotations.filter(n => n.normalizedName === normName);
         const provaInfo      = provaData.find(p => p.normalizedName === normName);
-        let conceitosDoAluno = conceitoData.filter(c => c.normalizedName === normName);
+        let conceitosDoAlunoRaw = conceitoData.filter(c => c.normalizedName === normName);
+        
+        const conceitosMap = new Map();
+        conceitosDoAlunoRaw.forEach(c => {
+          const current = conceitosMap.get(c.bimestre);
+          if (!current || (c.situacao === 'Ativo' && current.situacao !== 'Ativo')) {
+            conceitosMap.set(c.bimestre, c);
+          }
+        });
+        
+        let conceitosDoAluno = Array.from(conceitosMap.values());
         conceitosDoAluno.sort((a, b) => a.bimestre.localeCompare(b.bimestre));
         const ultimoBimestre = conceitosDoAluno.length > 0 ? conceitosDoAluno[conceitosDoAluno.length - 1] : null;
         let quickMat = '-', quickPort = '-';
