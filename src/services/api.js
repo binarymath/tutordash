@@ -22,12 +22,20 @@ const fetchAndParseCSV = async (url) => {
 
   // 2. Constrói a fetchUrl definitiva:
   //    - URLs do Google Sheets (contendo /d/<ID>) → converte para export CSV limpo
+  //    - Extrai o parâmetro gid se presente para baixar uma aba específica
   //    - Qualquer outra URL → usa como está
   let fetchUrl;
   const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
   if (idMatch) {
     const cleanId = idMatch[1].replace(/\s+/g, ''); // ex: "abc def" → "abcdef"
-    fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=csv`;
+    
+    let gidParam = '';
+    const gidMatch = cleanUrl.match(/[#&?]gid=([0-9]+)/);
+    if (gidMatch) {
+      gidParam = `&gid=${gidMatch[1]}`;
+    }
+    
+    fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=csv${gidParam}`;
   } else {
     fetchUrl = cleanUrl;
   }
@@ -250,10 +258,33 @@ export const fetchNotes = async (url) => {
     const noteIdx = headers.findIndex(h =>
       h && ['nota', 'obs', 'texto', 'ocorrência', 'anotação'].some(kw => String(h).toLowerCase().includes(kw))
     );
+
+    // Encontra a coluna "Turma" para saber de onde os nomes começam
+    const turmaIdx = headers.findIndex(h => h && String(h).toLowerCase().includes('turma'));
+    const offset = (turmaIdx !== -1 && turmaIdx > 1) ? (turmaIdx - 1) : 0;
+
+    // Encontra colunas de Professor e Tipo de forma dinâmica, com fallback pro offset
+    let teacherIdx = headers.findIndex(h => 
+      h && ['professor', 'tutor', 'educador', 'responsável'].some(kw => String(h).toLowerCase().includes(kw))
+    );
+    if (teacherIdx === -1) teacherIdx = 18 + offset;
+
+    let tipoIdx = headers.findIndex(h => 
+      h && ['tipo', 'sessão', 'motivo', 'assunto'].some(kw => String(h).toLowerCase().includes(kw))
+    );
+    if (tipoIdx === -1) tipoIdx = 19 + offset;
+
+    // Os nomes dos alunos começam logo após a coluna da Turma
+    const nameStart = turmaIdx !== -1 ? turmaIdx + 1 : (2 + offset);
+    
+    // O final do intervalo de nomes é antes da primeira coluna conhecida (Professor, Tipo, ou Anotação)
+    const knownCols = [teacherIdx, tipoIdx, noteIdx].filter(idx => idx > nameStart);
+    const nameEnd = knownCols.length > 0 ? Math.min(...knownCols) : (18 + offset);
+
     const parsedNotes = notesArray.slice(1).map(row => {
-      const teacherRaw       = row[18] ? String(row[18]).trim() : '';
-      const tipoAnotacaoRaw  = row[19] ? String(row[19]).trim() : '';
-      const studentNameRaw   = row.slice(2, 18).find(name => name && String(name).trim() !== '') || '';
+      const teacherRaw       = row[teacherIdx] ? String(row[teacherIdx]).trim() : '';
+      const tipoAnotacaoRaw  = row[tipoIdx] ? String(row[tipoIdx]).trim() : '';
+      const studentNameRaw   = row.slice(nameStart, nameEnd).find(name => name && String(name).trim() !== '') || '';
       return {
         id: Math.random().toString(),
         displayDate: excelSerialToDate(row[0]),
