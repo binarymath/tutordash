@@ -171,7 +171,6 @@ const excelSerialToDate = (value) => {
 export const parsePlanilhaTutoriaMedio = (csvArray) => {
   const grupos = new Map();
   let lastTurma = '';
-  let lastTutor = '';
 
   csvArray.slice(1).forEach((row) => {
     const turmaSanitized = sanitizeCellText(row?.[0]);
@@ -181,15 +180,10 @@ export const parsePlanilhaTutoriaMedio = (csvArray) => {
 
     if (!tutorado) return;
 
-    if (turmaRaw && turmaRaw !== lastTurma) {
-      lastTutor = '';
-    }
-
     const turma = turmaRaw || lastTurma || 'Sem Turma';
-    const tutor = tutorRaw || lastTutor || 'Sem Tutor';
+    const tutor = tutorRaw || 'Sem Tutor';
 
     if (turmaRaw) lastTurma = turmaRaw;
-    if (tutorRaw) lastTutor = tutorRaw;
 
     const key = `${turma}__${tutor}`;
     if (!grupos.has(key)) {
@@ -224,21 +218,33 @@ export const fetchStudents = async (url) => {
 
     const formattedAlunos = isFormatoMedio
       ? parsePlanilhaTutoriaMedio(alunosArray)
-      : alunosArray.slice(1).map((row, idx) => {
-          const tutoradosRaw = row.slice(2, 16) || [];
-          const tutorados = tutoradosRaw
-            .map(sanitizeCellText)
-            .filter(t => t !== "");
-          const turmaSanitized = sanitizeCellText(row[1]);
-          const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
-          const tutorRaw = sanitizeCellText(row[16]);
-          return {
-            id: idx,
-            turma: turmaRaw || 'Sem Turma',
-            tutorados,
-            tutor: tutorRaw || 'Não Atribuído'
-          };
-        }).filter(item => item.tutorados.length > 0);
+      : (() => {
+          const tTurmaIdx = header.findIndex(h => h && String(h).toLowerCase().includes('turma'));
+          const tTutorIdx = header.findIndex(h => h && ['tutor', 'professor'].some(kw => String(h).toLowerCase().includes(kw)));
+          
+          const colTurma = tTurmaIdx !== -1 ? tTurmaIdx : 1;
+          const colTutor = tTutorIdx !== -1 ? tTutorIdx : 16;
+          
+          return alunosArray.slice(1).map((row, idx) => {
+            const startName = colTurma + 1;
+            const endName = colTutor;
+            const tutoradosRaw = row.slice(startName, endName) || [];
+            const tutorados = tutoradosRaw
+              .map(sanitizeCellText)
+              .filter(t => t !== "");
+            
+            const turmaSanitized = sanitizeCellText(row[colTurma]);
+            const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
+            const tutorRaw = sanitizeCellText(row[colTutor]);
+            
+            return {
+              id: idx,
+              turma: turmaRaw || 'Sem Turma',
+              tutorados,
+              tutor: tutorRaw || 'Não Atribuído'
+            };
+          }).filter(item => item.tutorados.length > 0);
+        })();
 
     if (formattedAlunos.length === 0) throw new Error("Nenhum dado válido de tutoria encontrado.");
     return formattedAlunos;
@@ -322,6 +328,13 @@ export const fetchProvas = async (url) => {
   const XLSX = await getXLSX();
   const wb   = XLSX.read(arrayBuffer, { type: 'array' });
 
+  const hiddenSheets = new Set();
+  if (wb.Workbook && wb.Workbook.Sheets) {
+    wb.Workbook.Sheets.forEach(s => {
+      if (s.Hidden) hiddenSheets.add(s.name);
+    });
+  }
+
   // ── Parseador reutilizável por aba ─────────────────────────────────────────
   const parseSheet = (sheetName) => {
     // Extrai a turma do nome da aba (ex: "6A-1Bim" → "6A", "6A" → "6A")
@@ -386,6 +399,7 @@ export const fetchProvas = async (url) => {
   // ── Lê TODAS as abas e combina ────────────────────────────────────────────
   const allParsed = [];
   wb.SheetNames.forEach(sheetName => {
+    if (hiddenSheets.has(sheetName)) return;
     const rows = parseSheet(sheetName);
     allParsed.push(...rows);
   });
@@ -417,7 +431,15 @@ export const fetchConceitos = async (url) => {
   const wb          = XLSX.read(arrayBuffer, { type: 'array' });
   let todosConceitos = [];
 
+  const hiddenSheets = new Set();
+  if (wb.Workbook && wb.Workbook.Sheets) {
+    wb.Workbook.Sheets.forEach(s => {
+      if (s.Hidden) hiddenSheets.add(s.name);
+    });
+  }
+
   wb.SheetNames.forEach(nomeDaGuia => {
+    if (hiddenSheets.has(nomeDaGuia)) return;
     const ws       = wb.Sheets[nomeDaGuia];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
     let turmaPlanilha = nomeDaGuia;

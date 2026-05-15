@@ -72,22 +72,24 @@ describe('parsePlanilhaTutoriaMedio', () => {
 
   it('agrupa tutorados por turma+tutor', () => {
     const result = parsePlanilhaTutoriaMedio(csvComHeader);
-    const grupo1A = result.find(g => g.turma === '1A');
-    expect(grupo1A).toBeDefined();
-    expect(grupo1A.tutorados).toContain('João Silva');
-    expect(grupo1A.tutorados).toContain('Maria Oliveira');
+    const grupo2B = result.find(g => g.turma === '2B' && g.tutor === 'Prof Carlos');
+    expect(grupo2B).toBeDefined();
+    expect(grupo2B.tutorados).toContain('Pedro Santos');
+    expect(grupo2B.tutorados).toContain('Lucia Ferreira');
   });
 
   it('herda a turma da linha anterior quando célula vazia', () => {
     const result = parsePlanilhaTutoriaMedio(csvComHeader);
-    const grupo1A = result.find(g => g.turma === '1A');
-    expect(grupo1A.tutorados).toContain('Maria Oliveira');
+    const grupoHerdado = result.find(g => g.tutorados.includes('Maria Oliveira'));
+    expect(grupoHerdado).toBeDefined();
+    expect(grupoHerdado.turma).toBe('1A');
   });
 
-  it('herda o tutor da linha anterior quando célula vazia', () => {
+  it('não herda o tutor da linha anterior quando célula vazia, atribuindo "Sem Tutor"', () => {
     const result = parsePlanilhaTutoriaMedio(csvComHeader);
-    const grupo1A = result.find(g => g.tutor === 'Prof Ana');
-    expect(grupo1A.tutorados).toContain('Maria Oliveira');
+    const grupoSemTutor = result.find(g => g.tutor === 'Sem Tutor');
+    expect(grupoSemTutor).toBeDefined();
+    expect(grupoSemTutor.tutorados).toContain('Maria Oliveira');
   });
 
   it('não inclui linhas sem nome de tutorado', () => {
