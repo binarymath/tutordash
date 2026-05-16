@@ -28,7 +28,7 @@ const LgpdBanner = ({ onAccept }) => {
         isVisible && !isFadingOut ? 'opacity-100' : 'opacity-0'
       }`}
     >
-      <div className="max-w-7xl mx-auto p-6 md:p-8 flex flex-col md:flex-row items-center gap-6">
+      <div className="w-full px-6 md:px-8 py-6 md:py-8 flex flex-col md:flex-row items-center gap-6">
         <p className="flex-1 text-sm text-slate-600 font-medium leading-relaxed">
           O TutorDash utiliza cookies e tecnologias de armazenamento local para salvar suas preferências de tutoria, filtros do painel e garantir o funcionamento seguro do sistema. Também processamos os dados de desempenho dos estudantes estritamente para a finalidade de gestão escolar e relatórios pedagógicos, em conformidade com a LGPD. Ao continuar e utilizar nossa plataforma, você está ciente e concorda com esses termos.
         </p>

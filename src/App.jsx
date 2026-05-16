@@ -228,8 +228,8 @@ const App = () => {
     return [...resolvedDataRaw, ...additionalGroups];
   }, [dataRaw, conceitoData, provaData]);
 
-  const isLoading = isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos;
-  const isSyncing = isFetchingStudents || isFetchingNotes || isFetchingProvas || isFetchingConceitos;
+  const isLoading = hasLgpdConsent && (isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos);
+  const isSyncing = hasLgpdConsent && (isFetchingStudents || isFetchingNotes || isFetchingProvas || isFetchingConceitos);
   
   const [manualError, setManualError] = useState(null);
 
@@ -754,7 +754,12 @@ const App = () => {
       />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {data.length === 0 ? (
+        {!hasLgpdConsent ? (
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+            <p className="text-slate-500 font-medium text-lg">Aguardando aceite dos termos de uso e privacidade...</p>
+          </div>
+        ) : data.length === 0 ? (
           <EmptyState onLoad={loadAllData} isLoading={isLoading} canLoad={!!config.studentsUrl} onOpenSettings={() => setShowSettings(true)} />
         ) : (
           <div className="space-y-6">
