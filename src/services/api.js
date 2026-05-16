@@ -328,12 +328,7 @@ export const fetchProvas = async (url) => {
   const XLSX = await getXLSX();
   const wb   = XLSX.read(arrayBuffer, { type: 'array' });
 
-  const hiddenSheets = new Set();
-  if (wb.Workbook && wb.Workbook.Sheets) {
-    wb.Workbook.Sheets.forEach(s => {
-      if (s.Hidden) hiddenSheets.add(s.name);
-    });
-  }
+  // Removido o filtro de hiddenSheets genérico para permitir a leitura de abas ocultas do Ensino Fundamental
 
   // ── Parseador reutilizável por aba ─────────────────────────────────────────
   const parseSheet = (sheetName) => {
@@ -346,13 +341,16 @@ export const fetchProvas = async (url) => {
     const headers  = jsonData[0] || [];
     const dataRows = jsonData.slice(1);
 
-    // Coluna do nome: busca 'aluno'/'nome'; fallback col A (0)
-    const studentIdx = (() => {
-      const found = headers.findIndex(
-        h => h && ['aluno', 'nome'].some(kw => String(h).toLowerCase().includes(kw))
-      );
-      return found !== -1 ? found : 0;
-    })();
+    // Coluna do nome: busca 'aluno'/'nome'
+    const studentIdx = headers.findIndex(
+      h => h && ['aluno', 'nome', 'tutorado'].some(kw => String(h).toLowerCase().includes(kw))
+    );
+    
+    // Se não encontrou coluna de aluno, e a primeira coluna não parece ser aluno (ex: "Turma" ou "Tutor"), ignora
+    if (studentIdx === -1 && headers.length > 0 && ['turma', 'tutor'].includes(String(headers[0]).toLowerCase().trim())) {
+        return [];
+    }
+    const finalStudentIdx = studentIdx !== -1 ? studentIdx : 0;
 
     const RESULT_IDX      = 3; // Coluna D → (%) de Acertos geral
     const SUBJECT_START   = 4; // Coluna E em diante → matérias
@@ -370,7 +368,7 @@ export const fetchProvas = async (url) => {
 
     return dataRows
       .map(row => {
-        const alunoNome = row[studentIdx];
+        const alunoNome = row[finalStudentIdx];
         if (!alunoNome || String(alunoNome).trim() === '') return null;
 
         const nomeStr = String(alunoNome).trim();
@@ -399,7 +397,10 @@ export const fetchProvas = async (url) => {
   // ── Lê TODAS as abas e combina ────────────────────────────────────────────
   const allParsed = [];
   wb.SheetNames.forEach(sheetName => {
-    if (hiddenSheets.has(sheetName)) return;
+    // Ignora apenas se a aba se chamar EXATAMENTE "tutoria", "tutores", ou "base"
+    const sn = sheetName.trim().toLowerCase();
+    if (sn === 'tutoria' || sn === 'tutores' || sn === 'base') return;
+    
     const rows = parseSheet(sheetName);
     allParsed.push(...rows);
   });
@@ -431,15 +432,13 @@ export const fetchConceitos = async (url) => {
   const wb          = XLSX.read(arrayBuffer, { type: 'array' });
   let todosConceitos = [];
 
-  const hiddenSheets = new Set();
-  if (wb.Workbook && wb.Workbook.Sheets) {
-    wb.Workbook.Sheets.forEach(s => {
-      if (s.Hidden) hiddenSheets.add(s.name);
-    });
-  }
+  // Removido o filtro de hiddenSheets genérico para permitir a leitura de abas ocultas do Ensino Fundamental
 
   wb.SheetNames.forEach(nomeDaGuia => {
-    if (hiddenSheets.has(nomeDaGuia)) return;
+    // Ignora apenas se a aba se chamar EXATAMENTE "tutoria", "tutores", ou "base"
+    const sn = nomeDaGuia.trim().toLowerCase();
+    if (sn === 'tutoria' || sn === 'tutores' || sn === 'base') return;
+    
     const ws       = wb.Sheets[nomeDaGuia];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
     let turmaPlanilha = nomeDaGuia;

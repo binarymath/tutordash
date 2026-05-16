@@ -14,6 +14,7 @@ import Header         from './components/Header';
 import EmptyState     from './components/EmptyState';
 import Dashboard      from './components/Dashboard';
 import StudentProfile from './components/StudentProfile';
+import LgpdBanner     from './components/LgpdBanner';
 
 const App = () => {
   const queryClient = useQueryClient();
@@ -826,6 +827,8 @@ const App = () => {
             </span>
           </a>
         )}
+
+        <LgpdBanner />
       </main>
     </div>
   );
