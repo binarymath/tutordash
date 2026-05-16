@@ -1,27 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
-const LgpdBanner = () => {
-  const [consent, setConsent] = useState(() => {
-    try {
-      return localStorage.getItem('tutordash_lgpd_consent') === 'true';
-    } catch (e) {
-      return false;
-    }
-  });
-  
+const LgpdBanner = ({ onAccept }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
-    if (!consent) {
-      const t = setTimeout(() => setIsVisible(true), 50);
-      return () => clearTimeout(t);
-    }
-  }, [consent]);
-
-  if (consent && !isFadingOut) {
-    return null;
-  }
+    const t = setTimeout(() => setIsVisible(true), 50);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleAccept = () => {
     setIsFadingOut(true);
@@ -32,8 +18,7 @@ const LgpdBanner = () => {
     }
     
     setTimeout(() => {
-      setConsent(true);
-      setIsFadingOut(false);
+      onAccept();
     }, 500);
   };
 

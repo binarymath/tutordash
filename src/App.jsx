@@ -92,7 +92,15 @@ const App = () => {
   const activeProfile = multiConfig.activeProfile;
   const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' };
 
-  // ── Estado de navegação ────────────────────────────────────
+  // ── Estado de LGPD e Navegação ──────────────────────────────
+  const [hasLgpdConsent, setHasLgpdConsent] = useState(() => {
+    try {
+      return localStorage.getItem('tutordash_lgpd_consent') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
   const [showSettings,          setShowSettings]          = useState(false);
   const [filterMode,            setFilterMode]            = useState('tutor');
   const [selectedValue,         setSelectedValue]         = useState('Todos');
@@ -114,10 +122,16 @@ const App = () => {
   }, []);
 
   // ── Dados (TanStack Query) ─────────────────────────────────
-  const { data: dataRaw = [], isLoading: isLoadingStudents, isFetching: isFetchingStudents, error: errorStudents } = useStudents(config.studentsUrl);
-  const { data: annotations = [], isLoading: isLoadingNotes, isFetching: isFetchingNotes, error: errorNotes } = useNotes(config.notesUrl);
-  const { data: provaData = [], isLoading: isLoadingProvas, isFetching: isFetchingProvas, error: errorProvas } = useProvas(config.provaUrl);
-  const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(config.conceitoUrl);
+  // Apenas passa as URLs para os hooks se o usuário já tiver dado o consentimento da LGPD
+  const safeStudentsUrl = hasLgpdConsent ? config.studentsUrl : '';
+  const safeNotesUrl    = hasLgpdConsent ? config.notesUrl : '';
+  const safeProvaUrl    = hasLgpdConsent ? config.provaUrl : '';
+  const safeConceitoUrl = hasLgpdConsent ? config.conceitoUrl : '';
+
+  const { data: dataRaw = [], isLoading: isLoadingStudents, isFetching: isFetchingStudents, error: errorStudents } = useStudents(safeStudentsUrl);
+  const { data: annotations = [], isLoading: isLoadingNotes, isFetching: isFetchingNotes, error: errorNotes } = useNotes(safeNotesUrl);
+  const { data: provaData = [], isLoading: isLoadingProvas, isFetching: isFetchingProvas, error: errorProvas } = useProvas(safeProvaUrl);
+  const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(safeConceitoUrl);
 
   const data = useMemo(() => {
     // Redistribui alunos de turmas inválidas (405, 406) usando os dados do Mapão ou Prova Paulista
@@ -828,7 +842,7 @@ const App = () => {
           </a>
         )}
 
-        <LgpdBanner />
+        {!hasLgpdConsent && <LgpdBanner onAccept={() => setHasLgpdConsent(true)} />}
       </main>
     </div>
   );
