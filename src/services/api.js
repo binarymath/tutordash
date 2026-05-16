@@ -208,7 +208,50 @@ export const parsePlanilhaTutoriaMedio = (csvArray) => {
 export const fetchStudents = async (url) => {
   if (!url) throw new Error("A URL de Tutores não foi configurada");
   try {
-    const alunosArray = await fetchAndParseCSV(url);
+    const cleanUrl = url.trim();
+    const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
+    let fetchUrl;
+    if (idMatch) {
+      const cleanId = idMatch[1].replace(/\s+/g, '');
+      fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=xlsx`;
+    } else {
+      fetchUrl = cleanUrl;
+    }
+
+    const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error(`Proxy respondeu ${res.status} ao carregar tutores.`);
+    const arrayBuffer = await res.arrayBuffer();
+    const XLSX = await getXLSX();
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+
+    let targetSheetName = wb.SheetNames[0];
+    for (const sheetName of wb.SheetNames) {
+      const sn = sheetName.toLowerCase().trim();
+      if (sn === 'tutoria' || sn === 'tutores' || sn === 'base') {
+        targetSheetName = sheetName;
+        break;
+      }
+      const ws = wb.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      const header = jsonData[0] || [];
+      const normalizedHeader = header.map(normalizeHeaderToken);
+      
+      const tTurmaIdx = header.findIndex(h => h && String(h).toLowerCase().includes('turma'));
+      const tTutorIdx = header.findIndex(h => h && ['tutor', 'professor'].some(kw => String(h).toLowerCase().includes(kw)));
+      
+      if (
+        (normalizedHeader.includes('TURMA') && normalizedHeader.includes('TUTOR') && normalizedHeader.includes('TUTORADO')) ||
+        (tTurmaIdx !== -1 && tTutorIdx !== -1 && jsonData.length > 1)
+      ) {
+        targetSheetName = sheetName;
+        break;
+      }
+    }
+
+    const ws = wb.Sheets[targetSheetName];
+    const alunosArray = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
     const header = alunosArray?.[0] || [];
     const normalizedHeader = header.map(normalizeHeaderToken);
     const isFormatoMedio =
