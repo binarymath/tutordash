@@ -17,7 +17,7 @@ const SortIcon = ({ columnKey, sortConfig }) => {
 const Dashboard = ({
   allStudents, sortedData, filterMode, setFilterMode,
   selectedValue, setSelectedValue, optionsList, stats,
-  searchTerm, setSearchTerm, setSelectedStudent, sortConfig, handleSort,
+  searchTerm, setSearchTerm, setSelectedStudent, setSelectedTurma, sortConfig, handleSort,
   showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel
 }) => {
   const [showRanking, setShowRanking] = useState(false);
@@ -279,7 +279,15 @@ const Dashboard = ({
               <tbody className="divide-y divide-slate-100">
                 {sortedData.map((student, i) => (
                   <tr key={`${student.turma}-${student.nome}-${i}`} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-6 py-4 font-black text-slate-800 whitespace-nowrap">{student.turma}</td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedTurma && setSelectedTurma(student.turma)}
+                        className="font-black text-blue-600 hover:text-blue-800 hover:underline transition-all bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl text-xs uppercase"
+                        title={`Abrir Dashboard Coletiva da Turma ${student.turma}`}
+                      >
+                        {student.turma}
+                      </button>
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`inline-block text-[11px] px-2 py-1 rounded-md font-bold whitespace-nowrap ${student.tutor === 'Sem Tutor' ? 'bg-red-50 text-red-600' : 'text-slate-500'}`}>
                         {student.tutor}

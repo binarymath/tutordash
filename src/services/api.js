@@ -375,8 +375,12 @@ export const fetchProvas = async (url) => {
 
   // ── Parseador reutilizável por aba ─────────────────────────────────────────
   const parseSheet = (sheetName) => {
-    // Extrai a turma do nome da aba (ex: "6A-1Bim" → "6A", "6A" → "6A")
-    const turmaDaAba = formatTurma(sheetName.split('-')[0].trim());
+    // Extrai a turma e o bimestre do nome da aba (ex: "8A-2Bim" → turma: "8A", bim: "2º Bimestre")
+    const parts = sheetName.split('-');
+    const turmaDaAba = formatTurma(parts[0].trim());
+    const bimRaw = parts[1] ? parts[1].trim() : sheetName;
+    const bimestre = formatBimestre(bimRaw);
+
     const ws       = wb.Sheets[sheetName];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
     if (jsonData.length <= 1) return [];
@@ -432,6 +436,7 @@ export const fetchProvas = async (url) => {
             : 'S/N',
           notas,
           turmaPlanilha: turmaDaAba,
+          bimestre,
         };
       })
       .filter(Boolean);

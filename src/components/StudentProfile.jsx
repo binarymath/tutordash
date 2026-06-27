@@ -5,14 +5,15 @@ import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, UserCheck, TrendingUp,
   LineChart as LineChartIcon, History, BarChart2,
-  User, Calendar, ChevronDown, ChevronUp, Download, Printer
+  User, Calendar, ChevronDown, ChevronUp, Download, Printer, BookOpen, Maximize2, Minimize2, X
 } from 'lucide-react';
 import {
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
-import { formatDisciplina, parseGrade } from '../utils/helpers';
+import { formatDisciplina, parseGrade, toScale10 } from '../utils/helpers';
+import { buildChartDataMapao, buildChartDataProva } from '../utils/buildChartData';
 import PrintSelectionModal from './PrintSelectionModal';
 
 // ── Tooltip personalizado dos gráficos ──────────────────────
@@ -576,16 +577,113 @@ const StudentProfile = ({
   studentProfile, filteredNotes, studentSessions, studentSessionCounts,
   selectedSessionFilters, setSelectedSessionFilters,
   prevStudent, nextStudent, setSelectedStudent,
-  chartDataMapao, chartDataProva,
+  chartDataMapao: _propMapao, chartDataProva: _propProva,
   filteredStudents = [], conceitoData = [], provaData = [], allStudents = []
 }) => {
   const [showAnotacoes, setShowAnotacoes] = useState(true);
-  const [showProvaPaulista, setShowProvaPaulista] = useState(false);
-  const [showEvolutivo, setShowEvolutivo] = useState(false);
-  const [showGrafico, setShowGrafico] = useState(false);
+  const [selectedChartBimestre, setSelectedChartBimestre] = useState('ultimo');
   const [isExporting, setIsExporting] = useState(false);
   const [showPrintSelection, setShowPrintSelection] = useState(false);
   const [studentSelections, setStudentSelections] = useState({});
+  const [maximizedChart, setMaximizedChart] = useState(null);
+
+  const bimestresDisponiveis = React.useMemo(() => {
+    return Array.from(
+      new Set([
+        ...(studentProfile?.historicoConceitos || []).map(b => b.bimestre),
+        ...(studentProfile?.historicoProvas || []).map(p => p.bimestre)
+      ])
+    ).filter(Boolean).sort();
+  }, [studentProfile]);
+
+  const chartDataMapao = React.useMemo(() => {
+    return buildChartDataMapao(studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre);
+  }, [studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
+
+  const chartDataProva = React.useMemo(() => {
+    return buildChartDataProva(studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre);
+  }, [studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
+
+  const evolucaoDados = React.useMemo(() => {
+    return bimestresDisponiveis.map(bim => {
+      const ccData = buildChartDataMapao(studentProfile, conceitoData, provaData, allStudents, bim);
+      let ccAlunoSum = 0, ccAlunoCount = 0;
+      let ccTurmaSum = 0, ccTurmaCount = 0;
+      ccData.forEach(d => {
+        if (d.Aluno > 0) { ccAlunoSum += d.Aluno; ccAlunoCount++; }
+        if (d.Turma > 0) { ccTurmaSum += d.Turma; ccTurmaCount++; }
+      });
+      const mediaCcAluno = ccAlunoCount > 0 ? Number((ccAlunoSum / ccAlunoCount).toFixed(1)) : 0;
+      const mediaCcTurma = ccTurmaCount > 0 ? Number((ccTurmaSum / ccTurmaCount).toFixed(1)) : 0;
+
+      const ppData = buildChartDataProva(studentProfile, conceitoData, provaData, allStudents, bim);
+      let ppAlunoSum = 0, ppAlunoCount = 0;
+      let ppTurmaSum = 0, ppTurmaCount = 0;
+      ppData.forEach(d => {
+        if (d.Aluno > 0) { ppAlunoSum += d.Aluno; ppAlunoCount++; }
+        if (d.Turma > 0) { ppTurmaSum += d.Turma; ppTurmaCount++; }
+      });
+      const mediaPpAluno = ppAlunoCount > 0 ? Number((ppAlunoSum / ppAlunoCount).toFixed(2)) : 0;
+      const mediaPpTurma = ppTurmaCount > 0 ? Number((ppTurmaSum / ppTurmaCount).toFixed(2)) : 0;
+
+      return {
+        bimestre: bim.replace('º Bimestre', 'º Bim'),
+        ccAluno: mediaCcAluno,
+        ccTurma: mediaCcTurma,
+        ppAluno: mediaPpAluno,
+        ppTurma: mediaPpTurma
+      };
+    });
+  }, [bimestresDisponiveis, studentProfile, conceitoData, provaData, allStudents]);
+
+  const disciplinasEvolucaoCC = React.useMemo(() => {
+    const historico = studentProfile?.historicoConceitos || [];
+    const discSet = new Set();
+    historico.forEach(b => {
+      Object.keys(b.notas || {}).forEach(d => {
+        const val = parseGrade(b.notas[d]);
+        if (val > 0 || (b.notas[d] && b.notas[d] !== '-')) discSet.add(d);
+      });
+    });
+    const disciplinas = Array.from(discSet);
+    
+    return disciplinas.map(d => {
+      const notasPorBim = {};
+      let soma = 0, count = 0;
+      historico.forEach(b => {
+        const raw = b.notas?.[d];
+        const notaNum = parseGrade(raw);
+        notasPorBim[b.bimestre] = (raw !== undefined && raw !== null && raw !== '') ? raw : '-';
+        if (notaNum > 0) { soma += notaNum; count++; }
+      });
+      const media = count > 0 ? Number((soma / count).toFixed(1)) : null;
+      return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
+    }).sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+  }, [studentProfile]);
+
+  const disciplinasEvolucaoPP = React.useMemo(() => {
+    const historico = studentProfile?.historicoProvas || [];
+    const discSet = new Set();
+    historico.forEach(p => {
+      Object.keys(p.notas || {}).forEach(d => {
+        if (toScale10(p.notas[d]) !== null) discSet.add(d);
+      });
+    });
+    const disciplinas = Array.from(discSet);
+
+    return disciplinas.map(d => {
+      const notasPorBim = {};
+      let soma = 0, count = 0;
+      historico.forEach(p => {
+        const raw = p.notas?.[d];
+        const nVal = toScale10(raw);
+        notasPorBim[p.bimestre] = nVal !== null ? nVal.toFixed(2) : (raw || '-');
+        if (nVal !== null) { soma += nVal; count++; }
+      });
+      const media = count > 0 ? Number((soma / count).toFixed(2)) : null;
+      return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
+    }).sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+  }, [studentProfile]);
 
   // ── Cálculo da média do Conselho Bimestral ─────────────────
   const parseToNum = (v) => {
@@ -597,6 +695,55 @@ const StudentProfile = ({
   const conselhoNumbers = (chartDataMapao || []).map(item => parseToNum(item.Aluno)).filter(n => n != null);
   const conselhoMean = conselhoNumbers.length ? (conselhoNumbers.reduce((s, x) => s + x, 0) / conselhoNumbers.length) : null;
   const conselhoMeanStr = conselhoMean !== null ? conselhoMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'S/D';
+
+  const provaNumbers = (chartDataProva || []).map(item => parseToNum(item.Aluno)).filter(n => n != null);
+  const provaMean = provaNumbers.length ? (provaNumbers.reduce((s, x) => s + x, 0) / provaNumbers.length) : null;
+  const naoEfetuouPPCount = (chartDataProva || []).filter(item => item.naoEfetuou).length;
+  const naoEfetuouPPNames = (chartDataProva || []).filter(item => item.naoEfetuou).map(item => item.fullSubject || item.subject).join(', ');
+  const provaMeanStr = provaMean !== null ? provaMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : (studentProfile?.provaPaulista || 'S/D');
+
+  const heroMetrics = React.useMemo(() => {
+    if (selectedChartBimestre === 'evolucao') {
+      let ccSum = 0, ccCount = 0;
+      disciplinasEvolucaoCC.forEach(d => { if (d.media != null) { ccSum += d.media; ccCount++; } });
+      const mediaCC = ccCount > 0 ? (ccSum / ccCount).toFixed(1) : null;
+
+      let ppSum = 0, ppCount = 0;
+      disciplinasEvolucaoPP.forEach(d => { if (d.media != null) { ppSum += d.media; ppCount++; } });
+      const mediaPP = ppCount > 0 ? (ppSum / ppCount).toFixed(2) : null;
+
+      return {
+        label: 'Consolidado Histórico',
+        mediaCC: mediaCC ? Number(mediaCC).toLocaleString('pt-BR') : null,
+        mediaPP: mediaPP ? Number(mediaPP).toLocaleString('pt-BR') : null,
+        frequencia: studentProfile?.frequenciaGlobal || studentProfile?.frequencia || null
+      };
+    } else {
+      const isUltimo = selectedChartBimestre === 'ultimo';
+      const targetBim = isUltimo ? (studentProfile?.historicoConceitos?.[0]?.bimestre || 'Mais Recente') : selectedChartBimestre;
+
+      const bimConceito = studentProfile?.historicoConceitos?.find(b => b.bimestre === selectedChartBimestre || (isUltimo && b === studentProfile?.historicoConceitos?.[0]));
+      const freqRaw = bimConceito?.freqBimestre || studentProfile?.frequencia || null;
+
+      let ppVal = provaMean !== null ? provaMean.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null;
+      if (ppVal === null) {
+        if (chartDataProva.length > 0) {
+          ppVal = 'S/N';
+        } else if (isUltimo) {
+          ppVal = studentProfile?.provaPaulista || null;
+        }
+      }
+
+      return {
+        label: isUltimo ? 'Mais Recente' : selectedChartBimestre,
+        mediaCC: conselhoMean !== null ? conselhoMean.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : null,
+        mediaPP: ppVal,
+        naoEfetuouPPCount,
+        naoEfetuouPPNames,
+        frequencia: freqRaw
+      };
+    }
+  }, [selectedChartBimestre, conselhoMean, provaMean, chartDataProva, disciplinasEvolucaoCC, disciplinasEvolucaoPP, studentProfile, naoEfetuouPPNames]);
 
   // ── Impressão de gráfico individual ─────────────────────────
   const printChart = async (chartRef, title) => {
@@ -734,9 +881,9 @@ const StudentProfile = ({
     }
   };
 
-  const bimestreRadarLabel = studentProfile?.ultimoBimNome && String(studentProfile.ultimoBimNome).trim() !== 'Sem Dados'
-    ? studentProfile.ultimoBimNome
-    : 'Bimestre atual';
+  const bimestreRadarLabel = selectedChartBimestre === 'ultimo'
+    ? (studentProfile?.ultimoBimNome && String(studentProfile.ultimoBimNome).trim() !== 'Sem Dados' ? studentProfile.ultimoBimNome : 'Bimestre atual')
+    : selectedChartBimestre;
 
   const buildReportData = () => {
     const historico = studentProfile?.historicoConceitos || [];
@@ -825,6 +972,24 @@ const StudentProfile = ({
       ]
     });
 
+    const barEvolucaoCcUri = buildBarSvgDataUri({
+      title: 'Trajetória Média Geral — Conselho Bimestral',
+      labels: (evolucaoDados || []).map(d => d.bimestre),
+      datasets: [
+        { name: 'Média da Turma', color: '#cbd5e1', values: (evolucaoDados || []).map(d => d.ccTurma || 0) },
+        { name: 'Nota do Aluno', color: '#3b82f6', values: (evolucaoDados || []).map(d => d.ccAluno || 0) }
+      ]
+    });
+
+    const barEvolucaoPpUri = buildBarSvgDataUri({
+      title: 'Trajetória Média Geral — Prova Paulista',
+      labels: (evolucaoDados || []).map(d => d.bimestre),
+      datasets: [
+        { name: 'Média da Turma', color: '#94a3b8', values: (evolucaoDados || []).map(d => d.ppTurma || 0) },
+        { name: 'Nota do Aluno', color: '#0ea5e9', values: (evolucaoDados || []).map(d => d.ppAluno || 0) }
+      ]
+    });
+
     return {
       historico,
       disciplinas,
@@ -835,7 +1000,9 @@ const StudentProfile = ({
       radarMapaoUri,
       radarProvaUri,
       barMapaoUri,
-      barProvaUri
+      barProvaUri,
+      barEvolucaoCcUri,
+      barEvolucaoPpUri
     };
   };
 
@@ -846,7 +1013,7 @@ const StudentProfile = ({
     try {
       setIsExporting(true);
       const { default: html2pdf } = await import('html2pdf.js');
-      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri, barMapaoUri, barProvaUri } = buildReportData();
+      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri, barMapaoUri, barProvaUri, barEvolucaoCcUri, barEvolucaoPpUri } = buildReportData();
       const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
 
       // Calcula médias para exibição no PDF
@@ -895,6 +1062,36 @@ const StudentProfile = ({
         `).join('')
         : `<tr><td colspan="3">Sem dados para o Radar de Desempenho (Prova Paulista).</td></tr>`;
 
+      const bimsHeaderHtml = bimestresDisponiveis.map(b => `<th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">${b.replace('º Bimestre', 'º Bi')}</th>`).join('');
+
+      const evolucaoCcHtml = disciplinasEvolucaoCC.length > 0
+        ? disciplinasEvolucaoCC.map((row) => {
+            const bimsCells = bimestresDisponiveis.map(b => `<td style="text-align:center;">${row.notasPorBim[b] || '-'}</td>`).join('');
+            const situacaoText = row.media !== null ? (row.media >= 5 ? '<span style="color:#065f46; font-weight:800; background:#d1fae5; padding:2px 6px; border-radius:4px;">Ok</span>' : '<span style="color:#9f1239; font-weight:800; background:#ffe4e6; padding:2px 6px; border-radius:4px;">Recuperação</span>') : '-';
+            return `
+              <tr>
+                <td><strong>${escapeHtml(row.disciplina)}</strong></td>
+                ${bimsCells}
+                <td style="text-align:center; font-weight:800; background:#eff6ff; color:#1d4ed8;">${row.media !== null ? row.media.toFixed(1) : '-'}</td>
+                <td style="text-align:center;">${situacaoText}</td>
+              </tr>
+            `;
+          }).join('')
+        : `<tr><td colspan="${bimestresDisponiveis.length + 3}" style="text-align:center;">Sem histórico disciplinar disponível.</td></tr>`;
+
+      const evolucaoPpHtml = disciplinasEvolucaoPP.length > 0
+        ? disciplinasEvolucaoPP.map((row) => {
+            const bimsCells = bimestresDisponiveis.map(b => `<td style="text-align:center;">${row.notasPorBim[b] || '-'}</td>`).join('');
+            return `
+              <tr>
+                <td><strong>${escapeHtml(row.disciplina)}</strong></td>
+                ${bimsCells}
+                <td style="text-align:center; font-weight:800; background:#f0f9ff; color:#0369a1;">${row.media !== null ? row.media.toFixed(2) : '-'}</td>
+              </tr>
+            `;
+          }).join('')
+        : `<tr><td colspan="${bimestresDisponiveis.length + 2}" style="text-align:center;">Sem histórico disciplinar disponível.</td></tr>`;
+
       container = document.createElement('div');
       container.innerHTML = `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; color: #0f172a; padding: 0 10px; max-width: 190mm; margin: 0 auto; box-sizing: border-box;">
@@ -922,38 +1119,34 @@ const StudentProfile = ({
             }
           </style>
 
-          <!-- PÁGINA 1: CAPA + DADOS + ANOTAÇÕES -->
+          <!-- SEÇÃO 1: CABEÇALHO + DADOS GERAIS + ANOTAÇÕES -->
           <section class="pdf-page">
-            <div class="pdf-panel avoid-break" style="padding: 20px; margin-bottom: 10px; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 60%, #f8fafc 100%); border-color:#bfdbfe;">
-              <p style="margin:0; font-size:11px; letter-spacing:1px; text-transform:uppercase; color:#1d4ed8; font-weight:800;">TutorDash • Relatório de Consulta</p>
-              <h1 style="margin:10px 0 6px 0; font-size:29px; line-height:1.15; color:#0f172a;">Relatório Individual do Aluno</h1>
-              <p style="margin:0; font-size:15px; color:#1e293b;"><strong>${escapeHtml(studentProfile.nome)}</strong></p>
-              <p style="margin:8px 0 0; font-size:12px; color:#475569;">Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)}</p>
-              <p style="margin:6px 0 0; font-size:11px; color:#64748b;">Gerado em ${new Date().toLocaleString('pt-BR')}</p>
+            <div class="pdf-panel avoid-break" style="padding: 16px; margin-bottom: 10px; background: linear-gradient(135deg, #eff6ff 0%, #ffffff 60%, #f8fafc 100%); border-color:#bfdbfe;">
+              <p style="margin:0; font-size:10px; letter-spacing:1px; text-transform:uppercase; color:#1d4ed8; font-weight:800;">TutorDash • Relatório de Consulta</p>
+              <h1 style="margin:6px 0 4px 0; font-size:24px; line-height:1.15; color:#0f172a;">Relatório Individual do Aluno</h1>
+              <p style="margin:0; font-size:14px; color:#1e293b;"><strong>${escapeHtml(studentProfile.nome)}</strong></p>
+              <p style="margin:4px 0 0; font-size:11px; color:#475569;">Turma: ${escapeHtml(studentProfile.turma)} • Tutor: ${escapeHtml(studentProfile.tutor)} • Gerado em ${new Date().toLocaleString('pt-BR')}</p>
             </div>
 
-            <div class="pdf-panel avoid-break" style="padding: 12px; margin-bottom: 10px;">
-              <h2 style="margin:0 0 10px 0; font-size:15px; color:#0f172a;">Dados Gerais</h2>
-              <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px; color:#334155;">
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Aluno:</strong> ${escapeHtml(studentProfile.nome)}</div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Turma:</strong> ${escapeHtml(studentProfile.turma)}</div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Tutor:</strong> ${escapeHtml(studentProfile.tutor)}</div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Prova Paulista:</strong> ${escapeHtml(studentProfile.provaPaulista || 'S/D')}</div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Qtde Faltas:</strong> ${studentProfile.totalFaltas != null ? studentProfile.totalFaltas : 'S/D'}<br /><strong>Freq(%):</strong> ${studentProfile.frequenciaMedia != null ? studentProfile.frequenciaMedia.toFixed(1) + '%' : 'S/D'}</div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Conselho Bimestral:</strong> ${escapeHtml(conselhoMeanStr)}</div>
-                <div style="grid-column:1 / -1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px;"><strong>Total de anotações:</strong> ${notasComTipo.length}</div>
+            <div class="pdf-panel avoid-break" style="padding: 10px; margin-bottom: 10px;">
+              <h2 style="margin:0 0 8px 0; font-size:13px; color:#0f172a;">Dados Gerais</h2>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; font-size: 10px; color:#334155;">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px;"><strong>Turma:</strong> ${escapeHtml(studentProfile.turma)}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px;"><strong>Prova Paulista:</strong> ${escapeHtml(studentProfile.provaPaulista || 'S/D')}</div>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px;"><strong>Conselho:</strong> ${escapeHtml(conselhoMeanStr)}</div>
+                <div style="grid-column:1 / -1; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px;"><strong>Faltas:</strong> ${studentProfile.totalFaltas != null ? studentProfile.totalFaltas : 'S/D'} (${studentProfile.frequenciaMedia != null ? studentProfile.frequenciaMedia.toFixed(1) + '%' : 'S/D'}) • <strong>Anotações:</strong> ${notasComTipo.length}</div>
               </div>
             </div>
 
-            <div class="pdf-panel" style="padding: 10px;">
-              <h3 class="pdf-title" style="margin-bottom: 8px;">Anotações e Sessões</h3>
-              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+            <div class="pdf-panel avoid-break" style="padding: 10px; margin-bottom: 12px;">
+              <h3 class="pdf-title" style="margin-bottom: 6px;">Anotações e Sessões</h3>
+              <table style="width:100%; border-collapse: collapse; font-size: 9px;">
                 <thead>
                   <tr>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Data</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Tipo</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Quem Registrou</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Anotação</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Data</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Tipo</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Quem Registrou</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Anotação</th>
                   </tr>
                 </thead>
                 <tbody>${notesHtml}</tbody>
@@ -961,76 +1154,68 @@ const StudentProfile = ({
             </div>
           </section>
 
-          <!-- PÁGINA 2: RADAR CONSELHO -->
-          <section class="pdf-page pdf-page-break">
-            <h3 class="pdf-title">Radar de Equilíbrio (Conselho)</h3>
-            <div class="pdf-panel" style="padding: 12px;">
-              <div class="avoid-break" style="height: 108mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; background:#fafcff;">
-                ${radarMapaoUri ? `<img src="${radarMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
-              </div>
-              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+          <!-- SEÇÃO 2: EVOLUÇÃO COMPARATIVA MULTI-BIMESTRAL (APENAS TABELAS) -->
+          <div class="avoid-break" style="margin-top: 10px; margin-bottom: 12px;">
+            <h3 class="pdf-title" style="font-size: 14px; color:#0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 10px;">📋 Evolução Comparativa por Disciplina</h3>
+            
+            <div class="pdf-panel avoid-break" style="padding: 10px; margin-bottom: 10px;">
+              <p style="margin:0 0 6px 0; font-size:11px; font-weight:800; color:#1d4ed8;">Conselho Bimestral</p>
+              <table style="width:100%; border-collapse: collapse; font-size: 9px;">
                 <thead>
                   <tr>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Disciplina</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Aluno</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Média Turma</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Disciplina</th>
+                    ${bimsHeaderHtml}
+                    <th style="border:1px solid #d6deea; background:#eff6ff; color:#1d4ed8; padding:5px; text-align:center;">Média Geral</th>
+                    <th style="border:1px solid #d6deea; background:#eff6ff; color:#1e40af; padding:5px; text-align:center;">Situação</th>
                   </tr>
                 </thead>
-                <tbody>${mapaoHtml}</tbody>
+                <tbody>${evolucaoCcHtml}</tbody>
               </table>
             </div>
-          </section>
 
-          <!-- PÁGINA 3: RADAR PROVA PAULISTA -->
-          <section class="pdf-page pdf-page-break">
-            <h3 class="pdf-title">Radar de Desempenho (Prova Paulista)</h3>
-            <div class="pdf-panel" style="padding: 12px;">
-              <div class="avoid-break" style="height: 108mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:10px; overflow:hidden; background:#fafcff;">
-                ${radarProvaUri ? `<img src="${radarProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
-              </div>
-
-              <div style="display:flex; gap:12px; justify-content:center; align-items:center; margin:8px 0 12px 0;">
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:8px; min-width:160px; text-align:center;">
-                  <div style="font-size:11px; color:#64748b; font-weight:700;">Média Prova Paulista</div>
-                  <div style="font-size:16px; color:#0f172a; font-weight:800;">${escapeHtml(String(provaMeanStr))}</div>
-                </div>
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; padding:8px; border-radius:8px; min-width:160px; text-align:center;">
-                  <div style="font-size:11px; color:#64748b; font-weight:700;">Média Conselho Bimestral</div>
-                  <div style="font-size:16px; color:#0f172a; font-weight:800;">${escapeHtml(String(conselhoMeanStr))}</div>
-                </div>
-              </div>
-
-              <table style="width:100%; border-collapse: collapse; font-size: 10px;">
+            <div class="pdf-panel avoid-break" style="padding: 10px; margin-bottom: 12px;">
+              <p style="margin:0 0 6px 0; font-size:11px; font-weight:800; color:#0369a1;">Prova Paulista</p>
+              <table style="width:100%; border-collapse: collapse; font-size: 9px;">
                 <thead>
                   <tr>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px;">Disciplina</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Aluno</th>
-                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:6px; text-align:center;">Média Turma</th>
+                    <th style="border:1px solid #d6deea; background:#f8fafc; padding:5px;">Disciplina</th>
+                    ${bimsHeaderHtml}
+                    <th style="border:1px solid #d6deea; background:#f0f9ff; color:#0369a1; padding:5px; text-align:center;">Média Geral</th>
                   </tr>
                 </thead>
-                <tbody>${provaHtml}</tbody>
+                <tbody>${evolucaoPpHtml}</tbody>
               </table>
             </div>
-          </section>
+          </div>
 
-          <!-- PÁGINA 4: BARRAS COMPARATIVAS -->
-          <section class="pdf-page pdf-page-break avoid-break" style="height: 275mm; display:flex; flex-direction:column;">
-            <h3 class="pdf-title" style="margin-bottom:6px;">Análise Comparativa por Disciplina</h3>
-
-            <div class="pdf-panel avoid-break" style="flex:1 1 0; min-height:0; padding:10px; margin-bottom:8px; display:flex; flex-direction:column;">
-              <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Conselho Bimestral</p>
-              <div style="flex:1 1 0; min-height:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; display:flex; justify-content:center; align-items:center; background:#fafcff;">
-                ${barMapaoUri ? `<img src="${barMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+          <!-- SEÇÃO 3: ANÁLISE POR COMPONENTE -->
+          ${selectedChartBimestre !== 'evolucao' ? `
+          <div class="avoid-break" style="margin-top: 10px;">
+            <h3 class="pdf-title" style="font-size: 14px; color:#0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 4px; margin-bottom: 10px;">📊 Análise Detalhada por Componente (${bimestreRadarLabel})</h3>
+            
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+              <div class="pdf-panel avoid-break" style="padding: 8px;">
+                <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Radar Conselho</p>
+                ${radarMapaoUri ? `<div style="height:65mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fafcff;"><img src="${radarMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" /></div>` : ''}
+              </div>
+              <div class="pdf-panel avoid-break" style="padding: 8px;">
+                <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Radar Prova Paulista</p>
+                ${radarProvaUri ? `<div style="height:65mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fafcff;"><img src="${radarProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" /></div>` : ''}
               </div>
             </div>
 
-            <div class="pdf-panel avoid-break" style="flex:1 1 0; min-height:0; padding:10px; display:flex; flex-direction:column;">
-              <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Prova Paulista</p>
-              <div style="flex:1 1 0; min-height:0; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; display:flex; justify-content:center; align-items:center; background:#fafcff;">
-                ${barProvaUri ? `<img src="${barProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" />` : ''}
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div class="pdf-panel avoid-break" style="padding: 8px;">
+                <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Barras Conselho</p>
+                ${barMapaoUri ? `<div style="height:60mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fafcff;"><img src="${barMapaoUri}" style="width:100%; height:100%; object-fit:contain; display:block;" /></div>` : ''}
+              </div>
+              <div class="pdf-panel avoid-break" style="padding: 8px;">
+                <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; color:#334155; text-align:center;">Barras Prova Paulista</p>
+                ${barProvaUri ? `<div style="height:60mm; display:flex; justify-content:center; align-items:center; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden; background:#fafcff;"><img src="${barProvaUri}" style="width:100%; height:100%; object-fit:contain; display:block;" /></div>` : ''}
               </div>
             </div>
-          </section>
+          </div>
+          ` : ''}
         </div>
       `;
 
@@ -1101,13 +1286,71 @@ const StudentProfile = ({
         ImageRun,
         WidthType,
       } = docxModule;
-      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri } = buildReportData();
+      const { notasComTipo, mapaoRows, provaRows, radarMapaoUri, radarProvaUri, barMapaoUri, barProvaUri, barEvolucaoCcUri, barEvolucaoPpUri } = buildReportData();
       const fileBase = `relatorio_${toSafeFileName(studentProfile.nome)}`;
 
-      const [radarMapaoPng, radarProvaPng] = await Promise.all([
+      const [radarMapaoPng, radarProvaPng, barMapaoPng, barProvaPng, barEvolucaoCcPng, barEvolucaoPpPng] = await Promise.all([
         svgDataUriToPngBytes(radarMapaoUri),
         svgDataUriToPngBytes(radarProvaUri),
+        svgDataUriToPngBytes(barMapaoUri),
+        svgDataUriToPngBytes(barProvaUri),
+        svgDataUriToPngBytes(barEvolucaoCcUri),
+        svgDataUriToPngBytes(barEvolucaoPpUri),
       ]);
+
+      const bimsHeaderNames = bimestresDisponiveis.map(b => b.replace('º Bimestre', 'º Bi'));
+
+      const evolucaoCcTableRows = [
+        new TableRow({
+          children: ['Disciplina', ...bimsHeaderNames, 'Média Geral', 'Situação'].map((title) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
+          ),
+        }),
+        ...(disciplinasEvolucaoCC.length > 0
+          ? disciplinasEvolucaoCC.map((row) => {
+              const situacao = row.media !== null ? (row.media >= 5 ? 'Ok' : 'Recuperação') : '-';
+              return new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(String(row.disciplina))] }),
+                  ...bimestresDisponiveis.map(b => new TableCell({ children: [new Paragraph(String(row.notasPorBim[b] || '-'))] })),
+                  new TableCell({ children: [new Paragraph(row.media !== null ? row.media.toFixed(1) : '-')] }),
+                  new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: situacao, bold: true })] })] }),
+                ],
+              });
+            })
+          : [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Sem histórico disciplinar disponível.')], columnSpan: bimestresDisponiveis.length + 3 }),
+                ],
+              }),
+            ]),
+      ];
+
+      const evolucaoPpTableRows = [
+        new TableRow({
+          children: ['Disciplina', ...bimsHeaderNames, 'Média Geral'].map((title) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: title, bold: true })] })] })
+          ),
+        }),
+        ...(disciplinasEvolucaoPP.length > 0
+          ? disciplinasEvolucaoPP.map((row) =>
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph(String(row.disciplina))] }),
+                  ...bimestresDisponiveis.map(b => new TableCell({ children: [new Paragraph(String(row.notasPorBim[b] || '-'))] })),
+                  new TableCell({ children: [new Paragraph(row.media !== null ? row.media.toFixed(2) : '-')] }),
+                ],
+              })
+            )
+          : [
+              new TableRow({
+                children: [
+                  new TableCell({ children: [new Paragraph('Sem histórico disciplinar disponível.')], columnSpan: bimestresDisponiveis.length + 2 }),
+                ],
+              }),
+            ]),
+      ];
 
       const infoItems = [
         `Aluno: ${studentProfile.nome}`,
@@ -1216,36 +1459,76 @@ const StudentProfile = ({
               new Paragraph({ text: 'Anotações e Sessões', heading: HeadingLevel.HEADING_2 }),
               new Table({ rows: notesTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
               new Paragraph({ text: '' }),
-              new Paragraph({ text: 'Análise Gráfica e Comparativa', heading: HeadingLevel.HEADING_2 }),
-              new Paragraph({ text: `Radar de Equilíbrio (${bimestreRadarLabel})` }),
-              ...(radarMapaoPng
+              ...(selectedChartBimestre !== 'evolucao'
                 ? [
-                    new Paragraph({
-                      children: [
-                        new ImageRun({
-                          data: radarMapaoPng,
-                          transformation: { width: 520, height: 300 },
-                        }),
-                      ],
-                    }),
+                    new Paragraph({ text: 'Análise Gráfica e Comparativa', heading: HeadingLevel.HEADING_2 }),
+                    new Paragraph({ text: `Radar de Equilíbrio (${bimestreRadarLabel})` }),
+                    ...(radarMapaoPng
+                      ? [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: radarMapaoPng,
+                                transformation: { width: 520, height: 300 },
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
+                    new Table({ rows: mapaoTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({ text: 'Radar de Desempenho (Prova Paulista)' }),
+                    ...(radarProvaPng
+                      ? [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: radarProvaPng,
+                                transformation: { width: 520, height: 300 },
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
+                    new Table({ rows: provaTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+                    new Paragraph({ text: '' }),
                   ]
                 : []),
-              new Table({ rows: mapaoTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+              new Paragraph({ text: 'Evolução Comparativa por Disciplina — Conselho Bimestral', heading: HeadingLevel.HEADING_2 }),
+              new Table({ rows: evolucaoCcTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
               new Paragraph({ text: '' }),
-              new Paragraph({ text: 'Radar de Desempenho (Prova Paulista)' }),
-              ...(radarProvaPng
+              new Paragraph({ text: 'Evolução Comparativa por Disciplina — Prova Paulista', heading: HeadingLevel.HEADING_2 }),
+              new Table({ rows: evolucaoPpTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
+              ...(selectedChartBimestre !== 'evolucao'
                 ? [
-                    new Paragraph({
-                      children: [
-                        new ImageRun({
-                          data: radarProvaPng,
-                          transformation: { width: 520, height: 300 },
-                        }),
-                      ],
-                    }),
+                    new Paragraph({ text: '' }),
+                    new Paragraph({ text: `Análise por Componente — Bimestre Selecionado (${bimestreRadarLabel})`, heading: HeadingLevel.HEADING_2 }),
+                    ...(barMapaoPng
+                      ? [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: barMapaoPng,
+                                transformation: { width: 520, height: 260 },
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
+                    ...(barProvaPng
+                      ? [
+                          new Paragraph({
+                            children: [
+                              new ImageRun({
+                                data: barProvaPng,
+                                transformation: { width: 520, height: 260 },
+                              }),
+                            ],
+                          }),
+                        ]
+                      : []),
                   ]
                 : []),
-              new Table({ rows: provaTableRows, width: { size: 100, type: WidthType.PERCENTAGE } }),
             ],
           },
         ],
@@ -1257,6 +1540,114 @@ const StudentProfile = ({
       console.error('Erro ao exportar DOCX:', error);
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const renderChartContent = (chartConfig) => {
+    if (!chartConfig) return null;
+    switch (chartConfig.type) {
+      case 'evolucaoCC':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 13, fontWeight: 700 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 13 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold', paddingBottom: '15px' }} />
+              <Bar name="Nota do Aluno" dataKey="ccAluno" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                <LabelList dataKey="ccAluno" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+              </Bar>
+              <Bar name="Média da Turma" dataKey="ccTurma" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                <LabelList dataKey="ccTurma" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      case 'evolucaoPP':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 13, fontWeight: 700 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 13 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold', paddingBottom: '15px' }} />
+              <Bar name="Nota do Aluno" dataKey="ppAluno" fill="#0ea5e9" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                <LabelList dataKey="ppAluno" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+              </Bar>
+              <Bar name="Média da Turma" dataKey="ppTurma" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={60}>
+                <LabelList dataKey="ppTurma" position="top" style={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      case 'radarCC':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartDataMapao}>
+              <PolarGrid stroke="#cbd5e1" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 13, fontWeight: 700 }} />
+              <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }} />
+              <Radar name="Média Turma" dataKey="Turma" stroke="#94a3b8" fill="#cbd5e1" fillOpacity={0.3} />
+              <Radar name="Aluno" dataKey="Aluno" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+            </RadarChart>
+          </ResponsiveContainer>
+        );
+      case 'barrasCC':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartDataMapao} margin={{ top: 25, right: 10, left: -20, bottom: 85 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} angle={-35} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={85} />
+              <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 13 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold', paddingBottom: '15px' }} />
+              <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
+              </Bar>
+              <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      case 'radarPP':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartDataProva}>
+              <PolarGrid stroke="#cbd5e1" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 13, fontWeight: 700 }} />
+              <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 11 }} />
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold' }} />
+              <Radar name="Média da Turma" dataKey="Turma" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
+              <Radar name="Aluno" dataKey="Aluno" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.5} />
+            </RadarChart>
+          </ResponsiveContainer>
+        );
+      case 'barrasPP':
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartDataProva} margin={{ top: 25, right: 10, left: -20, bottom: 85 }}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} angle={-35} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={85} />
+              <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 13 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+              <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '13px', fontWeight: 'bold', paddingBottom: '15px' }} />
+              <Bar name="Nota do Aluno" dataKey="Aluno" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
+              </Bar>
+              <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        );
+      default:
+        return null;
     }
   };
 
@@ -1294,6 +1685,30 @@ const StudentProfile = ({
       {/* Cabeçalho do aluno */}
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
         <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
+        <div className="flex flex-wrap items-center gap-2 mt-4 mb-3 bg-slate-100 p-2 rounded-2xl border border-slate-200 shadow-inner">
+          <span className="text-xs font-black text-slate-500 uppercase px-3 tracking-wider flex items-center gap-1.5"><Calendar className="w-4 h-4 text-blue-600" /> Período:</span>
+          <button
+            onClick={() => setSelectedChartBimestre('ultimo')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${selectedChartBimestre === 'ultimo' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
+          >
+            ⚡ Mais Recente
+          </button>
+          {bimestresDisponiveis.map(bim => (
+            <button
+              key={bim}
+              onClick={() => setSelectedChartBimestre(bim)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${selectedChartBimestre === bim ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
+            >
+              {bim}
+            </button>
+          ))}
+          <button
+            onClick={() => setSelectedChartBimestre('evolucao')}
+            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${selectedChartBimestre === 'evolucao' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
+          >
+            📈 Evolução Comparativa
+          </button>
+        </div>
         <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase flex-wrap">
           <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
           <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
@@ -1332,434 +1747,591 @@ const StudentProfile = ({
         </div>
       </div>
 
-      {showPrintSelection && (
-        <PrintSelectionModal
-          student={studentProfile}
-          studentName={studentProfile.nome}
-          studentsToFilter={filteredStudents.length > 0 ? filteredStudents : [studentProfile]}
-          conceitoData={conceitoData}
-          provaData={provaData}
-          allStudents={allStudents}
-          studentSelections={studentSelections}
-          setStudentSelections={setStudentSelections}
-          onClose={() => setShowPrintSelection(false)}
-        />
-      )}
-
-      {/* Anotações e Sessões */}
-      <div className="space-y-6">
-        <div>
-          <div className="flex items-center justify-between mb-4 ml-2">
-            <button
-              onClick={() => setShowAnotacoes(!showAnotacoes)}
-              className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
-              title={showAnotacoes ? "Recolher" : "Expandir"}
-            >
-              <History className="w-4 h-4" /> Anotações e Sessões
-            </button>
-            <button
-              onClick={() => setShowAnotacoes(!showAnotacoes)}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
-              title={showAnotacoes ? "Recolher" : "Expandir"}
-            >
-              {showAnotacoes ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {showAnotacoes && (
-            <>
-
-          {studentProfile.notes.length > 0 && studentSessions.length > 0 && (
-            <div className="mb-4 p-4 bg-white rounded-2xl border border-slate-200 shadow-sm">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Filtrar por Tipo</p>
-              <div className="mb-3">
-                <button
-                  onClick={() => setSelectedSessionFilters([])}
-                  className="text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-700"
-                >
-                  Limpar filtros
-                </button>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                <label
-                  className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilters.length === 0 ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSessionFilters.length === 0}
-                    onChange={() => setSelectedSessionFilters([])}
-                    className="sr-only peer"
-                  />
-                  <span className={`w-4 h-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${selectedSessionFilters.length === 0 ? 'border-blue-600' : 'border-slate-400'} bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500`}>
-                    {selectedSessionFilters.length === 0 && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                    )}
-                  </span>
-                  <span className={`text-xs font-bold ${selectedSessionFilters.length === 0 ? 'text-blue-700' : 'text-slate-600'}`}>Todos</span>
-                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${selectedSessionFilters.length === 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
-                    {studentProfile.notes.length}
-                  </span>
-                </label>
-
-                {studentSessions.map(sessao => (
-                  <label
-                    key={sessao}
-                    className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border transition-all ${selectedSessionFilters.includes(sessao) ? 'bg-blue-50 border-blue-300' : 'bg-slate-50 border-slate-200 hover:border-blue-200'}`}
-                  >
-                    <input
-                      type="checkbox"
-                      value={sessao}
-                      checked={selectedSessionFilters.includes(sessao)}
-                      onChange={() => {
-                        setSelectedSessionFilters(prev => (
-                          prev.includes(sessao)
-                            ? prev.filter(item => item !== sessao)
-                            : [...prev, sessao]
-                        ));
-                      }}
-                      className="sr-only peer"
-                    />
-                    <span className={`w-4 h-4 shrink-0 rounded-full border flex items-center justify-center transition-colors ${selectedSessionFilters.includes(sessao) ? 'border-blue-600' : 'border-slate-400'} bg-white peer-focus-visible:ring-2 peer-focus-visible:ring-blue-500`}>
-                      {selectedSessionFilters.includes(sessao) && (
-                        <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-                      )}
-                    </span>
-                    <span className={`text-xs font-bold ${selectedSessionFilters.includes(sessao) ? 'text-blue-700' : 'text-slate-600'}`}>{sessao}</span>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${selectedSessionFilters.includes(sessao) ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-600'}`}>
-                      {studentSessionCounts?.[sessao] || 0}
-                    </span>
-                  </label>
-                ))}
-              </div>
+      {/* ── ANOTAÇÕES E SESSÕES (OBSERVAÇÕES DO TUTOR) — PRIMEIRO PLANO ABSOLUTO ── */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 mt-6 mb-8">
+        <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-5">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
+              <History className="w-6 h-6" />
             </div>
-          )}
+            <div>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Anotações Pedagógicas e Sessões</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Histórico de Atendimentos do Aluno</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowAnotacoes(!showAnotacoes)}
+            className="px-4 py-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-600 hover:text-blue-600 font-black text-xs flex items-center gap-2 border border-slate-200"
+          >
+            {showAnotacoes ? <>Ocultar <ChevronUp className="w-4 h-4" /></> : <>Mostrar Registros ({studentProfile.notes?.length || 0}) <ChevronDown className="w-4 h-4" /></>}
+          </button>
+        </div>
 
-          <div className="space-y-4 max-h-[480px] overflow-y-auto pr-2 custom-scrollbar">
-            {studentProfile.notes.length === 0 ? (
-              <div className="bg-white border border-dashed border-slate-200 p-10 rounded-3xl text-center">
-                <p className="text-slate-400 font-bold uppercase text-xs">Este aluno ainda não possui anotações.</p>
-              </div>
-            ) : filteredNotes.length > 0 ? (
-              filteredNotes.map(n => (
-                <div key={n.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
-                  {n.tipoSessao && (
-                    <div className="absolute top-0 right-0 bg-amber-50 border-b border-l border-amber-100 px-4 py-1.5 rounded-bl-xl">
-                      <span className="text-[10px] font-black text-amber-600 uppercase">{n.tipoSessao}</span>
-                    </div>
+        {showAnotacoes && (
+          <div className="space-y-6">
+            {studentProfile.notes?.length > 0 && studentSessions.length > 0 && (
+              <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar por Tipo de Sessão</span>
+                  {selectedSessionFilters.length > 0 && (
+                    <button onClick={() => setSelectedSessionFilters([])} className="text-[10px] font-black text-blue-600 hover:underline uppercase">Limpar filtros</button>
                   )}
-                  <div className={`flex justify-between items-center mb-4 text-[10px] font-bold text-slate-400 uppercase border-b border-slate-50 pb-3 ${n.tipoSessao ? 'mt-8' : 'mt-1'}`}>
-                    <span className="text-blue-600 flex items-center gap-1">
-                      <User className="w-3 h-3" /> Quem Registrou: {n.teacher}
-                    </span>
-                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {n.displayDate}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {n.note ? (
-                      <div>
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Anotação / Observação</span>
-                        <p className="text-slate-700 font-medium leading-relaxed">{n.note}</p>
-                      </div>
-                    ) : (
-                      <p className="text-slate-400 font-medium italic text-sm">Registo sem descrição.</p>
-                    )}
-                  </div>
                 </div>
-              ))
-            ) : (
-              <div className="bg-white border border-dashed border-slate-200 p-10 rounded-3xl text-center">
-                <p className="text-slate-400 font-bold uppercase text-xs">Sem anotações registadas para este filtro.</p>
+                <div className="flex flex-wrap gap-2.5">
+                  <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border text-xs font-bold transition-all ${selectedSessionFilters.length === 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                    <input type="checkbox" checked={selectedSessionFilters.length === 0} onChange={() => setSelectedSessionFilters([])} className="sr-only" />
+                    <span>Todos</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedSessionFilters.length === 0 ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{studentProfile.notes.length}</span>
+                  </label>
+
+                  {studentSessions.map(sessao => (
+                    <label key={sessao} className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border text-xs font-bold transition-all ${selectedSessionFilters.includes(sessao) ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'}`}>
+                      <input type="checkbox" value={sessao} checked={selectedSessionFilters.includes(sessao)} onChange={() => { setSelectedSessionFilters(prev => prev.includes(sessao) ? prev.filter(item => item !== sessao) : [...prev, sessao]); }} className="sr-only" />
+                      <span>{sessao}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${selectedSessionFilters.includes(sessao) ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{studentSessionCounts?.[sessao] || 0}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             )}
-            </div>
-          </>
-        )}
-      </div>
 
-        {/* Prova Paulista em largura total */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 w-full">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setShowProvaPaulista(!showProvaPaulista)}
-              className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
-              title={showProvaPaulista ? "Recolher" : "Expandir"}
-            >
-              <TrendingUp className="w-4 h-4" /> Prova Paulista
-            </button>
-            <button
-              onClick={() => setShowProvaPaulista(!showProvaPaulista)}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
-              title={showProvaPaulista ? "Recolher" : "Expandir"}
-            >
-              {showProvaPaulista ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-          </div>
-
-          {showProvaPaulista && (
-            <div className="space-y-4">
-              {/* Badge de Desempenho Geral */}
-              <div className="flex items-center gap-4 p-4 bg-sky-50 rounded-2xl border border-sky-100">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest mb-0.5">Desempenho Geral</span>
-                  <span className="text-3xl font-black text-sky-700 leading-none">{studentProfile.provaPaulista || 'S/D'}</span>
+            <div className="space-y-4 max-h-[460px] overflow-y-auto pr-2 custom-scrollbar">
+              {studentProfile.notes?.length === 0 ? (
+                <div className="border border-dashed border-slate-200 p-12 rounded-3xl text-center bg-slate-50/40">
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Este estudante ainda não possui anotações.</p>
                 </div>
-                <div className="h-12 w-px bg-sky-200 mx-2" />
-                <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                  Resultado consolidado da<br />Prova Paulista do aluno
-                </p>
-              </div>
-
-              {/* Conselho Bimestral - Média */}
-              <div className="flex items-center gap-4 p-4 bg-purple-50 rounded-2xl border border-purple-100">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-purple-600 uppercase tracking-widest mb-0.5">Média Conselho</span>
-                  <span className="text-3xl font-black text-purple-700 leading-none">{conselhoMeanStr}</span>
-                </div>
-                <div className="h-12 w-px bg-purple-200 mx-2" />
-                <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                  Média consolidada do<br />Conselho Bimestral do aluno
-                </p>
-              </div>
-
-              {/* Tabela por matéria */}
-              {chartDataProva.length > 0 ? (
-                <div className="rounded-2xl overflow-hidden border border-slate-200">
-                  <table className="w-full text-[11px] border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200">
-                        <th className="text-left px-4 py-3 font-black text-slate-500 uppercase tracking-wider">Matéria</th>
-                        <th className="px-4 py-3 font-black text-sky-600 uppercase tracking-wider text-center">Aluno</th>
-                        <th className="px-4 py-3 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chartDataProva.map((item, idx) => {
-                        const alunoVal  = item.Aluno  != null ? Number(item.Aluno)  : null;
-                        const turmaVal  = item.Turma  != null ? Number(item.Turma)  : null;
-                        const isAbove   = alunoVal != null && turmaVal != null && alunoVal >= turmaVal;
-                        const notaColor = alunoVal == null ? 'text-slate-300'
-                          : alunoVal >= 7 ? 'text-emerald-700'
-                          : alunoVal >= 5 ? 'text-amber-600'
-                          : 'text-red-600';
-                        return (
-                          <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'} hover:bg-sky-50/40 transition-colors`}>
-                            <td className="px-4 py-2.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
-                            <td className="px-4 py-2.5 text-center">
-                              <span className={`inline-flex items-center justify-center min-w-[48px] h-7 px-2 rounded-lg font-black text-[12px] ${alunoVal == null ? 'text-slate-300 bg-slate-50' : alunoVal >= 7 ? 'text-emerald-700 bg-emerald-50' : alunoVal >= 5 ? 'text-amber-700 bg-amber-50' : 'text-red-700 bg-red-50'}`}>
-                                {alunoVal != null ? alunoVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                              <span className="inline-flex items-center justify-center min-w-[48px] h-7 px-2 rounded-lg font-bold text-[11px] text-slate-500 bg-slate-100">
-                                {turmaVal != null ? turmaVal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+              ) : filteredNotes.length > 0 ? (
+                filteredNotes.map(n => (
+                  <div key={n.id} className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden transition-all hover:bg-slate-50 hover:border-slate-300">
+                    {n.tipoSessao && (
+                      <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-800 px-4 py-1.5 rounded-bl-2xl font-black text-[10px] uppercase tracking-wider">
+                        {n.tipoSessao}
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase mb-4 border-b border-slate-200/60 pb-3">
+                      <span className="text-slate-700 flex items-center gap-1.5 font-black">
+                        <User className="w-3.5 h-3.5 text-blue-600" /> Autor: {n.teacher}
+                      </span>
+                      <span className="flex items-center gap-1.5 text-slate-500"><Calendar className="w-3.5 h-3.5 text-slate-400" /> {n.displayDate}</span>
+                    </div>
+                    <p className="text-slate-700 text-xs leading-relaxed font-medium mt-2">{n.note || 'Registo sem descrição.'}</p>
+                  </div>
+                ))
               ) : (
-                <div className="bg-slate-50 border border-dashed border-slate-200 p-8 rounded-2xl text-center">
-                  <p className="text-slate-400 font-bold uppercase text-[10px]">Sem notas detalhadas por matéria disponíveis</p>
+                <div className="border border-dashed border-slate-200 p-12 rounded-3xl text-center bg-slate-50/40">
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Nenhum registro encontrado para este filtro.</p>
                 </div>
               )}
             </div>
-          )}
-        </div>
-    </div>
-
-      {/* ── Evolutivo Numérico: largura total, 2 cards por linha ── */}
-      <div>
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-4">
-          <button
-            onClick={() => setShowEvolutivo(!showEvolutivo)}
-            className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
-            title={showEvolutivo ? "Recolher" : "Expandir"}
-          >
-            <LineChartIcon className="w-5 h-5 text-blue-600" /> Evolutivo Numérico (Conceito Bimestral)
-          </button>
-          <button
-            onClick={() => setShowEvolutivo(!showEvolutivo)}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
-            title={showEvolutivo ? "Recolher" : "Expandir"}
-          >
-            {showEvolutivo ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-          </button>
-        </div>
-        {showEvolutivo && (
-          studentProfile.historicoConceitos?.length > 0 ? (
-            <EvolutivoNumerico historicoConceitos={studentProfile.historicoConceitos} />
-          ) : (
-            <div className="bg-slate-50 border border-dashed border-slate-200 p-10 rounded-2xl text-center">
-              <p className="text-slate-400 font-bold uppercase text-[10px]">Sem dados bimestrais disponíveis</p>
-            </div>
-          )
+          </div>
         )}
       </div>
 
-      {/* ── Análise Gráfica ────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between border-b border-slate-200 pb-4 mb-6">
-          <button
-            onClick={() => setShowGrafico(!showGrafico)}
-            className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 hover:text-blue-600 transition-colors"
-            title={showGrafico ? "Recolher" : "Expandir"}
-          >
-            <BarChart2 className="w-6 h-6 text-blue-600" /> Análise Gráfica e Comparativa
-          </button>
-          <button
-            onClick={() => setShowGrafico(!showGrafico)}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-blue-600"
-            title={showGrafico ? "Recolher" : "Expandir"}
-          >
-            {showGrafico ? <ChevronUp className="w-6 h-6" /> : <ChevronDown className="w-6 h-6" />}
-          </button>
-        </div>
-
-        {showGrafico && (
-          <>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Radar Mapão */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center relative" data-chart>
-            <button
-              onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Radar de Equilíbrio (${bimestreRadarLabel})`); }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-              title="Imprimir este gráfico"
-            >
-              <Printer className="w-4 h-4" />
-            </button>
-            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Equilíbrio ({bimestreRadarLabel})</h4>
-            {chartDataMapao.length > 0 ? (
-              <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="60%" data={chartDataMapao} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomTooltip />} />
-                    <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} />
-                    <Radar name="Média Turma" dataKey="Turma" stroke="#94a3b8" fill="#cbd5e1" fillOpacity={0.3} />
-                    <Radar name="Aluno" dataKey="Aluno" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
-                  </RadarChart>
-                </ResponsiveContainer>
+      {/* ── SEÇÃO HERO: RESUMO DO PERÍODO SELECIONADO ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+        {/* Card Média Conselho */}
+        {heroMetrics.mediaCC != null && (
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1">
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div>
+              <div className="flex items-center justify-between text-blue-100 font-black text-[11px] uppercase tracking-widest">
+                <span>📋 Conselho Bimestral</span>
+                <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
               </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                <p className="text-slate-400 text-xs font-bold uppercase text-center px-4">Sem dados numéricos suficientes</p>
+              <div className="mt-5 flex items-baseline gap-2">
+                <span className="text-6xl font-black tracking-tight">{heroMetrics.mediaCC}</span>
+                <span className="text-blue-200 text-xs font-black uppercase tracking-wider">Média Geral</span>
+              </div>
+            </div>
+            <p className="mt-6 text-[11px] text-blue-100/90 font-medium">Índice consolidado das notas escolares</p>
+          </div>
+        )}
+
+        {/* Card Prova Paulista */}
+        {heroMetrics.mediaPP != null && (
+          <div className={`p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1 ${heroMetrics.mediaPP === 'S/N' ? 'bg-gradient-to-br from-amber-600 to-rose-700' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+            <div>
+              <div className="flex items-center justify-between font-black text-[11px] uppercase tracking-widest opacity-90">
+                <span>🎯 Prova Paulista</span>
+                <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
+              </div>
+              <div className="mt-5 flex items-baseline gap-2">
+                <span className={`font-black tracking-tight ${heroMetrics.mediaPP === 'S/N' ? 'text-5xl text-amber-100' : 'text-6xl'}`}>{heroMetrics.mediaPP}</span>
+                {heroMetrics.mediaPP !== 'S/N' && <span className="text-sky-200 text-xs font-black uppercase tracking-wider">Consolidado</span>}
+              </div>
+            </div>
+            <p className="mt-6 text-[11px] opacity-90 font-medium">
+              {heroMetrics.mediaPP === 'S/N' 
+                ? '⚠️ Sem registros de Prova Paulista neste período (S/N)' 
+                : heroMetrics.naoEfetuouPPCount > 0 
+                  ? `⚠️ Pendentes (S/N): ${heroMetrics.naoEfetuouPPNames}` 
+                  : 'Desempenho consolidado na avaliação estadual'}
+            </p>
+          </div>
+        )}
+
+        {/* Card Frequência */}
+        {heroMetrics.frequencia != null && heroMetrics.frequencia !== '-' && (
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1">
+            <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+            <div>
+              <div className="flex items-center justify-between text-slate-400 font-black text-[11px] uppercase tracking-widest">
+                <span>📅 Assiduidade</span>
+                <span className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] text-slate-300">{heroMetrics.label}</span>
+              </div>
+              <div className="mt-5 flex items-baseline gap-2">
+                <span className="text-6xl font-black tracking-tight text-emerald-400">{heroMetrics.frequencia}</span>
+                <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Presença</span>
+              </div>
+            </div>
+            <p className="mt-6 text-[11px] text-slate-400 font-medium">Comparecimento registrado às aulas</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── PAINEL PRINCIPAL DINÂMICO (SEM SANFONAS REDUNDANTES) ── */}
+      <div className="space-y-10 mt-6">
+        {selectedChartBimestre === 'evolucao' ? (
+          /* MODO EVOLUÇÃO COMPARATIVA */
+          <div className="space-y-8 animate-fadeIn">
+            <div className="bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
+              <h3 className="text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-6">
+                📈 Trajetória Multi-Bimestral de Desempenho
+              </h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Evolução Conselho */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <button
+                      onClick={() => setMaximizedChart({ type: 'evolucaoCC', title: 'Evolução Média Geral — Conselho' })}
+                      className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Maximizar gráfico em tela cheia"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Evolução Bimestral (Conselho)'); }}
+                      className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                      title="Imprimir este gráfico"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-16">Evolução Média Geral — Conselho</h4>
+                  {evolucaoDados.length > 0 ? (
+                    <div style={{ position: 'relative', width: '100%', height: '320px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+                          <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Bar name="Nota do Aluno" dataKey="ccAluno" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="ccAluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+                          </Bar>
+                          <Bar name="Média da Turma" dataKey="ccTurma" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="ccTurma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <div className="w-full h-[320px]"></div>}
+                </div>
+
+                {/* Evolução PP */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+                  <div className="absolute top-4 right-4 flex items-center gap-1">
+                    <button
+                      onClick={() => setMaximizedChart({ type: 'evolucaoPP', title: 'Evolução Média Geral — Prova Paulista' })}
+                      className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                      title="Maximizar gráfico em tela cheia"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Evolução Bimestral (Prova Paulista)'); }}
+                      className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                      title="Imprimir este gráfico"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-16">Evolução Média Geral — Prova Paulista</h4>
+                  {evolucaoDados.length > 0 ? (
+                    <div style={{ position: 'relative', width: '100%', height: '320px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+                          <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '15px' }} />
+                          <Bar name="Nota do Aluno" dataKey="ppAluno" fill="#0ea5e9" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="ppAluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+                          </Bar>
+                          <Bar name="Média da Turma" dataKey="ppTurma" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="ppTurma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : <div className="w-full h-[320px]"></div>}
+                </div>
+              </div>
+            </div>
+
+            {/* Tabela Conselho */}
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+              <h4 className="text-xs font-black text-blue-600 uppercase mb-5 tracking-widest">
+                📋 Conselho — Evolução por Disciplina e Média Geral
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left">
+                      <th className="p-4">Disciplina</th>
+                      {bimestresDisponiveis.map(b => (
+                        <th key={b} className="p-4 text-center">{b.replace('º Bimestre', 'º Bi')}</th>
+                      ))}
+                      <th className="p-4 text-center bg-blue-50 text-blue-700">Média Geral</th>
+                      <th className="p-4 text-center bg-blue-50/80 text-blue-800">Situação</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {disciplinasEvolucaoCC.length > 0 ? (
+                      disciplinasEvolucaoCC.map((row, i) => (
+                        <tr key={row.rawName} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                          <td className="p-4 font-bold text-slate-700">{row.disciplina}</td>
+                          {bimestresDisponiveis.map(b => (
+                            <td key={b} className="p-4 text-center font-semibold text-slate-600">
+                              {row.notasPorBim[b] || '-'}
+                            </td>
+                          ))}
+                          <td className="p-4 text-center font-black bg-blue-50/50 text-blue-700 text-sm">
+                            {row.media !== null ? row.media.toFixed(1) : '-'}
+                          </td>
+                          <td className="p-4 text-center font-black text-xs">
+                            {row.media !== null ? (
+                              row.media >= 5 ? (
+                                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg border border-emerald-200 shadow-2xs inline-block">Ok</span>
+                              ) : (
+                                <span className="px-2.5 py-1 bg-rose-100 text-rose-800 rounded-lg border border-rose-200 shadow-2xs inline-block">Recuperação</span>
+                              )
+                            ) : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={bimestresDisponiveis.length + 3} className="p-8 text-center text-slate-400 font-bold">Sem histórico disciplinar disponível</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Tabela Prova Paulista */}
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+              <h4 className="text-xs font-black text-sky-600 uppercase mb-5 tracking-widest">
+                🎯 Prova Paulista — Evolução por Disciplina e Média Geral
+              </h4>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left">
+                      <th className="p-4">Disciplina</th>
+                      {bimestresDisponiveis.map(b => (
+                        <th key={b} className="p-4 text-center">{b.replace('º Bimestre', 'º Bi')}</th>
+                      ))}
+                      <th className="p-4 text-center bg-sky-50 text-sky-700">Média Geral</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {disciplinasEvolucaoPP.length > 0 ? (
+                      disciplinasEvolucaoPP.map((row, i) => (
+                        <tr key={row.rawName} className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                          <td className="p-4 font-bold text-slate-700">{row.disciplina}</td>
+                          {bimestresDisponiveis.map(b => (
+                            <td key={b} className="p-4 text-center font-semibold text-slate-600">
+                              {row.notasPorBim[b] || '-'}
+                            </td>
+                          ))}
+                          <td className="p-4 text-center font-black bg-sky-50/50 text-sky-700 text-sm">
+                            {row.media !== null ? row.media.toFixed(2) : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={bimestresDisponiveis.length + 2} className="p-8 text-center text-slate-400 font-bold">Sem disciplinas detalhadas na Prova Paulista</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* MODO BIMESTRE ESPECÍFICO */
+          <div className="space-y-10 animate-fadeIn">
+            {/* ── PILAR CONSELHO BIMESTRAL ── */}
+            {chartDataMapao.length > 0 && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl">
+                      <BookOpen className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 tracking-tight">Conselho Bimestral</h3>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{bimestreRadarLabel}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black uppercase px-3.5 py-1.5 bg-blue-50 text-blue-700 rounded-xl">Notas Escolares</span>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Radar Mapão */}
+                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                    <div className="absolute top-4 right-4 flex items-center gap-1">
+                      <button
+                        onClick={() => setMaximizedChart({ type: 'radarCC', title: `Radar de Equilíbrio — Conselho (${bimestreRadarLabel})` })}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-white transition-colors shadow-sm"
+                        title="Maximizar gráfico em tela cheia"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Radar Conselho (${bimestreRadarLabel})`); }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-white transition-colors shadow-sm"
+                        title="Imprimir"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-500 uppercase mb-4 tracking-widest text-center pr-16">Radar de Equilíbrio</h4>
+                    <div style={{ position: 'relative', width: '100%', height: '340px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartDataMapao}>
+                          <PolarGrid stroke="#cbd5e1" />
+                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }} />
+                          <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                          <RechartsTooltip content={<CustomTooltip />} />
+                          <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                          <Radar name="Média Turma" dataKey="Turma" stroke="#94a3b8" fill="#cbd5e1" fillOpacity={0.3} />
+                          <Radar name="Aluno" dataKey="Aluno" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Barras Mapão */}
+                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-100 shadow-sm" data-chart>
+                    <div className="absolute top-4 right-4 flex items-center gap-1">
+                      <button
+                        onClick={() => setMaximizedChart({ type: 'barrasCC', title: `Comparativo de Notas — Conselho (${bimestreRadarLabel})` })}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Maximizar gráfico em tela cheia"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Notas por Disciplina (${bimestreRadarLabel})`); }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                        title="Imprimir"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-16">Comparativo de Notas por Disciplina</h4>
+                    <div style={{ position: 'relative', width: '100%', height: '340px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartDataMapao} margin={{ top: 20, right: 10, left: -20, bottom: 65 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-35} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={65} />
+                          <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 11 }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+                          <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingBottom: '10px' }} />
+                          <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
+                          </Bar>
+                          <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── PILAR PROVA PAULISTA ── */}
+            {chartDataProva.length > 0 && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3.5 bg-sky-50 text-sky-600 rounded-2xl">
+                      <TrendingUp className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-black text-slate-800 tracking-tight">Prova Paulista</h3>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">{bimestreRadarLabel}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black uppercase px-3.5 py-1.5 bg-sky-50 text-sky-700 rounded-xl">Avaliação Estadual</span>
+                </div>
+
+                <div className="space-y-8">
+                  {/* Radar Prova Paulista */}
+                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                    <div className="absolute top-4 right-4 flex items-center gap-1">
+                      <button
+                        onClick={() => setMaximizedChart({ type: 'radarPP', title: `Desempenho por Área — Prova Paulista (${bimestreRadarLabel})` })}
+                        className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-white transition-colors shadow-sm"
+                        title="Maximizar gráfico em tela cheia"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Radar Prova Paulista (${bimestreRadarLabel})`); }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-white transition-colors shadow-sm"
+                        title="Imprimir"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-xs font-black text-sky-600 uppercase mb-4 tracking-widest text-center pr-16">Desempenho por Área</h4>
+                    <div style={{ position: 'relative', width: '100%', height: '340px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={chartDataProva}>
+                          <PolarGrid stroke="#cbd5e1" />
+                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#475569', fontSize: 11, fontWeight: 700 }} />
+                          <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                          <RechartsTooltip content={<CustomTooltip />} />
+                          <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold' }} />
+                          <Radar name="Média da Turma" dataKey="Turma" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
+                          <Radar name="Aluno" dataKey="Aluno" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.5} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Barras Prova Paulista */}
+                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-100 shadow-sm" data-chart>
+                    <div className="absolute top-4 right-4 flex items-center gap-1">
+                      <button
+                        onClick={() => setMaximizedChart({ type: 'barrasPP', title: `Comparativo de Notas — Prova Paulista (${bimestreRadarLabel})` })}
+                        className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                        title="Maximizar gráfico em tela cheia"
+                      >
+                        <Maximize2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Notas Prova Paulista (${bimestreRadarLabel})`); }}
+                        className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
+                        title="Imprimir"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-16">Comparativo de Notas — Prova Paulista</h4>
+                    <div style={{ position: 'relative', width: '100%', height: '340px' }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={chartDataProva} margin={{ top: 20, right: 10, left: -20, bottom: 65 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                          <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-35} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={65} />
+                          <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 11 }} axisLine={false} tickLine={false} />
+                          <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
+                          <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingBottom: '10px' }} />
+                          <Bar name="Nota do Aluno" dataKey="Aluno" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
+                          </Bar>
+                          <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={45}>
+                            <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela de Matérias PP Integrada */}
+                <div className="mt-10 pt-8 border-t border-slate-100">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas da Prova Paulista no Período</h4>
+                  <div className="rounded-2xl overflow-hidden border border-slate-200">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-200">
+                          <th className="text-left px-5 py-3.5 font-black text-slate-500 uppercase tracking-wider">Disciplina</th>
+                          <th className="px-5 py-3.5 font-black text-sky-600 uppercase tracking-wider text-center">Nota Aluno</th>
+                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
+                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Desempenho</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chartDataProva.map((item, idx) => {
+                          const alunoVal = item.Aluno != null ? Number(item.Aluno) : null;
+                          const turmaVal = item.Turma != null ? Number(item.Turma) : null;
+                          const diff = alunoVal != null && turmaVal != null ? (alunoVal - turmaVal).toFixed(2) : null;
+                          return (
+                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                              <td className="px-5 py-3.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
+                              <td className="px-5 py-3.5 text-center font-black text-sky-700 text-sm">
+                                {alunoVal != null ? alunoVal.toFixed(2) : (item.naoEfetuou ? <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider border border-amber-200" title="Avaliação não efetuada pelo estudante">S/N</span> : '-')}
+                              </td>
+                              <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
+                                {turmaVal != null ? turmaVal.toFixed(2) : '-'}
+                              </td>
+                              <td className="px-5 py-3.5 text-center font-bold">
+                                {diff != null ? (
+                                  diff >= 0 ? <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-[11px] border border-emerald-100">+{diff} vs Turma</span>
+                                            : <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-xl text-[11px] border border-rose-100">{diff} vs Turma</span>
+                                ) : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Se não tiver nem Conselho nem PP no bimestre selecionado */}
+            {chartDataMapao.length === 0 && chartDataProva.length === 0 && (
+              <div className="bg-white border border-dashed border-slate-300 p-20 rounded-3xl text-center shadow-sm">
+                <BookOpen className="w-14 h-14 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-lg font-black text-slate-700 tracking-tight">Nenhuma avaliação registrada no {bimestreRadarLabel}</h3>
+                <p className="text-xs text-slate-400 mt-2 font-medium">Este estudante não possui notas cadastradas para o período selecionado.<br/>Escolha outro bimestre ou acesse a visão de Evolução Comparativa no topo.</p>
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Radar Prova Paulista */}
-          <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex flex-col items-center relative" data-chart>
+      {/* Modal Maximizado */}
+      {maximizedChart && (
+        <div className="fixed inset-0 z-50 bg-slate-900/95 backdrop-blur-md flex flex-col p-4 md:p-10 animate-fade-in" data-html2canvas-ignore>
+          <div className="flex items-center justify-between text-white mb-6 max-w-7xl mx-auto w-full">
+            <h3 className="text-xl md:text-2xl font-black flex items-center gap-3">
+              <span className="p-2 bg-blue-500/20 text-blue-400 rounded-xl"><Maximize2 className="w-6 h-6"/></span>
+              {maximizedChart.title}
+            </h3>
             <button
-              onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Radar de Desempenho (Prova Paulista)'); }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
-              title="Imprimir este gráfico"
+              onClick={() => setMaximizedChart(null)}
+              className="px-4 py-2.5 bg-white/10 hover:bg-rose-500 hover:text-white rounded-2xl text-slate-200 transition-all flex items-center gap-2 font-bold text-xs shadow-lg"
             >
-              <Printer className="w-4 h-4" />
+              <Minimize2 className="w-4 h-4" /> Fechar Tela Cheia
             </button>
-            <h4 className="text-[10px] font-black text-slate-400 uppercase mb-4 tracking-widest text-center">Radar de Desempenho (Prova Paulista)</h4>
-            {chartDataProva.length > 0 ? (
-              <div style={{ position: 'relative', width: '100%', height: '288px', minHeight: '288px' }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                  <RadarChart cx="50%" cy="50%" outerRadius="60%" data={chartDataProva} margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
-                    <PolarGrid stroke="#e2e8f0" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} />
-                    <RechartsTooltip content={<CustomTooltip />} />
-                    <Legend verticalAlign="bottom" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingTop: '10px' }} />
-                    <Radar name="Média da Turma" dataKey="Turma" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
-                    <Radar name="Aluno" dataKey="Aluno" stroke="#0ea5e9" fill="#0ea5e9" fillOpacity={0.5} />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <div className="flex-1 flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-                <p className="text-slate-400 text-xs font-bold uppercase text-center px-4">Sem disciplinas detalhadas na Prova Paulista</p>
-              </div>
-            )}
+          </div>
+          <div className="flex-1 w-full max-w-7xl mx-auto bg-white rounded-3xl p-6 md:p-10 shadow-2xl relative flex flex-col justify-center min-h-0 border border-slate-100 overflow-hidden">
+            <div className="w-full h-full min-h-[450px]">
+              {renderChartContent(maximizedChart)}
+            </div>
           </div>
         </div>
-
-        {/* Barras comparativas — Mapão */}
-        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
-          <button
-            onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, `Mapão — Aluno vs Média da Turma (${bimestreRadarLabel})`); }}
-            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-            title="Imprimir este gráfico"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
-            <span className="text-blue-500">Mapão</span> — Comparação: Aluno vs Média da Turma
-            <span className="ml-1 text-slate-300 normal-case font-bold">({bimestreRadarLabel})</span>
-          </h4>
-          {chartDataMapao.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '480px', minHeight: '480px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={chartDataMapao} margin={{ top: 20, right: 10, left: -20, bottom: 100 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={100} />
-                  <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
-                  <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
-                  <Bar name="Nota do Aluno" dataKey="Aluno" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
-                  </Bar>
-                  <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-              <p className="text-slate-400 text-xs font-bold uppercase">Sem dados comparativos suficientes</p>
-            </div>
-          )}
-        </div>
-
-        {/* Barras comparativas — Prova Paulista */}
-        <div className="mt-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
-          <button
-            onClick={e => { const card = e.currentTarget.closest('[data-chart]'); printChart(card, 'Prova Paulista — Aluno vs Média da Turma'); }}
-            className="absolute top-3 right-3 p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
-            title="Imprimir este gráfico"
-          >
-            <Printer className="w-4 h-4" />
-          </button>
-          <h4 className="text-[10px] font-black text-slate-400 uppercase mb-2 tracking-widest">
-            <span className="text-sky-500">Prova Paulista</span> — Comparação: Aluno vs Média da Turma
-          </h4>
-          {chartDataProva.length > 0 ? (
-            <div style={{ position: 'relative', width: '100%', height: '480px', minHeight: '480px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-                <BarChart data={chartDataProva} margin={{ top: 20, right: 10, left: -20, bottom: 100 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="subject" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 700 }} angle={-45} textAnchor="end" interval={0} axisLine={false} tickLine={false} height={100} />
-                  <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
-                  <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
-                  <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', paddingBottom: '20px' }} />
-                  <Bar name="Nota do Aluno" dataKey="Aluno" fill="#0ea5e9" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Aluno" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
-                  </Bar>
-                  <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={30}>
-                    <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v != null ? Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 }) : ''} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center w-full h-64 bg-slate-50 border border-dashed border-slate-200 rounded-2xl">
-              <p className="text-slate-400 text-xs font-bold uppercase">Sem dados comparativos da Prova Paulista</p>
-            </div>
-          )}
-          </div>
-        </>
       )}
-    </div>
     </div>
   );
 };

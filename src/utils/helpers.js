@@ -13,11 +13,12 @@ export const normalizeName = (name) => {
 };
 
 export const formatBimestre = (text) => {
-  const t = String(text).toLowerCase();
-  if (t.includes('primeiro') || t.includes('1º')) return '1º Bimestre';
-  if (t.includes('segundo')  || t.includes('2º')) return '2º Bimestre';
-  if (t.includes('terceiro') || t.includes('3º')) return '3º Bimestre';
-  if (t.includes('quarto')   || t.includes('4º')) return '4º Bimestre';
+  if (!text) return '1º Bimestre';
+  const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (t.includes('primeiro') || t.includes('1º') || t.includes('1bim') || t.includes('1 bim') || t === '1' || t.startsWith('1-')) return '1º Bimestre';
+  if (t.includes('segundo')  || t.includes('2º') || t.includes('2bim') || t.includes('2 bim') || t === '2' || t.startsWith('2-')) return '2º Bimestre';
+  if (t.includes('terceiro') || t.includes('3º') || t.includes('3bim') || t.includes('3 bim') || t === '3' || t.startsWith('3-')) return '3º Bimestre';
+  if (t.includes('quarto')   || t.includes('4º') || t.includes('4bim') || t.includes('4 bim') || t === '4' || t.startsWith('4-')) return '4º Bimestre';
   return text.trim();
 };
 

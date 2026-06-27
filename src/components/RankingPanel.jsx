@@ -36,7 +36,27 @@ const colorMap = {
 const RankingList = ({ title, color, students, field, onSelectStudent }) => {
   const c = colorMap[color];
 
+  let activePpSubjects = [];
+  if (field === 'provaPaulista') {
+    const subjectsSet = new Set();
+    students.forEach(s => {
+      if (s.provaPaulistaNotas) {
+        Object.keys(s.provaPaulistaNotas).forEach(subj => subjectsSet.add(subj));
+      }
+    });
+    activePpSubjects = Array.from(subjectsSet).filter(subj =>
+      students.some(s => s.provaPaulistaNotas && parseNum(s.provaPaulistaNotas[subj]) !== null)
+    );
+  }
+
   const ranked = students
+    .filter(s => {
+      if (field === 'provaPaulista') {
+        if (!s.provaPaulistaNotas || activePpSubjects.length === 0) return false;
+        return activePpSubjects.every(subj => parseNum(s.provaPaulistaNotas[subj]) !== null);
+      }
+      return true;
+    })
     .map(s => ({ nome: s.nome, tutor: s.tutor, turma: s.turma, val: parseNum(s[field]) }))
     .filter(s => s.val !== null)
     .sort((a, b) => b.val - a.val)

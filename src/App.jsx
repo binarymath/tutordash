@@ -14,6 +14,7 @@ import Header         from './components/Header';
 import EmptyState     from './components/EmptyState';
 import Dashboard      from './components/Dashboard';
 import StudentProfile from './components/StudentProfile';
+import ClassProfile   from './components/ClassProfile';
 import LgpdBanner     from './components/LgpdBanner';
 
 const App = () => {
@@ -106,10 +107,14 @@ const App = () => {
   const [selectedValue,         setSelectedValue]         = useState('Todos');
   const [searchTerm,            setSearchTerm]            = useState('');
   const [selectedStudent,       setSelectedStudent]       = useState(null);
+  const [selectedTurma,         setSelectedTurma]         = useState(null);
   const [selectedSessionFilters, setSelectedSessionFilters] = useState([]);
   const [sortConfig,            setSortConfig]            = useState({ key: 'turma', direction: 'asc' });
   const [showStickyName,        setShowStickyName]        = useState(false);
   const [showOnlyActive,        setShowOnlyActive]        = useState(true);
+
+  useEffect(() => { if (selectedStudent) setSelectedTurma(null); }, [selectedStudent]);
+  useEffect(() => { if (selectedTurma) setSelectedStudent(null); }, [selectedTurma]);
 
   // Resetar filtro de sessão ao trocar de aluno
   useEffect(() => { setSelectedSessionFilters([]); }, [selectedStudent]);
@@ -261,7 +266,15 @@ const App = () => {
       item.tutorados.forEach(nomeOriginal => {
         const normName       = normalizeName(nomeOriginal);
         const studentNotes   = annotations.filter(n => n.normalizedName === normName);
-        const provaInfo      = provaData.find(p => p.normalizedName === normName);
+        let provasDoAlunoRaw = provaData.filter(p => p.normalizedName === normName);
+        const provasMap = new Map();
+        provasDoAlunoRaw.forEach(p => {
+          if (p.bimestre) provasMap.set(p.bimestre, p);
+        });
+        let historicoProvas = Array.from(provasMap.values());
+        historicoProvas.sort((a, b) => (a.bimestre || '').localeCompare(b.bimestre || ''));
+        const provaInfo = historicoProvas.length > 0 ? historicoProvas[historicoProvas.length - 1] : null;
+
         let conceitosDoAlunoRaw = conceitoData.filter(c => c.normalizedName === normName);
         
         const conceitosMap = new Map();
@@ -384,6 +397,7 @@ const App = () => {
             ppMat, ppPort,
             ccMat: quickMat, ccPort: quickPort,
             historicoConceitos: conceitosDoAluno,
+            historicoProvas: historicoProvas,
             consilhoBimestral,
             ultimoBimNome: ultimoBimestre ? ultimoBimestre.bimestre : 'Sem Dados',
             situacao: situacaoAtual,
@@ -763,7 +777,15 @@ const App = () => {
           <EmptyState onLoad={loadAllData} isLoading={isLoading} canLoad={!!config.studentsUrl} onOpenSettings={() => setShowSettings(true)} />
         ) : (
           <div className="space-y-6">
-            {!selectedStudent ? (
+            {selectedTurma ? (
+              <ClassProfile
+                selectedTurma={selectedTurma}
+                setSelectedTurma={setSelectedTurma}
+                allStudents={allStudents}
+                conceitoData={conceitoData}
+                provaData={provaData}
+              />
+            ) : !selectedStudent ? (
               <Dashboard
                 allStudents={allStudents}
                 sortedData={sortedData}
@@ -776,6 +798,7 @@ const App = () => {
                 searchTerm={searchTerm}
                 setSearchTerm={setSearchTerm}
                 setSelectedStudent={setSelectedStudent}
+                setSelectedTurma={setSelectedTurma}
                 sortConfig={sortConfig}
                 handleSort={handleSort}
                 showOnlyActive={showOnlyActive}
