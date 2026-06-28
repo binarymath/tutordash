@@ -784,6 +784,11 @@ const App = () => {
                 allStudents={allStudents}
                 conceitoData={conceitoData}
                 provaData={provaData}
+                onSelectStudent={(nome) => {
+                  setSelectedStudent(nome);
+                  setSelectedTurma(null);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
               />
             ) : !selectedStudent ? (
               <Dashboard
