@@ -59,6 +59,7 @@ const ClassProfile = ({
   const [metaDiscPP, setMetaDiscPP] = useState('Geral');
   const [metaOuroVal, setMetaOuroVal] = useState(7.5);
   const [metaDiamanteVal, setMetaDiamanteVal] = useState(8.5);
+  const [metaFiltroAlunos, setMetaFiltroAlunos] = useState('todos');
 
   const serieLabel = useMemo(() => getSerieFromTurma(selectedTurma), [selectedTurma]);
 
@@ -813,25 +814,45 @@ const ClassProfile = ({
 
     bimestresDisponiveis.forEach(bim => {
       const regs = provaData.filter(r => r.bimestre === bim && r.notas);
-      let bimSum = 0, bimCnt = 0;
+      const studentScores = [];
+
       regs.forEach(reg => {
         const isTurma = normNamesTurmaSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
         if (!isTurma) return;
+
+        let sSum = 0, sCnt = 0;
         Object.entries(reg.notas || {}).forEach(([disc, valRaw]) => {
           const disp = formatDisciplina(disc);
           const matchDisc = metaDiscPP === 'Geral' || disp === metaDiscPP || (disp.length > 12 && `${disp.substring(0, 10)}.` === metaDiscPP);
           if (matchDisc) {
             const n = toScale10(valRaw);
-            if (n !== null && n > 0) { bimSum += n; bimCnt++; }
+            if (n !== null && n > 0) { sSum += n; sCnt++; }
           }
         });
+
+        if (sCnt > 0) {
+          studentScores.push(sSum / sCnt);
+        }
       });
-      const mediaBim = bimCnt > 0 ? Number((bimSum / bimCnt).toFixed(2)) : 0;
+
+      // Ordenar decrescente para pegar os melhores alunos
+      studentScores.sort((a, b) => b - a);
+
+      // Limitar pelo filtro de alunos escolhido
+      let filteredScores = studentScores;
+      if (metaFiltroAlunos === '10') filteredScores = studentScores.slice(0, 10);
+      else if (metaFiltroAlunos === '20') filteredScores = studentScores.slice(0, 20);
+      else if (metaFiltroAlunos === '30') filteredScores = studentScores.slice(0, 30);
+
+      const mediaBim = filteredScores.length > 0
+        ? Number((filteredScores.reduce((acc, val) => acc + val, 0) / filteredScores.length).toFixed(2))
+        : 0;
+
       bimestresList.push({
         bimestre: bim.replace('º Bimestre', 'º Bi'),
         media: mediaBim
       });
-      if (bimCnt > 0) {
+      if (filteredScores.length > 0) {
         totalSum += mediaBim;
         totalCnt++;
       }
@@ -839,7 +860,7 @@ const ClassProfile = ({
 
     const geral = totalCnt > 0 ? Number((totalSum / totalCnt).toFixed(2)) : 0;
     return { geral, bimestres: bimestresList };
-  }, [selectedTurma, allStudents, bimestresDisponiveis, provaData, metaDiscPP]);
+  }, [selectedTurma, allStudents, bimestresDisponiveis, provaData, metaDiscPP, metaFiltroAlunos]);
 
   const activeBimestreLabel = useMemo(() => {
     if (selectedBimestre === 'evolucao') return 'Evolução Comparativa Histórica';
@@ -1796,7 +1817,7 @@ const ClassProfile = ({
         {/* Painel de Metas e Hidrômetro da Prova Paulista (Apenas Evolução Comparativa) */}
         {selectedBimestre === 'evolucao' && (
           <div className="mt-8 pt-8 border-t border-slate-200">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col gap-5 mb-8">
               <div>
                 <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                   Gestão de Desempenho
@@ -1809,14 +1830,28 @@ const ClassProfile = ({
                 </p>
               </div>
 
-              {/* Controles do Professor */}
-              <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              {/* Controles do Professor (Posicionados abaixo do título em grade) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-sm w-full">
                 <div className="flex flex-col">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase">Disciplina PP</label>
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1">👥 Alunos</label>
+                  <select
+                    value={metaFiltroAlunos}
+                    onChange={(e) => setMetaFiltroAlunos(e.target.value)}
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-sm w-full"
+                  >
+                    <option value="todos">Todos os Alunos</option>
+                    <option value="10">Top 10 Melhores</option>
+                    <option value="20">Top 20 Melhores</option>
+                    <option value="30">Top 30 Melhores</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase mb-1">Disciplina PP</label>
                   <select
                     value={metaDiscPP}
                     onChange={(e) => setMetaDiscPP(e.target.value)}
-                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-sm"
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-sm w-full"
                   >
                     {allDisciplinesPP.map((disc) => (
                       <option key={disc} value={disc}>
@@ -1826,8 +1861,8 @@ const ClassProfile = ({
                   </select>
                 </div>
 
-                <div className="flex flex-col w-28">
-                  <label className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1 mb-1">
                     🥇 Meta Ouro
                   </label>
                   <input
@@ -1837,12 +1872,12 @@ const ClassProfile = ({
                     max="10"
                     value={metaOuroVal}
                     onChange={(e) => setMetaOuroVal(parseFloat(e.target.value) || 0)}
-                    className="bg-white border border-amber-300 rounded-xl px-3 py-1 text-xs font-black text-amber-700 outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                    className="bg-white border border-amber-300 rounded-xl px-3 py-2 text-xs font-black text-amber-700 outline-none focus:ring-2 focus:ring-amber-500 shadow-sm w-full"
                   />
                 </div>
 
-                <div className="flex flex-col w-28">
-                  <label className="text-[10px] font-bold text-cyan-600 uppercase flex items-center gap-1">
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-bold text-cyan-600 uppercase flex items-center gap-1 mb-1">
                     💎 Meta Diamante
                   </label>
                   <input
@@ -1852,7 +1887,7 @@ const ClassProfile = ({
                     max="10"
                     value={metaDiamanteVal}
                     onChange={(e) => setMetaDiamanteVal(parseFloat(e.target.value) || 0)}
-                    className="bg-white border border-cyan-300 rounded-xl px-3 py-1 text-xs font-black text-cyan-700 outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm"
+                    className="bg-white border border-cyan-300 rounded-xl px-3 py-2 text-xs font-black text-cyan-700 outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm w-full"
                   />
                 </div>
               </div>
@@ -1865,7 +1900,7 @@ const ClassProfile = ({
                 metaOuro={metaOuroVal}
                 metaDiamante={metaDiamanteVal}
                 title={metaDiscPP === 'Geral' ? '🌟 Média Geral' : metaDiscPP}
-                subtitle="Média Consolidada"
+                subtitle={`Consolidada (${metaFiltroAlunos === 'todos' ? 'Turma' : `Top ${metaFiltroAlunos}`})`}
                 isHighlight={true}
               />
             </div>
@@ -1876,7 +1911,7 @@ const ClassProfile = ({
                 <div className="flex items-center justify-center gap-2 max-w-7xl mx-auto px-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
                   <h4 className="text-sm font-black text-slate-700 tracking-wider uppercase text-center">
-                    Evolução Bimestral — {metaDiscPP === 'Geral' ? '🌟 Média Geral' : metaDiscPP}
+                    Evolução Bimestral — {metaDiscPP === 'Geral' ? '🌟 Média Geral' : metaDiscPP} ({metaFiltroAlunos === 'todos' ? 'Todos os Alunos' : `Top ${metaFiltroAlunos} Melhores`})
                   </h4>
                 </div>
                 <div className="flex flex-wrap justify-center gap-8 max-w-7xl mx-auto py-2">
@@ -1887,7 +1922,7 @@ const ClassProfile = ({
                       metaOuro={metaOuroVal}
                       metaDiamante={metaDiamanteVal}
                       title={b.bimestre}
-                      subtitle={metaDiscPP === 'Geral' ? 'Média Geral' : metaDiscPP}
+                      subtitle={`${metaDiscPP === 'Geral' ? 'Média Geral' : metaDiscPP} (${metaFiltroAlunos === 'todos' ? 'Turma' : `Top ${metaFiltroAlunos}`})`}
                       isHighlight={false}
                     />
                   ))}
