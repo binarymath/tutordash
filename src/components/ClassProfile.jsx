@@ -273,41 +273,43 @@ const ClassProfile = ({
 
     const studentMapPP = new Map();
     const studentMapCC = new Map();
-    if (targetBim === 'evolucao') {
-      provaData.forEach(reg => {
-        if (!reg.normalizedName || !reg.notas) return;
-        if (!studentMapPP.has(reg.normalizedName)) studentMapPP.set(reg.normalizedName, { sum: 0, cnt: 0 });
-        const st = studentMapPP.get(reg.normalizedName);
-        Object.values(reg.notas).forEach(valRaw => {
-          const n = toScale10(valRaw);
-          if (n !== null && n > 0) { st.sum += n; st.cnt++; }
-        });
+    provaData.forEach(reg => {
+      if (targetBim !== 'evolucao' && reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
+      if (!reg.normalizedName || !reg.notas) return;
+      if (!studentMapPP.has(reg.normalizedName)) studentMapPP.set(reg.normalizedName, { sum: 0, cnt: 0 });
+      const st = studentMapPP.get(reg.normalizedName);
+      Object.values(reg.notas).forEach(valRaw => {
+        const n = toScale10(valRaw);
+        if (n !== null && n > 0) { st.sum += n; st.cnt++; }
       });
-      conceitoData.forEach(reg => {
-        if (!reg.normalizedName || !reg.notas) return;
-        if (!studentMapCC.has(reg.normalizedName)) studentMapCC.set(reg.normalizedName, { sum: 0, cnt: 0 });
-        const st = studentMapCC.get(reg.normalizedName);
-        Object.values(reg.notas).forEach(valRaw => {
-          const n = parseGrade(valRaw);
-          if (n > 0) { st.sum += n; st.cnt++; }
-        });
+    });
+    conceitoData.forEach(reg => {
+      if (targetBim !== 'evolucao' && reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
+      if (!reg.normalizedName || !reg.notas) return;
+      if (!studentMapCC.has(reg.normalizedName)) studentMapCC.set(reg.normalizedName, { sum: 0, cnt: 0 });
+      const st = studentMapCC.get(reg.normalizedName);
+      Object.values(reg.notas).forEach(valRaw => {
+        const n = parseGrade(valRaw);
+        if (n > 0) { st.sum += n; st.cnt++; }
       });
-    }
+    });
 
     const getStudentValPP = (s) => {
-      if (targetBim === 'evolucao' && studentMapPP.has(s.normalizedName)) {
+      if (studentMapPP.has(s.normalizedName)) {
         const st = studentMapPP.get(s.normalizedName);
         return st.cnt > 0 ? parseFloat((st.sum / st.cnt).toFixed(2)) : null;
       }
+      if (targetBim !== 'evolucao') return null;
       const val = parseFloat(String(s.provaPaulista || '').replace(',', '.'));
       return isNaN(val) ? null : val;
     };
 
     const getStudentValCC = (s) => {
-      if (targetBim === 'evolucao' && studentMapCC.has(s.normalizedName)) {
+      if (studentMapCC.has(s.normalizedName)) {
         const st = studentMapCC.get(s.normalizedName);
         return st.cnt > 0 ? parseFloat((st.sum / st.cnt).toFixed(1)) : null;
       }
+      if (targetBim !== 'evolucao') return null;
       const val = parseFloat(String(s.consilhoBimestral || '').replace(',', '.'));
       return isNaN(val) ? null : val;
     };
@@ -398,7 +400,7 @@ const ClassProfile = ({
         let nota = null;
         const bimObj = !targetBim
           ? hist[hist.length - 1]
-          : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim) || hist[hist.length - 1];
+          : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim);
         if (bimObj?.notas) {
           Object.entries(bimObj.notas).forEach(([disc, valRaw]) => {
             const disp = formatDisciplina(disc);
@@ -516,7 +518,7 @@ const ClassProfile = ({
         let nota = null;
         const bimObj = !targetBim
           ? hist[hist.length - 1]
-          : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim) || hist[hist.length - 1];
+          : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim);
         if (bimObj?.notas) {
           Object.entries(bimObj.notas).forEach(([disc, valRaw]) => {
             const disp = formatDisciplina(disc);

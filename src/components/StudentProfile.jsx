@@ -658,7 +658,8 @@ const StudentProfile = ({
       });
       const media = count > 0 ? Number((soma / count).toFixed(1)) : null;
       return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
-    }).sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+    }).filter(item => item.media !== null && item.media > 0)
+      .sort((a, b) => a.disciplina.localeCompare(b.disciplina));
   }, [studentProfile]);
 
   const disciplinasEvolucaoPP = React.useMemo(() => {
@@ -682,7 +683,8 @@ const StudentProfile = ({
       });
       const media = count > 0 ? Number((soma / count).toFixed(2)) : null;
       return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
-    }).sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+    }).filter(item => item.media !== null && item.media > 0)
+      .sort((a, b) => a.disciplina.localeCompare(b.disciplina));
   }, [studentProfile]);
 
   // ── Cálculo da média do Conselho Bimestral ─────────────────

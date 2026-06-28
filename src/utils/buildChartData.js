@@ -67,7 +67,8 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
         Aluno: notaAlunoMed,
         Turma: turmaCnt > 0 ? parseFloat((turmaSum / turmaCnt).toFixed(1)) : 0,
       };
-    }).sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
+    }).filter(item => item.Aluno !== null && item.Aluno > 0)
+      .sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
   }
 
   const bRegistro = getConceitoBimestre(studentProfile, targetBimestre);
@@ -159,7 +160,8 @@ export const buildChartDataProva = (studentProfile, conceitoData = [], provaData
         Turma: turmaCnt > 0 ? Math.round((turmaSum / turmaCnt) * 100) / 100 : 0,
         naoEfetuou: notaAlunoMed === null
       };
-    }).sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
+    }).filter(item => item.Aluno !== null && item.Aluno > 0)
+      .sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
   }
 
   const pRegistro = getProvaBimestre(studentProfile, targetBimestre);
