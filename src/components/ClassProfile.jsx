@@ -319,21 +319,89 @@ const ClassProfile = ({
       return isNaN(val) ? null : val;
     };
 
+    // Identificar bimestres ativos com provas da disciplina na turma/série
+    const activeBimsPP = new Set();
+    provaData.forEach(reg => {
+      const isSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === serieLabel;
+      if (!isSerie || !reg.notas || !reg.bimestre) return;
+      Object.entries(reg.notas).forEach(([k, valRaw]) => {
+        const n = toScale10(valRaw);
+        if (n !== null && n > 0) {
+          const d = formatDisciplina(k);
+          if (currentDiscPP === 'Geral' || d === currentDiscPP || (d.length > 12 && `${d.substring(0, 10)}.` === currentDiscPP)) {
+            activeBimsPP.add(reg.bimestre.replace('º Bimestre', 'º Bi'));
+          }
+        }
+      });
+    });
+
+    const activeBimsCC = new Set();
+    conceitoData.forEach(reg => {
+      const isSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === serieLabel;
+      if (!isSerie || !reg.notas || !reg.bimestre) return;
+      Object.entries(reg.notas).forEach(([k, valRaw]) => {
+        const n = parseGrade(valRaw);
+        if (n > 0) {
+          const d = formatDisciplina(k);
+          if (currentDiscCC === 'Geral' || d === currentDiscCC || (d.length > 12 && `${d.substring(0, 10)}.` === currentDiscCC)) {
+            activeBimsCC.add(reg.bimestre.replace('º Bimestre', 'º Bi'));
+          }
+        }
+      });
+    });
+
+    const hasCompleteHistoryPP = (student) => {
+      if (targetBim !== 'evolucao' || activeBimsPP.size === 0) return true;
+      const hist = student.historicoProvas || [];
+      const studentBims = new Set();
+      hist.forEach(h => {
+        if (!h?.notas || !h.bimestre) return;
+        const normBim = h.bimestre.replace('º Bimestre', 'º Bi');
+        Object.entries(h.notas).forEach(([disc, valRaw]) => {
+          const disp = formatDisciplina(disc);
+          if (currentDiscPP === 'Geral' || disp === currentDiscPP || (disp.length > 12 && `${disp.substring(0, 10)}.` === currentDiscPP)) {
+            const n = toScale10(valRaw);
+            if (n !== null && n > 0) studentBims.add(normBim);
+          }
+        });
+      });
+      return Array.from(activeBimsPP).every(bim => studentBims.has(bim));
+    };
+
+    const hasCompleteHistoryCC = (student) => {
+      if (targetBim !== 'evolucao' || activeBimsCC.size === 0) return true;
+      const hist = student.historicoConceitos || [];
+      const studentBims = new Set();
+      hist.forEach(h => {
+        if (!h?.notas || !h.bimestre) return;
+        const normBim = h.bimestre.replace('º Bimestre', 'º Bi');
+        Object.entries(h.notas).forEach(([disc, valRaw]) => {
+          const disp = formatDisciplina(disc);
+          if (currentDiscCC === 'Geral' || disp === currentDiscCC || (disp.length > 12 && `${disp.substring(0, 10)}.` === currentDiscCC)) {
+            const n = parseGrade(valRaw);
+            if (n > 0) studentBims.add(normBim);
+          }
+        });
+      });
+      return Array.from(activeBimsCC).every(bim => studentBims.has(bim));
+    };
+
     // --- PROVA PAULISTA ---
     let turmaMediaPP = '-', escolaMediaPP = '-', rankPP = '-', totalPP = 1, rankSeriePP = '-', totalSeriePP = 1, topPP = [];
     if (currentDiscPP === 'Geral') {
       const listPP = studentsInTurma
         .map(s => ({ ...s, val: getStudentValPP(s) }))
-        .filter(s => s.val !== null && s.situacao === 'Ativo')
+        .filter(s => s.val !== null && s.situacao === 'Ativo' && hasCompleteHistoryPP(s))
         .sort((a, b) => b.val - a.val);
 
       const schoolPP = allStudents
+        .filter(s => hasCompleteHistoryPP(s))
         .map(s => getStudentValPP(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelPP = allStudents
-        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
+        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel && hasCompleteHistoryPP(s))
         .map(s => getStudentValPP(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
@@ -420,16 +488,17 @@ const ClassProfile = ({
 
       const listPP = studentsInTurma
         .map(s => ({ ...s, val: getStudentDiscGradePP(s) }))
-        .filter(s => s.val !== null && s.situacao === 'Ativo')
+        .filter(s => s.val !== null && s.situacao === 'Ativo' && hasCompleteHistoryPP(s))
         .sort((a, b) => b.val - a.val);
 
       const schoolPP = allStudents
+        .filter(s => hasCompleteHistoryPP(s))
         .map(s => getStudentDiscGradePP(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelPP = allStudents
-        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
+        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel && hasCompleteHistoryPP(s))
         .map(s => getStudentDiscGradePP(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
@@ -442,16 +511,17 @@ const ClassProfile = ({
     if (currentDiscCC === 'Geral') {
       const listCC = studentsInTurma
         .map(s => ({ ...s, val: getStudentValCC(s) }))
-        .filter(s => s.val !== null && s.situacao === 'Ativo')
+        .filter(s => s.val !== null && s.situacao === 'Ativo' && hasCompleteHistoryCC(s))
         .sort((a, b) => b.val - a.val);
 
       const schoolCC = allStudents
+        .filter(s => hasCompleteHistoryCC(s))
         .map(s => getStudentValCC(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelCC = allStudents
-        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
+        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel && hasCompleteHistoryCC(s))
         .map(s => getStudentValCC(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
@@ -538,16 +608,17 @@ const ClassProfile = ({
 
       const listCC = studentsInTurma
         .map(s => ({ ...s, val: getStudentDiscGradeCC(s) }))
-        .filter(s => s.val !== null && s.situacao === 'Ativo')
+        .filter(s => s.val !== null && s.situacao === 'Ativo' && hasCompleteHistoryCC(s))
         .sort((a, b) => b.val - a.val);
 
       const schoolCC = allStudents
+        .filter(s => hasCompleteHistoryCC(s))
         .map(s => getStudentDiscGradeCC(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelCC = allStudents
-        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
+        .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel && hasCompleteHistoryCC(s))
         .map(s => getStudentDiscGradeCC(s))
         .filter(n => n !== null)
         .sort((a, b) => b - a);
