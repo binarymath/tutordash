@@ -18,6 +18,7 @@ import {
   buildTurmaEvolucaoData
 } from '../utils/buildChartData';
 import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma } from '../utils/helpers';
+import SpeedometerGauge from './SpeedometerGauge';
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload || !payload.length) return null;
@@ -55,6 +56,9 @@ const ClassProfile = ({
   const [selectedDiscCC, setSelectedDiscCC] = useState('Geral');
   const [evolucaoDiscPP, setEvolucaoDiscPP] = useState('Geral');
   const [evolucaoDiscCC, setEvolucaoDiscCC] = useState('Geral');
+  const [metaDiscPP, setMetaDiscPP] = useState('Geral');
+  const [metaOuroVal, setMetaOuroVal] = useState(7.5);
+  const [metaDiamanteVal, setMetaDiamanteVal] = useState(8.5);
 
   const serieLabel = useMemo(() => getSerieFromTurma(selectedTurma), [selectedTurma]);
 
@@ -785,6 +789,57 @@ const ClassProfile = ({
       cc: getEvolutionForPillar(conceitoData, evolucaoDiscCC, false)
     };
   }, [selectedTurma, evolucaoDiscPP, evolucaoDiscCC, conceitoData, provaData, allStudents, bimestresDisponiveis]);
+
+  const allDisciplinesPP = useMemo(() => {
+    const set = new Set();
+    provaData.forEach(reg => {
+      if (reg?.notas) {
+        Object.keys(reg.notas).forEach(k => {
+          const d = formatDisciplina(k);
+          if (d) set.add(d);
+        });
+      }
+    });
+    return ['Geral', ...Array.from(set).sort()];
+  }, [provaData]);
+
+  const dadosMetasPP = useMemo(() => {
+    if (!selectedTurma) return { geral: 0, bimestres: [] };
+    const studentsInTurma = allStudents.filter(s => s.turma === selectedTurma);
+    const normNamesTurmaSet = new Set(studentsInTurma.map(s => s.normalizedName));
+
+    const bimestresList = [];
+    let totalSum = 0, totalCnt = 0;
+
+    bimestresDisponiveis.forEach(bim => {
+      const regs = provaData.filter(r => r.bimestre === bim && r.notas);
+      let bimSum = 0, bimCnt = 0;
+      regs.forEach(reg => {
+        const isTurma = normNamesTurmaSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
+        if (!isTurma) return;
+        Object.entries(reg.notas || {}).forEach(([disc, valRaw]) => {
+          const disp = formatDisciplina(disc);
+          const matchDisc = metaDiscPP === 'Geral' || disp === metaDiscPP || (disp.length > 12 && `${disp.substring(0, 10)}.` === metaDiscPP);
+          if (matchDisc) {
+            const n = toScale10(valRaw);
+            if (n !== null && n > 0) { bimSum += n; bimCnt++; }
+          }
+        });
+      });
+      const mediaBim = bimCnt > 0 ? Number((bimSum / bimCnt).toFixed(2)) : 0;
+      bimestresList.push({
+        bimestre: bim.replace('º Bimestre', 'º Bi'),
+        media: mediaBim
+      });
+      if (bimCnt > 0) {
+        totalSum += mediaBim;
+        totalCnt++;
+      }
+    });
+
+    const geral = totalCnt > 0 ? Number((totalSum / totalCnt).toFixed(2)) : 0;
+    return { geral, bimestres: bimestresList };
+  }, [selectedTurma, allStudents, bimestresDisponiveis, provaData, metaDiscPP]);
 
   const activeBimestreLabel = useMemo(() => {
     if (selectedBimestre === 'evolucao') return 'Evolução Comparativa Histórica';
@@ -1737,6 +1792,110 @@ const ClassProfile = ({
             </div>
           </div>
         </div>
+
+        {/* Painel de Metas e Hidrômetro da Prova Paulista (Apenas Evolução Comparativa) */}
+        {selectedBimestre === 'evolucao' && (
+          <div className="mt-8 pt-8 border-t border-slate-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                  Gestão de Desempenho
+                </span>
+                <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">
+                  Meta Prova Paulista
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Defina as metas desejadas para monitorar a velocidade de evolução da turma no comparativo bimestral.
+                </p>
+              </div>
+
+              {/* Controles do Professor */}
+              <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="flex flex-col">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase">Disciplina PP</label>
+                  <select
+                    value={metaDiscPP}
+                    onChange={(e) => setMetaDiscPP(e.target.value)}
+                    className="bg-white border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:ring-2 focus:ring-sky-500 cursor-pointer shadow-sm"
+                  >
+                    {allDisciplinesPP.map((disc) => (
+                      <option key={disc} value={disc}>
+                        {disc === 'Geral' ? '🌟 Média Geral' : disc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex flex-col w-28">
+                  <label className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+                    🥇 Meta Ouro
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    value={metaOuroVal}
+                    onChange={(e) => setMetaOuroVal(parseFloat(e.target.value) || 0)}
+                    className="bg-white border border-amber-300 rounded-xl px-3 py-1 text-xs font-black text-amber-700 outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                  />
+                </div>
+
+                <div className="flex flex-col w-28">
+                  <label className="text-[10px] font-bold text-cyan-600 uppercase flex items-center gap-1">
+                    💎 Meta Diamante
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="10"
+                    value={metaDiamanteVal}
+                    onChange={(e) => setMetaDiamanteVal(parseFloat(e.target.value) || 0)}
+                    className="bg-white border border-cyan-300 rounded-xl px-3 py-1 text-xs font-black text-cyan-700 outline-none focus:ring-2 focus:ring-cyan-500 shadow-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 1. Hidrômetro Principal: Média Consolidada (Acima) */}
+            <div className="flex justify-center mb-10">
+              <SpeedometerGauge
+                value={dadosMetasPP.geral}
+                metaOuro={metaOuroVal}
+                metaDiamante={metaDiamanteVal}
+                title={metaDiscPP === 'Geral' ? '🌟 Média Geral' : metaDiscPP}
+                subtitle="Média Consolidada"
+                isHighlight={true}
+              />
+            </div>
+
+            {/* 2. Hidrômetros Individuais por Bimestre Passado (Abaixo) */}
+            {dadosMetasPP.bimestres.length > 0 && (
+              <div className="space-y-4 pt-4 border-t border-slate-200/60">
+                <div className="flex items-center justify-center gap-2 max-w-7xl mx-auto px-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
+                  <h4 className="text-sm font-black text-slate-700 tracking-wider uppercase text-center">
+                    Evolução Bimestral — {metaDiscPP === 'Geral' ? '🌟 Média Geral' : metaDiscPP}
+                  </h4>
+                </div>
+                <div className="flex flex-wrap justify-center gap-8 max-w-7xl mx-auto py-2">
+                  {dadosMetasPP.bimestres.map((b) => (
+                    <SpeedometerGauge
+                      key={b.bimestre}
+                      value={b.media}
+                      metaOuro={metaOuroVal}
+                      metaDiamante={metaDiamanteVal}
+                      title={b.bimestre}
+                      subtitle={metaDiscPP === 'Geral' ? 'Média Geral' : metaDiscPP}
+                      isHighlight={false}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modal Maximizado */}
