@@ -2161,6 +2161,47 @@ const StudentProfile = ({
                       </ResponsiveContainer>
                     </div>
                   </div>
+
+                  {/* Tabela de Matérias CC Integrada */}
+                  <div className="mt-10 pt-8 border-t border-slate-100">
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas de Conselho de Classe no Período</h4>
+                    <div className="rounded-2xl overflow-hidden border border-slate-200">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200">
+                            <th className="text-left px-5 py-3.5 font-black text-slate-500 uppercase tracking-wider">Disciplina</th>
+                            <th className="px-5 py-3.5 font-black text-blue-600 uppercase tracking-wider text-center">Nota Aluno</th>
+                            <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
+                            <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Desempenho</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {chartDataMapao.map((item, idx) => {
+                            const alunoVal = item.Aluno != null ? Number(item.Aluno) : null;
+                            const turmaVal = item.Turma != null ? Number(item.Turma) : null;
+                            const diff = alunoVal != null && turmaVal != null ? (alunoVal - turmaVal).toFixed(1) : null;
+                            return (
+                              <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
+                                <td className="px-5 py-3.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
+                                <td className="px-5 py-3.5 text-center font-black text-blue-700 text-sm">
+                                  {alunoVal != null ? alunoVal.toFixed(1) : '-'}
+                                </td>
+                                <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
+                                  {turmaVal != null ? turmaVal.toFixed(1) : '-'}
+                                </td>
+                                <td className="px-5 py-3.5 text-center font-bold">
+                                  {diff != null ? (
+                                    diff >= 0 ? <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-[11px] border border-emerald-100">+{diff} vs Turma</span>
+                                              : <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-xl text-[11px] border border-rose-100">{diff} vs Turma</span>
+                                  ) : '-'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
