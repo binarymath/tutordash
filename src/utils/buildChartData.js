@@ -20,6 +20,56 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
   void provaData;
   void allStudents;
 
+  if (targetBimestre === 'evolucao') {
+    const historico = studentProfile?.historicoConceitos || [];
+    if (historico.length === 0) return [];
+
+    const discMap = new Map();
+    const studentBims = new Set();
+    historico.forEach(b => {
+      studentBims.add(b.bimestre);
+      Object.entries(b.notas || {}).forEach(([disc, notaRaw]) => {
+        const notaAluno = parseGrade(notaRaw);
+        if (notaAluno > 0 || (notaRaw && notaRaw !== '-')) {
+          if (!discMap.has(disc)) discMap.set(disc, { alunoSum: 0, alunoCnt: 0 });
+          const item = discMap.get(disc);
+          if (notaAluno > 0) {
+            item.alunoSum += notaAluno;
+            item.alunoCnt += 1;
+          }
+        }
+      });
+    });
+
+    const turmaPlanilha = historico[0]?.turmaPlanilha || studentProfile?.turma;
+    const turmaAlunos = conceitoData.filter(aluno => studentBims.has(aluno.bimestre) && (aluno.turmaPlanilha === turmaPlanilha || aluno.turma === studentProfile?.turma));
+
+    return Array.from(discMap.entries()).map(([disciplina, item]) => {
+      let turmaSum = 0;
+      let turmaCnt = 0;
+      turmaAlunos.forEach(aluno => {
+        if (aluno.notas?.[disciplina] !== undefined) {
+          const nota = parseGrade(aluno.notas[disciplina]);
+          if (nota > 0 || (aluno.notas[disciplina] && aluno.notas[disciplina] !== '-')) {
+            if (nota > 0) {
+              turmaSum += nota;
+              turmaCnt += 1;
+            }
+          }
+        }
+      });
+      const displaySub = formatDisciplina(disciplina);
+      const shortName = displaySub.length > 12 ? `${displaySub.substring(0, 10)}.` : displaySub;
+      const notaAlunoMed = item.alunoCnt > 0 ? parseFloat((item.alunoSum / item.alunoCnt).toFixed(1)) : null;
+      return {
+        subject: shortName,
+        fullSubject: displaySub,
+        Aluno: notaAlunoMed,
+        Turma: turmaCnt > 0 ? parseFloat((turmaSum / turmaCnt).toFixed(1)) : 0,
+      };
+    }).sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
+  }
+
   const bRegistro = getConceitoBimestre(studentProfile, targetBimestre);
   if (!bRegistro?.notas) return [];
 
@@ -58,6 +108,59 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
 
 export const buildChartDataProva = (studentProfile, conceitoData = [], provaData = [], allStudents = [], targetBimestre = 'ultimo') => {
   void conceitoData;
+
+  if (targetBimestre === 'evolucao') {
+    const historico = studentProfile?.historicoProvas || [];
+    if (historico.length === 0) return [];
+
+    const discMap = new Map();
+    const studentBims = new Set();
+    historico.forEach(p => {
+      studentBims.add(p.bimestre);
+      Object.entries(p.notas || {}).forEach(([disc, notaRaw]) => {
+        const notaAluno = toScale10(notaRaw);
+        if (notaAluno !== null || notaRaw) {
+          if (!discMap.has(disc)) discMap.set(disc, { alunoSum: 0, alunoCnt: 0 });
+          const item = discMap.get(disc);
+          if (notaAluno !== null) {
+            item.alunoSum += notaAluno;
+            item.alunoCnt += 1;
+          }
+        }
+      });
+    });
+
+    const studentsByName = new Map((allStudents || []).map((student) => [student.normalizedName, student]));
+    const sameTurma = provaData.filter((provaAluno) => {
+      if (provaAluno.bimestre && !studentBims.has(provaAluno.bimestre)) return false;
+      const aluno = studentsByName.get(provaAluno.normalizedName);
+      return aluno && aluno.turma === studentProfile.turma;
+    });
+
+    return Array.from(discMap.entries()).map(([disciplina, item]) => {
+      let turmaSum = 0;
+      let turmaCnt = 0;
+      sameTurma.forEach(colega => {
+        if (colega.notas?.[disciplina] !== undefined) {
+          const nota = toScale10(colega.notas[disciplina]);
+          if (nota !== null) {
+            turmaSum += nota;
+            turmaCnt += 1;
+          }
+        }
+      });
+      const displaySub = formatDisciplina(disciplina);
+      const shortName = displaySub.length > 12 ? `${displaySub.substring(0, 10)}.` : displaySub;
+      const notaAlunoMed = item.alunoCnt > 0 ? Math.round((item.alunoSum / item.alunoCnt) * 100) / 100 : null;
+      return {
+        subject: shortName,
+        fullSubject: displaySub,
+        Aluno: notaAlunoMed,
+        Turma: turmaCnt > 0 ? Math.round((turmaSum / turmaCnt) * 100) / 100 : 0,
+        naoEfetuou: notaAlunoMed === null
+      };
+    }).sort((a, b) => a.fullSubject.localeCompare(b.fullSubject));
+  }
 
   const pRegistro = getProvaBimestre(studentProfile, targetBimestre);
   if (!pRegistro?.notas) return [];

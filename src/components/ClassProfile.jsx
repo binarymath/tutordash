@@ -53,6 +53,8 @@ const ClassProfile = ({
   const [maximizedChart, setMaximizedChart] = useState(null);
   const [selectedDiscPP, setSelectedDiscPP] = useState('Geral');
   const [selectedDiscCC, setSelectedDiscCC] = useState('Geral');
+  const [evolucaoDiscPP, setEvolucaoDiscPP] = useState('Geral');
+  const [evolucaoDiscCC, setEvolucaoDiscCC] = useState('Geral');
 
   const serieLabel = useMemo(() => getSerieFromTurma(selectedTurma), [selectedTurma]);
 
@@ -136,51 +138,35 @@ const ClassProfile = ({
       mapPP.set(t, { sum: 0, count: 0 });
     });
 
-    if (targetBim === 'evolucao' || !targetBim) {
-      allStudents.forEach(s => {
-        if (!s.turma || !mapCC.has(s.turma)) return;
-        const nCC = parseFloat(String(s.consilhoBimestral || '').replace(',', '.'));
-        if (!isNaN(nCC) && nCC >= 0) {
-          const item = mapCC.get(s.turma);
-          item.sum += nCC; item.count++;
-        }
-        const nPP = parseFloat(String(s.provaPaulista || '').replace(',', '.'));
-        if (!isNaN(nPP) && nPP >= 0) {
-          const item = mapPP.get(s.turma);
-          item.sum += nPP; item.count++;
-        }
-      });
-    } else {
-      const bimLabel = targetBim.replace('º Bimestre', 'º Bi');
-      const studentTurmaMap = new Map();
-      allStudents.forEach(s => {
-        if (s.normalizedName && s.turma) studentTurmaMap.set(s.normalizedName, s.turma);
-      });
+    const bimLabel = targetBim ? targetBim.replace('º Bimestre', 'º Bi') : '';
+    const studentTurmaMap = new Map();
+    allStudents.forEach(s => {
+      if (s.normalizedName && s.turma) studentTurmaMap.set(s.normalizedName, s.turma);
+    });
 
-      conceitoData.forEach(reg => {
-        if (reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
-        const turma = reg.turmaPlanilha || studentTurmaMap.get(reg.normalizedName);
-        if (!turma || !mapCC.has(turma)) return;
-        const item = mapCC.get(turma);
+    conceitoData.forEach(reg => {
+      if (targetBim && targetBim !== 'evolucao' && reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
+      const turma = reg.turmaPlanilha || studentTurmaMap.get(reg.normalizedName);
+      if (!turma || !mapCC.has(turma)) return;
+      const item = mapCC.get(turma);
 
-        Object.values(reg.notas || {}).forEach(valRaw => {
-          const n = parseGrade(valRaw);
-          if (n > 0) { item.sum += n; item.count++; }
-        });
+      Object.values(reg.notas || {}).forEach(valRaw => {
+        const n = parseGrade(valRaw);
+        if (n > 0) { item.sum += n; item.count++; }
       });
+    });
 
-      provaData.forEach(reg => {
-        if (reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
-        const turma = reg.turmaPlanilha || studentTurmaMap.get(reg.normalizedName);
-        if (!turma || !mapPP.has(turma)) return;
-        const item = mapPP.get(turma);
+    provaData.forEach(reg => {
+      if (targetBim && targetBim !== 'evolucao' && reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
+      const turma = reg.turmaPlanilha || studentTurmaMap.get(reg.normalizedName);
+      if (!turma || !mapPP.has(turma)) return;
+      const item = mapPP.get(turma);
 
-        Object.values(reg.notas || {}).forEach(valRaw => {
-          const n = toScale10(valRaw);
-          if (n !== null) { item.sum += n; item.count++; }
-        });
+      Object.values(reg.notas || {}).forEach(valRaw => {
+        const n = toScale10(valRaw);
+        if (n !== null && n > 0) { item.sum += n; item.count++; }
       });
-    }
+    });
 
     const rankingCC = allTurmasSorted
       .map(t => {
@@ -235,13 +221,36 @@ const ClassProfile = ({
   }, [selectedTurma, provaData, allStudents, selectedBimestre]);
 
   const disciplineRankingData = useMemo(() => {
+    const studentsInSerie = allStudents.filter(s => getSerieFromTurma(s.turma) === serieLabel);
+    const normNamesSerieSet = new Set(studentsInSerie.map(s => s.normalizedName));
+
     const discSetPP = new Set();
-    chartDataProva.forEach(item => discSetPP.add(item.fullSubject || item.subject));
+    provaData.forEach(reg => {
+      const isSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === serieLabel;
+      if (!isSerie || !reg.notas) return;
+      Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
+        const n = toScale10(valRaw);
+        if (n !== null && n > 0) {
+          const d = formatDisciplina(k);
+          if (d) discSetPP.add(d);
+        }
+      });
+    });
     const listDiscsPP = ['Geral', ...Array.from(discSetPP).sort()];
     const currentDiscPP = listDiscsPP.includes(selectedDiscPP) ? selectedDiscPP : 'Geral';
 
     const discSetCC = new Set();
-    chartDataMapao.forEach(item => discSetCC.add(item.fullSubject || item.subject));
+    conceitoData.forEach(reg => {
+      const isSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === serieLabel;
+      if (!isSerie || !reg.notas) return;
+      Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
+        const n = parseGrade(valRaw);
+        if (n > 0) {
+          const d = formatDisciplina(k);
+          if (d) discSetCC.add(d);
+        }
+      });
+    });
     const listDiscsCC = ['Geral', ...Array.from(discSetCC).sort()];
     const currentDiscCC = listDiscsCC.includes(selectedDiscCC) ? selectedDiscCC : 'Geral';
 
@@ -262,26 +271,64 @@ const ClassProfile = ({
       if (s.normalizedName && s.turma) studentTurmaMap.set(s.normalizedName, s.turma);
     });
 
+    const studentMapPP = new Map();
+    const studentMapCC = new Map();
+    if (targetBim === 'evolucao') {
+      provaData.forEach(reg => {
+        if (!reg.normalizedName || !reg.notas) return;
+        if (!studentMapPP.has(reg.normalizedName)) studentMapPP.set(reg.normalizedName, { sum: 0, cnt: 0 });
+        const st = studentMapPP.get(reg.normalizedName);
+        Object.values(reg.notas).forEach(valRaw => {
+          const n = toScale10(valRaw);
+          if (n !== null && n > 0) { st.sum += n; st.cnt++; }
+        });
+      });
+      conceitoData.forEach(reg => {
+        if (!reg.normalizedName || !reg.notas) return;
+        if (!studentMapCC.has(reg.normalizedName)) studentMapCC.set(reg.normalizedName, { sum: 0, cnt: 0 });
+        const st = studentMapCC.get(reg.normalizedName);
+        Object.values(reg.notas).forEach(valRaw => {
+          const n = parseGrade(valRaw);
+          if (n > 0) { st.sum += n; st.cnt++; }
+        });
+      });
+    }
+
+    const getStudentValPP = (s) => {
+      if (targetBim === 'evolucao' && studentMapPP.has(s.normalizedName)) {
+        const st = studentMapPP.get(s.normalizedName);
+        return st.cnt > 0 ? parseFloat((st.sum / st.cnt).toFixed(2)) : null;
+      }
+      const val = parseFloat(String(s.provaPaulista || '').replace(',', '.'));
+      return isNaN(val) ? null : val;
+    };
+
+    const getStudentValCC = (s) => {
+      if (targetBim === 'evolucao' && studentMapCC.has(s.normalizedName)) {
+        const st = studentMapCC.get(s.normalizedName);
+        return st.cnt > 0 ? parseFloat((st.sum / st.cnt).toFixed(1)) : null;
+      }
+      const val = parseFloat(String(s.consilhoBimestral || '').replace(',', '.'));
+      return isNaN(val) ? null : val;
+    };
+
     // --- PROVA PAULISTA ---
     let turmaMediaPP = '-', escolaMediaPP = '-', rankPP = '-', totalPP = 1, rankSeriePP = '-', totalSeriePP = 1, topPP = [];
     if (currentDiscPP === 'Geral') {
       const listPP = studentsInTurma
-        .map(s => {
-          const val = parseFloat(String(s.provaPaulista || '').replace(',', '.'));
-          return { ...s, val: isNaN(val) ? null : val };
-        })
+        .map(s => ({ ...s, val: getStudentValPP(s) }))
         .filter(s => s.val !== null && s.situacao === 'Ativo')
         .sort((a, b) => b.val - a.val);
 
       const schoolPP = allStudents
-        .map(s => parseFloat(String(s.provaPaulista || '').replace(',', '.')))
-        .filter(n => !isNaN(n))
+        .map(s => getStudentValPP(s))
+        .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelPP = allStudents
         .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
-        .map(s => parseFloat(String(s.provaPaulista || '').replace(',', '.')))
-        .filter(n => !isNaN(n))
+        .map(s => getStudentValPP(s))
+        .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       turmaMediaPP = rankingMetrics.mediaTurmaPP !== null ? rankingMetrics.mediaTurmaPP.toFixed(2) : '-';
@@ -332,9 +379,24 @@ const ClassProfile = ({
       totalSeriePP = rankListPPSerie.length || 1;
 
       const getStudentDiscGradePP = (student) => {
-        let nota = null;
         const hist = student.historicoProvas || [];
-        const bimObj = targetBim === 'evolucao' || !targetBim
+        if (targetBim === 'evolucao') {
+          let sum = 0, count = 0;
+          hist.forEach(h => {
+            if (h?.notas) {
+              Object.entries(h.notas).forEach(([disc, valRaw]) => {
+                const disp = formatDisciplina(disc);
+                if (disp === currentDiscPP || (disp.length > 12 && `${disp.substring(0, 10)}.` === currentDiscPP)) {
+                  const n = toScale10(valRaw);
+                  if (n !== null && n > 0) { sum += n; count++; }
+                }
+              });
+            }
+          });
+          return count > 0 ? parseFloat((sum / count).toFixed(2)) : null;
+        }
+        let nota = null;
+        const bimObj = !targetBim
           ? hist[hist.length - 1]
           : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim) || hist[hist.length - 1];
         if (bimObj?.notas) {
@@ -372,22 +434,19 @@ const ClassProfile = ({
     let turmaMediaCC = '-', escolaMediaCC = '-', rankCC = '-', totalCC = 1, rankSerieCC = '-', totalSerieCC = 1, topCC = [];
     if (currentDiscCC === 'Geral') {
       const listCC = studentsInTurma
-        .map(s => {
-          const val = parseFloat(String(s.consilhoBimestral || '').replace(',', '.'));
-          return { ...s, val: isNaN(val) ? null : val };
-        })
+        .map(s => ({ ...s, val: getStudentValCC(s) }))
         .filter(s => s.val !== null && s.situacao === 'Ativo')
         .sort((a, b) => b.val - a.val);
 
       const schoolCC = allStudents
-        .map(s => parseFloat(String(s.consilhoBimestral || '').replace(',', '.')))
-        .filter(n => !isNaN(n))
+        .map(s => getStudentValCC(s))
+        .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       const levelCC = allStudents
         .filter(s => getSerieFromTurma(s.turma || studentTurmaMap.get(s.normalizedName)) === serieLabel)
-        .map(s => parseFloat(String(s.consilhoBimestral || '').replace(',', '.')))
-        .filter(n => !isNaN(n))
+        .map(s => getStudentValCC(s))
+        .filter(n => n !== null)
         .sort((a, b) => b - a);
 
       turmaMediaCC = rankingMetrics.mediaTurmaCC !== null ? rankingMetrics.mediaTurmaCC.toFixed(1) : '-';
@@ -438,9 +497,24 @@ const ClassProfile = ({
       totalSerieCC = rankListCCSerie.length || 1;
 
       const getStudentDiscGradeCC = (student) => {
-        let nota = null;
         const hist = student.historicoConceitos || [];
-        const bimObj = targetBim === 'evolucao' || !targetBim
+        if (targetBim === 'evolucao') {
+          let sum = 0, count = 0;
+          hist.forEach(h => {
+            if (h?.notas) {
+              Object.entries(h.notas).forEach(([disc, valRaw]) => {
+                const disp = formatDisciplina(disc);
+                if (disp === currentDiscCC || (disp.length > 12 && `${disp.substring(0, 10)}.` === currentDiscCC)) {
+                  const n = parseGrade(valRaw);
+                  if (n > 0) { sum += n; count++; }
+                }
+              });
+            }
+          });
+          return count > 0 ? parseFloat((sum / count).toFixed(1)) : null;
+        }
+        let nota = null;
+        const bimObj = !targetBim
           ? hist[hist.length - 1]
           : hist.find(h => h.bimestre === bimLabel || h.bimestre === targetBim) || hist[hist.length - 1];
         if (bimObj?.notas) {
@@ -474,9 +548,92 @@ const ClassProfile = ({
       topCC = listCC.map(s => ({ ...s, schoolRank: getSchoolRank(s.val, schoolCC), levelRank: getSchoolRank(s.val, levelCC) })).slice(0, 10);
     }
 
+    const calcSummaryList = (listDiscs, data, isPP) => {
+      const result = [];
+      listDiscs.forEach(disc => {
+        if (disc === 'Geral') {
+          if (isPP) {
+            result.push({
+              subject: 'Geral',
+              label: '🌟 Média Geral',
+              media: rankingMetrics.mediaTurmaPP !== null ? rankingMetrics.mediaTurmaPP.toFixed(2) : '-',
+              rank: rankingMetrics.rankPP,
+              total: rankingMetrics.totalPP,
+              rankSerie: rankingMetrics.rankPPSerie,
+              totalSerie: rankingMetrics.totalPPSerie
+            });
+          } else {
+            result.push({
+              subject: 'Geral',
+              label: '🌟 Média Geral',
+              media: rankingMetrics.mediaTurmaCC !== null ? rankingMetrics.mediaTurmaCC.toFixed(1) : '-',
+              rank: rankingMetrics.rankCC,
+              total: rankingMetrics.totalCC,
+              rankSerie: rankingMetrics.rankCCSerie,
+              totalSerie: rankingMetrics.totalCCSerie
+            });
+          }
+          return;
+        }
+
+        const turmaSum = new Map(), turmaCnt = new Map();
+        allTurmasSorted.forEach(t => { turmaSum.set(t, 0); turmaCnt.set(t, 0); });
+
+        data.forEach(reg => {
+          if (targetBim !== 'evolucao' && reg.bimestre !== bimLabel && reg.bimestre !== targetBim) return;
+          const turma = reg.turmaPlanilha || studentTurmaMap.get(reg.normalizedName);
+          if (!turma || !turmaSum.has(turma)) return;
+
+          Object.entries(reg.notas || {}).forEach(([d, valRaw]) => {
+            const disp = formatDisciplina(d);
+            if (disp === disc || (disp.length > 12 && `${disp.substring(0, 10)}.` === disc)) {
+              const n = isPP ? toScale10(valRaw) : parseGrade(valRaw);
+              if (n !== null && (isPP || n > 0)) {
+                turmaSum.set(turma, turmaSum.get(turma) + n);
+                turmaCnt.set(turma, turmaCnt.get(turma) + 1);
+              }
+            }
+          });
+        });
+
+        const rankList = allTurmasSorted
+          .map(t => {
+            const cnt = turmaCnt.get(t);
+            return { turma: t, serie: getSerieFromTurma(t), media: cnt > 0 ? turmaSum.get(t) / cnt : null };
+          })
+          .filter(x => x.media !== null)
+          .sort((a, b) => b.media - a.media);
+
+        const pos = rankList.findIndex(x => x.turma === selectedTurma);
+        const decimals = isPP ? 2 : 1;
+        const media = pos !== -1 ? rankList[pos].media.toFixed(decimals) : '-';
+        const rank = pos !== -1 ? pos + 1 : '-';
+        const total = rankList.length || 1;
+
+        const rankListSerie = rankList.filter(x => x.serie === serieLabel);
+        const posSerie = rankListSerie.findIndex(x => x.turma === selectedTurma);
+        const rankSerie = posSerie !== -1 ? posSerie + 1 : '-';
+        const totalSerie = rankListSerie.length || 1;
+
+        result.push({
+          subject: disc,
+          label: disc,
+          media,
+          rank,
+          total,
+          rankSerie,
+          totalSerie
+        });
+      });
+      return result;
+    };
+
+    const summaryListPP = calcSummaryList(listDiscsPP, provaData, true);
+    const summaryListCC = calcSummaryList(listDiscsCC, conceitoData, false);
+
     return {
-      pp: { listDiscs: listDiscsPP, currentDisc: currentDiscPP, turmaMedia: turmaMediaPP, escolaMedia: escolaMediaPP, rank: rankPP, total: totalPP, rankSerie: rankSeriePP, totalSerie: totalSeriePP, top: topPP },
-      cc: { listDiscs: listDiscsCC, currentDisc: currentDiscCC, turmaMedia: turmaMediaCC, escolaMedia: escolaMediaCC, rank: rankCC, total: totalCC, rankSerie: rankSerieCC, totalSerie: totalSerieCC, top: topCC }
+      pp: { listDiscs: listDiscsPP, currentDisc: currentDiscPP, turmaMedia: turmaMediaPP, escolaMedia: escolaMediaPP, rank: rankPP, total: totalPP, rankSerie: rankSeriePP, totalSerie: totalSeriePP, top: topPP, summaryList: summaryListPP },
+      cc: { listDiscs: listDiscsCC, currentDisc: currentDiscCC, turmaMedia: turmaMediaCC, escolaMedia: escolaMediaCC, rank: rankCC, total: totalCC, rankSerie: rankSerieCC, totalSerie: totalSerieCC, top: topCC, summaryList: summaryListCC }
     };
   }, [chartDataMapao, chartDataProva, selectedDiscPP, selectedDiscCC, studentsInTurma, allStudents, selectedBimestre, bimestresDisponiveis, allTurmasSorted, conceitoData, provaData, selectedTurma, rankingMetrics, serieLabel]);
 
@@ -488,22 +645,41 @@ const ClassProfile = ({
     const mapCC = new Map();
     const mapPP = new Map();
 
+    mapCC.set('🌟 Média Geral', { fullSubject: '🌟 Média Geral', subject: '🌟 Geral' });
+    mapPP.set('🌟 Média Geral', { fullSubject: '🌟 Média Geral', subject: '🌟 Geral' });
+
+    disciplineRankingData.cc.listDiscs.forEach(disp => {
+      if (disp !== 'Geral') {
+        mapCC.set(disp, { fullSubject: disp, subject: disp.length > 12 ? `${disp.substring(0,10)}.` : disp });
+      }
+    });
+    disciplineRankingData.pp.listDiscs.forEach(disp => {
+      if (disp !== 'Geral') {
+        mapPP.set(disp, { fullSubject: disp, subject: disp.length > 12 ? `${disp.substring(0,10)}.` : disp });
+      }
+    });
+
     conceitoData.forEach(reg => {
       const isTurma = normSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
       if (!isTurma || !reg.notas || !reg.bimestre) return;
 
+      const geralCC = mapCC.get('🌟 Média Geral');
       Object.entries(reg.notas).forEach(([disc, valRaw]) => {
         const n = parseGrade(valRaw);
         if (n > 0 || (valRaw && valRaw !== '-')) {
           const val = n > 0 ? n : 0;
-          if (!mapCC.has(disc)) {
-            const disp = formatDisciplina(disc);
-            mapCC.set(disc, { fullSubject: disp, subject: disp.length > 12 ? `${disp.substring(0,10)}.` : disp });
+          if (n > 0) {
+            if (!geralCC[reg.bimestre]) geralCC[reg.bimestre] = { sum: 0, cnt: 0 };
+            geralCC[reg.bimestre].sum += val;
+            geralCC[reg.bimestre].cnt += 1;
           }
-          const item = mapCC.get(disc);
-          if (!item[reg.bimestre]) item[reg.bimestre] = { sum: 0, cnt: 0 };
-          item[reg.bimestre].sum += val;
-          item[reg.bimestre].cnt += 1;
+          const disp = formatDisciplina(disc);
+          const item = mapCC.get(disp);
+          if (item) {
+            if (!item[reg.bimestre]) item[reg.bimestre] = { sum: 0, cnt: 0 };
+            item[reg.bimestre].sum += val;
+            item[reg.bimestre].cnt += 1;
+          }
         }
       });
     });
@@ -512,22 +688,26 @@ const ClassProfile = ({
       const isTurma = normSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
       if (!isTurma || !reg.notas || !reg.bimestre) return;
 
+      const geralPP = mapPP.get('🌟 Média Geral');
       Object.entries(reg.notas).forEach(([disc, valRaw]) => {
         const n = toScale10(valRaw);
         if (n !== null) {
-          if (!mapPP.has(disc)) {
-            const disp = formatDisciplina(disc);
-            mapPP.set(disc, { fullSubject: disp, subject: disp.length > 12 ? `${disp.substring(0,10)}.` : disp });
+          if (!geralPP[reg.bimestre]) geralPP[reg.bimestre] = { sum: 0, cnt: 0 };
+          geralPP[reg.bimestre].sum += n;
+          geralPP[reg.bimestre].cnt += 1;
+
+          const disp = formatDisciplina(disc);
+          const item = mapPP.get(disp);
+          if (item) {
+            if (!item[reg.bimestre]) item[reg.bimestre] = { sum: 0, cnt: 0 };
+            item[reg.bimestre].sum += n;
+            item[reg.bimestre].cnt += 1;
           }
-          const item = mapPP.get(disc);
-          if (!item[reg.bimestre]) item[reg.bimestre] = { sum: 0, cnt: 0 };
-          item[reg.bimestre].sum += n;
-          item[reg.bimestre].cnt += 1;
         }
       });
     });
 
-    const cc = Array.from(mapCC.values()).map(item => {
+    const ccList = Array.from(mapCC.values()).map(item => {
       const res = { subject: item.subject, fullSubject: item.fullSubject };
       bimestresDisponiveis.forEach(b => {
         if (item[b] && item[b].cnt > 0) {
@@ -538,8 +718,11 @@ const ClassProfile = ({
       });
       return res;
     });
+    const ccGeral = ccList.find(x => x.fullSubject === '🌟 Média Geral');
+    const ccDiscs = ccList.filter(x => x.fullSubject !== '🌟 Média Geral').sort((a,b) => a.fullSubject.localeCompare(b.fullSubject));
+    const cc = ccGeral ? [ccGeral, ...ccDiscs] : ccDiscs;
 
-    const pp = Array.from(mapPP.values()).map(item => {
+    const ppList = Array.from(mapPP.values()).map(item => {
       const res = { subject: item.subject, fullSubject: item.fullSubject };
       bimestresDisponiveis.forEach(b => {
         if (item[b] && item[b].cnt > 0) {
@@ -550,9 +733,56 @@ const ClassProfile = ({
       });
       return res;
     });
+    const ppGeral = ppList.find(x => x.fullSubject === '🌟 Média Geral');
+    const ppDiscs = ppList.filter(x => x.fullSubject !== '🌟 Média Geral').sort((a,b) => a.fullSubject.localeCompare(b.fullSubject));
+    const pp = ppGeral ? [ppGeral, ...ppDiscs] : ppDiscs;
 
     return { cc, pp };
-  }, [selectedTurma, conceitoData, provaData, allStudents, bimestresDisponiveis]);
+  }, [selectedTurma, conceitoData, provaData, allStudents, bimestresDisponiveis, disciplineRankingData]);
+
+  const disciplineEvolutionData = useMemo(() => {
+    if (!selectedTurma) return { pp: [], cc: [] };
+    const targetSerie = getSerieFromTurma(selectedTurma);
+    const studentsInTurma = allStudents.filter(s => s.turma === selectedTurma);
+    const studentsInSerie = allStudents.filter(s => getSerieFromTurma(s.turma) === targetSerie);
+    const normNamesTurmaSet = new Set(studentsInTurma.map(s => s.normalizedName));
+    const normNamesSerieSet = new Set(studentsInSerie.map(s => s.normalizedName));
+
+    const getEvolutionForPillar = (data, selectedDisc, isPP) => {
+      return bimestresDisponiveis.map(bim => {
+        const regs = data.filter(r => r.bimestre === bim && r.notas);
+        let turmaSum = 0, turmaCnt = 0, serieSum = 0, serieCnt = 0;
+        regs.forEach(reg => {
+          const isTurma = normNamesTurmaSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
+          const isSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === targetSerie;
+          if (!isSerie) return;
+
+          Object.entries(reg.notas || {}).forEach(([disc, valRaw]) => {
+            const disp = formatDisciplina(disc);
+            const matchDisc = selectedDisc === 'Geral' || disp === selectedDisc || (disp.length > 12 && `${disp.substring(0, 10)}.` === selectedDisc);
+            if (matchDisc) {
+              const n = isPP ? toScale10(valRaw) : parseGrade(valRaw);
+              if (n !== null && (isPP || n > 0)) {
+                serieSum += n; serieCnt++;
+                if (isTurma) { turmaSum += n; turmaCnt++; }
+              }
+            }
+          });
+        });
+        const decimals = isPP ? 2 : 1;
+        return {
+          bimestre: bim.replace('º Bimestre', 'º Bi'),
+          turmaMedia: turmaCnt > 0 ? parseFloat((turmaSum / turmaCnt).toFixed(decimals)) : 0,
+          serieMedia: serieCnt > 0 ? parseFloat((serieSum / serieCnt).toFixed(decimals)) : 0,
+        };
+      });
+    };
+
+    return {
+      pp: getEvolutionForPillar(provaData, evolucaoDiscPP, true),
+      cc: getEvolutionForPillar(conceitoData, evolucaoDiscCC, false)
+    };
+  }, [selectedTurma, evolucaoDiscPP, evolucaoDiscCC, conceitoData, provaData, allStudents, bimestresDisponiveis]);
 
   const activeBimestreLabel = useMemo(() => {
     if (selectedBimestre === 'evolucao') return 'Evolução Comparativa Histórica';
@@ -925,30 +1155,65 @@ const ClassProfile = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             {/* Evolução CC Turma */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative min-h-[380px]" data-chart>
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative min-h-[420px]" data-chart>
               <div className="absolute top-4 right-4 flex items-center gap-1">
                 <button
-                  onClick={() => setMaximizedChart({ type: 'evolucaoCC', title: `Evolução Média Geral — Conselho (Turma ${selectedTurma})` })}
+                  onClick={() => setMaximizedChart({ type: 'evolucaoCC', title: `Evolução — ${evolucaoDiscCC} — Conselho (Turma ${selectedTurma})` })}
                   className="p-2 rounded-xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
                   title="Maximizar gráfico"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
               </div>
-              <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-12">Evolução Média Geral — Conselho</h4>
+              <div className="flex items-center justify-center gap-2 mb-3 pr-12">
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center flex items-center gap-1.5 flex-wrap justify-center">
+                  <span>Conselho — Evolução Comparativa</span>
+                  <button
+                    onClick={() => setEvolucaoDiscCC('Geral')}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all ${
+                      evolucaoDiscCC === 'Geral'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100 underline cursor-pointer'
+                    }`}
+                  >
+                    🌟 Média Geral
+                  </button>
+                  {evolucaoDiscCC !== 'Geral' && (
+                    <span className="text-slate-700">({evolucaoDiscCC})</span>
+                  )}
+                </h4>
+              </div>
+
+              {/* Seletor de Disciplina para Evolução CC */}
+              <div className="flex items-center justify-center gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
+                {disciplineRankingData.cc.listDiscs.map(disc => (
+                  <button
+                    key={disc}
+                    onClick={() => setEvolucaoDiscCC(disc)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+                      evolucaoDiscCC === disc
+                        ? 'bg-blue-600 text-white shadow-sm scale-[1.02]'
+                        : 'bg-slate-50 text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/60'
+                    }`}
+                  >
+                    {disc === 'Geral' ? '🌟 Média Geral' : disc}
+                  </button>
+                ))}
+              </div>
+
               <div style={{ position: 'relative', width: '100%', height: '320px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+                  <BarChart data={disciplineEvolutionData.cc} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
                     <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                    <Bar name="Média da Turma" dataKey="ccTurma" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={45}>
-                      <LabelList dataKey="ccTurma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+                    <Bar name="Média da Turma" dataKey="turmaMedia" fill="#3b82f6" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                      <LabelList dataKey="turmaMedia" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#3b82f6' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
                     </Bar>
-                    <Bar name={`Média (${serieLabel})`} dataKey="ccEscola" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={45}>
-                      <LabelList dataKey="ccEscola" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
+                    <Bar name={`Média Nível (${serieLabel})`} dataKey="serieMedia" fill="#cbd5e1" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                      <LabelList dataKey="serieMedia" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(1) : '-'} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -956,30 +1221,65 @@ const ClassProfile = ({
             </div>
 
             {/* Evolução PP Turma */}
-            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative min-h-[380px]" data-chart>
+            <div className="bg-white p-6 md:p-8 rounded-3xl border border-slate-200 shadow-sm relative min-h-[420px]" data-chart>
               <div className="absolute top-4 right-4 flex items-center gap-1">
                 <button
-                  onClick={() => setMaximizedChart({ type: 'evolucaoPP', title: `Evolução Média Geral — Prova Paulista (Turma ${selectedTurma})` })}
+                  onClick={() => setMaximizedChart({ type: 'evolucaoPP', title: `Evolução — ${evolucaoDiscPP} — Prova Paulista (Turma ${selectedTurma})` })}
                   className="p-2 rounded-xl text-slate-400 hover:text-sky-600 hover:bg-sky-50 transition-colors"
                   title="Maximizar gráfico"
                 >
                   <Maximize2 className="w-4 h-4" />
                 </button>
               </div>
-              <h4 className="text-xs font-black text-slate-500 uppercase mb-6 tracking-widest text-center pr-12">Evolução Média Geral — Prova Paulista</h4>
+              <div className="flex items-center justify-center gap-2 mb-3 pr-12">
+                <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center flex items-center gap-1.5 flex-wrap justify-center">
+                  <span>Prova Paulista — Evolução Comparativa</span>
+                  <button
+                    onClick={() => setEvolucaoDiscPP('Geral')}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all ${
+                      evolucaoDiscPP === 'Geral'
+                        ? 'bg-sky-600 text-white shadow-2xs'
+                        : 'bg-sky-50 text-sky-600 hover:bg-sky-100 underline cursor-pointer'
+                    }`}
+                  >
+                    🌟 Média Geral
+                  </button>
+                  {evolucaoDiscPP !== 'Geral' && (
+                    <span className="text-slate-700">({evolucaoDiscPP})</span>
+                  )}
+                </h4>
+              </div>
+
+              {/* Seletor de Disciplina para Evolução PP */}
+              <div className="flex items-center justify-center gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
+                {disciplineRankingData.pp.listDiscs.map(disc => (
+                  <button
+                    key={disc}
+                    onClick={() => setEvolucaoDiscPP(disc)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
+                      evolucaoDiscPP === disc
+                        ? 'bg-sky-600 text-white shadow-sm scale-[1.02]'
+                        : 'bg-slate-50 text-slate-500 hover:text-slate-800 hover:bg-slate-100 border border-slate-200/60'
+                    }`}
+                  >
+                    {disc === 'Geral' ? '🌟 Média Geral' : disc}
+                  </button>
+                ))}
+              </div>
+
               <div style={{ position: 'relative', width: '100%', height: '320px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={evolucaoDados} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
+                  <BarChart data={disciplineEvolutionData.pp} margin={{ top: 25, right: 10, left: -20, bottom: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 10]} tick={{ fill: '#cbd5e1', fontSize: 10 }} axisLine={false} tickLine={false} />
                     <RechartsTooltip cursor={{ fill: '#f8fafc' }} content={<CustomTooltip />} />
                     <Legend verticalAlign="top" align="center" wrapperStyle={{ fontSize: '11px', fontWeight: 'bold', paddingBottom: '15px' }} />
-                    <Bar name="Média da Turma" dataKey="ppTurma" fill="#0ea5e9" radius={[6, 6, 0, 0]} maxBarSize={45}>
-                      <LabelList dataKey="ppTurma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+                    <Bar name="Média da Turma" dataKey="turmaMedia" fill="#0ea5e9" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                      <LabelList dataKey="turmaMedia" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#0ea5e9' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
                     </Bar>
-                    <Bar name={`Média (${serieLabel})`} dataKey="ppEscola" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={45}>
-                      <LabelList dataKey="ppEscola" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
+                    <Bar name={`Média Nível (${serieLabel})`} dataKey="serieMedia" fill="#94a3b8" radius={[6, 6, 0, 0]} maxBarSize={45}>
+                      <LabelList dataKey="serieMedia" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#64748b' }} formatter={(v) => v > 0 ? Number(v).toFixed(2) : '-'} />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -1321,10 +1621,10 @@ const ClassProfile = ({
                               {s.tutor || 'Sem Tutor'}
                             </span>
                             <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              🏫 #{s.schoolRank} Geral
+                              🏫 #{s.schoolRank} {disciplineRankingData.pp.currentDisc === 'Geral' ? 'Geral' : 'na Escola'}
                             </span>
                             <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              🎯 #{s.levelRank} Nível
+                              🎯 #{s.levelRank} no Nível
                             </span>
                           </div>
                         </div>
@@ -1417,10 +1717,10 @@ const ClassProfile = ({
                               {s.tutor || 'Sem Tutor'}
                             </span>
                             <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              🏫 #{s.schoolRank} Geral
+                              🏫 #{s.schoolRank} {disciplineRankingData.cc.currentDisc === 'Geral' ? 'Geral' : 'na Escola'}
                             </span>
                             <span className="text-[9px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded flex items-center gap-1">
-                              🎯 #{s.levelRank} Nível
+                              🎯 #{s.levelRank} no Nível
                             </span>
                           </div>
                         </div>
