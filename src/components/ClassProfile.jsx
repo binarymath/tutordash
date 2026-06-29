@@ -60,6 +60,8 @@ const ClassProfile = ({
   const [metaOuroVal, setMetaOuroVal] = useState(7.5);
   const [metaDiamanteVal, setMetaDiamanteVal] = useState(8.5);
   const [metaFiltroAlunos, setMetaFiltroAlunos] = useState('todos');
+  const [faixaDestaquePP, setFaixaDestaquePP] = useState('1-10');
+  const [faixaDestaqueCC, setFaixaDestaqueCC] = useState('1-10');
 
   const serieLabel = useMemo(() => getSerieFromTurma(selectedTurma), [selectedTurma]);
 
@@ -235,7 +237,7 @@ const ClassProfile = ({
       if (!isSerie || !reg.notas) return;
       Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
         const n = toScale10(valRaw);
-        if (n !== null && n > 0) {
+        if ((n !== null && n >= 0) || (valRaw !== undefined && valRaw !== null && valRaw !== '' && valRaw !== '-')) {
           const d = formatDisciplina(k);
           if (d) discSetPP.add(d);
         }
@@ -250,7 +252,7 @@ const ClassProfile = ({
       if (!isSerie || !reg.notas) return;
       Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
         const n = parseGrade(valRaw);
-        if (n > 0) {
+        if (n > 0 || (valRaw !== undefined && valRaw !== null && valRaw !== '' && valRaw !== '-')) {
           const d = formatDisciplina(k);
           if (d) discSetCC.add(d);
         }
@@ -412,7 +414,7 @@ const ClassProfile = ({
       totalPP = rankingMetrics.totalPP;
       rankSeriePP = rankingMetrics.rankPPSerie;
       totalSeriePP = rankingMetrics.totalPPSerie;
-      topPP = listPP.map(s => ({ ...s, schoolRank: getSchoolRank(s.val, schoolPP), levelRank: getSchoolRank(s.val, levelPP) })).slice(0, 10);
+      topPP = listPP.map((s, idx) => ({ ...s, turmaRank: idx + 1, schoolRank: getSchoolRank(s.val, schoolPP), levelRank: getSchoolRank(s.val, levelPP) }));
     } else {
       const turmaSumPP = new Map(), turmaCntPP = new Map();
       allTurmasSorted.forEach(t => { turmaSumPP.set(t, 0); turmaCntPP.set(t, 0); });
@@ -503,7 +505,7 @@ const ClassProfile = ({
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
-      topPP = listPP.map(s => ({ ...s, schoolRank: getSchoolRank(s.val, schoolPP), levelRank: getSchoolRank(s.val, levelPP) })).slice(0, 10);
+      topPP = listPP.map((s, idx) => ({ ...s, turmaRank: idx + 1, schoolRank: getSchoolRank(s.val, schoolPP), levelRank: getSchoolRank(s.val, levelPP) }));
     }
 
     // --- CONSELHO DE CLASSE ---
@@ -532,7 +534,7 @@ const ClassProfile = ({
       totalCC = rankingMetrics.totalCC;
       rankSerieCC = rankingMetrics.rankCCSerie;
       totalSerieCC = rankingMetrics.totalCCSerie;
-      topCC = listCC.map(s => ({ ...s, schoolRank: getSchoolRank(s.val, schoolCC), levelRank: getSchoolRank(s.val, levelCC) })).slice(0, 10);
+      topCC = listCC.map((s, idx) => ({ ...s, turmaRank: idx + 1, schoolRank: getSchoolRank(s.val, schoolCC), levelRank: getSchoolRank(s.val, levelCC) }));
     } else {
       const turmaSumCC = new Map(), turmaCntCC = new Map();
       allTurmasSorted.forEach(t => { turmaSumCC.set(t, 0); turmaCntCC.set(t, 0); });
@@ -623,7 +625,7 @@ const ClassProfile = ({
         .filter(n => n !== null)
         .sort((a, b) => b - a);
 
-      topCC = listCC.map(s => ({ ...s, schoolRank: getSchoolRank(s.val, schoolCC), levelRank: getSchoolRank(s.val, levelCC) })).slice(0, 10);
+      topCC = listCC.map((s, idx) => ({ ...s, turmaRank: idx + 1, schoolRank: getSchoolRank(s.val, schoolCC), levelRank: getSchoolRank(s.val, levelCC) }));
     }
 
     const calcSummaryList = (listDiscs, data, isPP) => {
@@ -840,7 +842,7 @@ const ClassProfile = ({
             const matchDisc = selectedDisc === 'Geral' || disp === selectedDisc || (disp.length > 12 && `${disp.substring(0, 10)}.` === selectedDisc);
             if (matchDisc) {
               const n = isPP ? toScale10(valRaw) : parseGrade(valRaw);
-              if (n !== null && (isPP || n > 0)) {
+              if (n !== null && n >= 0) {
                 serieSum += n; serieCnt++;
                 if (isTurma) { turmaSum += n; turmaCnt++; }
               }
@@ -863,17 +865,24 @@ const ClassProfile = ({
   }, [selectedTurma, evolucaoDiscPP, evolucaoDiscCC, conceitoData, provaData, allStudents, bimestresDisponiveis]);
 
   const allDisciplinesPP = useMemo(() => {
+    if (!selectedTurma) return ['Geral'];
+    const studentsInTurma = allStudents.filter(s => s.turma === selectedTurma);
+    const normNamesTurmaSet = new Set(studentsInTurma.map(s => s.normalizedName));
+
     const set = new Set();
     provaData.forEach(reg => {
-      if (reg?.notas) {
-        Object.keys(reg.notas).forEach(k => {
+      const isTurma = normNamesTurmaSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
+      if (!isTurma || !reg?.notas) return;
+      Object.entries(reg.notas).forEach(([k, valRaw]) => {
+        const n = toScale10(valRaw);
+        if ((n !== null && n >= 0) || (valRaw !== undefined && valRaw !== null && valRaw !== '' && valRaw !== '-')) {
           const d = formatDisciplina(k);
           if (d) set.add(d);
-        });
-      }
+        }
+      });
     });
     return ['Geral', ...Array.from(set).sort()];
-  }, [provaData]);
+  }, [provaData, selectedTurma, allStudents]);
 
   const dadosMetasPP = useMemo(() => {
     if (!selectedTurma) return { geral: 0, bimestres: [] };
@@ -1317,24 +1326,14 @@ const ClassProfile = ({
               <div className="flex items-center justify-center gap-2 mb-3 pr-12">
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center flex items-center gap-1.5 flex-wrap justify-center">
                   <span>Conselho — Evolução Comparativa</span>
-                  <button
-                    onClick={() => setEvolucaoDiscCC('Geral')}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all ${
-                      evolucaoDiscCC === 'Geral'
-                        ? 'bg-blue-600 text-white shadow-2xs'
-                        : 'bg-blue-50 text-blue-600 hover:bg-blue-100 underline cursor-pointer'
-                    }`}
-                  >
-                    🌟 Média Geral
-                  </button>
                   {evolucaoDiscCC !== 'Geral' && (
-                    <span className="text-slate-700">({evolucaoDiscCC})</span>
+                    <span className="text-blue-600 font-extrabold">— {evolucaoDiscCC}</span>
                   )}
                 </h4>
               </div>
 
               {/* Seletor de Disciplina para Evolução CC */}
-              <div className="flex items-center justify-center gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
+              <div className="flex items-center justify-start gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
                 {disciplineRankingData.cc.listDiscs.map(disc => (
                   <button
                     key={disc}
@@ -1383,24 +1382,14 @@ const ClassProfile = ({
               <div className="flex items-center justify-center gap-2 mb-3 pr-12">
                 <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest text-center flex items-center gap-1.5 flex-wrap justify-center">
                   <span>Prova Paulista — Evolução Comparativa</span>
-                  <button
-                    onClick={() => setEvolucaoDiscPP('Geral')}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-black transition-all ${
-                      evolucaoDiscPP === 'Geral'
-                        ? 'bg-sky-600 text-white shadow-2xs'
-                        : 'bg-sky-50 text-sky-600 hover:bg-sky-100 underline cursor-pointer'
-                    }`}
-                  >
-                    🌟 Média Geral
-                  </button>
                   {evolucaoDiscPP !== 'Geral' && (
-                    <span className="text-slate-700">({evolucaoDiscPP})</span>
+                    <span className="text-sky-600 font-extrabold">— {evolucaoDiscPP}</span>
                   )}
                 </h4>
               </div>
 
               {/* Seletor de Disciplina para Evolução PP */}
-              <div className="flex items-center justify-center gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
+              <div className="flex items-center justify-start gap-1.5 overflow-x-auto pb-3 mb-4 max-w-full border-b border-slate-100">
                 {disciplineRankingData.pp.listDiscs.map(disc => (
                   <button
                     key={disc}
@@ -1735,19 +1724,57 @@ const ClassProfile = ({
               ))}
             </div>
 
-            <h5 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <h5 className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5 mb-2">
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               Destaques da Turma — Prova Paulista
             </h5>
+            <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 mb-3 overflow-x-auto">
+              {[
+                { id: '1-10', label: '1 a 10' },
+                { id: '11-20', label: '11 a 20' },
+                { id: '21-30', label: '21 a 30' },
+                { id: '31+', label: `31 a ${disciplineRankingData.pp.top.length || 31}` },
+                { id: 'todos', label: 'Mostrar todos' }
+              ].map((faixa) => (
+                <button
+                  key={faixa.id}
+                  onClick={() => setFaixaDestaquePP(faixa.id)}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all whitespace-nowrap cursor-pointer ${
+                    faixaDestaquePP === faixa.id
+                      ? 'bg-white text-sky-700 shadow-2xs border border-slate-200/60'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                  }`}
+                >
+                  {faixa.label}
+                </button>
+              ))}
+            </div>
 
             <div className="space-y-2.5 flex-1">
-              {disciplineRankingData.pp.top.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-2xl border border-sky-100 text-slate-400 font-bold text-xs">
-                  Nenhum dado disponível para este recorte.
-                </div>
-              ) : (
-                disciplineRankingData.pp.top.map((s, idx) => {
-                  const medals = ['🥇', '🥈', '🥉', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];
+              {(() => {
+                const listPPFiltered = disciplineRankingData.pp.top.filter((_, i) => {
+                  if (faixaDestaquePP === '1-10') return i < 10;
+                  if (faixaDestaquePP === '11-20') return i >= 10 && i < 20;
+                  if (faixaDestaquePP === '21-30') return i >= 20 && i < 30;
+                  if (faixaDestaquePP === '31+' || faixaDestaquePP === 'demais') return i >= 30;
+                  if (faixaDestaquePP === 'todos') return true;
+                  return true;
+                });
+
+                if (listPPFiltered.length === 0) {
+                  return (
+                    <div className="p-8 text-center bg-white rounded-2xl border border-sky-100 text-slate-400 font-bold text-xs">
+                      Nenhum aluno nesta faixa de ranking.
+                    </div>
+                  );
+                }
+
+                return listPPFiltered.map((s, idx) => {
+                  const rankPos = s.turmaRank || (idx + 1);
+                  const badgeLabel = rankPos === 1 ? '🥇' : rankPos === 2 ? '🥈' : rankPos === 3 ? '🥉' : `${rankPos}º`;
+                  const badgeBg = rankPos === 1 ? 'bg-amber-100 text-amber-800' : rankPos === 2 ? 'bg-slate-200 text-slate-800' : rankPos === 3 ? 'bg-amber-700/20 text-amber-900' : 'bg-slate-100 text-slate-600';
+                  const isPodium = rankPos <= 3;
+
                   return (
                     <div
                       key={s.nome || idx}
@@ -1755,11 +1782,11 @@ const ClassProfile = ({
                       role="button"
                       tabIndex={0}
                       title={`Abrir perfil individual de ${s.nome}`}
-                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 bg-white hover:shadow-md hover:border-sky-300 hover:scale-[1.01] cursor-pointer group ${idx < 3 ? 'border-sky-200 bg-sky-50/20' : 'border-slate-200'}`}
+                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 bg-white hover:shadow-md hover:border-sky-300 hover:scale-[1.01] cursor-pointer group ${isPodium ? 'border-sky-200 bg-sky-50/20' : 'border-slate-200'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${idx === 0 ? 'bg-amber-100 text-amber-800' : idx === 1 ? 'bg-slate-200 text-slate-800' : idx === 2 ? 'bg-amber-700/20 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>
-                          {medals[idx]}
+                        <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${badgeBg}`}>
+                          {badgeLabel}
                         </span>
                         <div className="min-w-0">
                           <p className="text-xs font-black text-slate-800 truncate group-hover:text-sky-600 transition-colors">
@@ -1783,8 +1810,8 @@ const ClassProfile = ({
                       </span>
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </div>
 
@@ -1831,19 +1858,57 @@ const ClassProfile = ({
               ))}
             </div>
 
-            <h5 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+            <h5 className="text-xs font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5 mb-2">
               <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               Destaques da Turma — Conselho
             </h5>
+            <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 mb-3 overflow-x-auto">
+              {[
+                { id: '1-10', label: '1 a 10' },
+                { id: '11-20', label: '11 a 20' },
+                { id: '21-30', label: '21 a 30' },
+                { id: '31+', label: `31 a ${disciplineRankingData.cc.top.length || 31}` },
+                { id: 'todos', label: 'Mostrar todos' }
+              ].map((faixa) => (
+                <button
+                  key={faixa.id}
+                  onClick={() => setFaixaDestaqueCC(faixa.id)}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all whitespace-nowrap cursor-pointer ${
+                    faixaDestaqueCC === faixa.id
+                      ? 'bg-white text-purple-700 shadow-2xs border border-slate-200/60'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'
+                  }`}
+                >
+                  {faixa.label}
+                </button>
+              ))}
+            </div>
 
             <div className="space-y-2.5 flex-1">
-              {disciplineRankingData.cc.top.length === 0 ? (
-                <div className="p-8 text-center bg-white rounded-2xl border border-purple-100 text-slate-400 font-bold text-xs">
-                  Nenhum dado disponível para este recorte.
-                </div>
-              ) : (
-                disciplineRankingData.cc.top.map((s, idx) => {
-                  const medals = ['🥇', '🥈', '🥉', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];
+              {(() => {
+                const listCCFiltered = disciplineRankingData.cc.top.filter((_, i) => {
+                  if (faixaDestaqueCC === '1-10') return i < 10;
+                  if (faixaDestaqueCC === '11-20') return i >= 10 && i < 20;
+                  if (faixaDestaqueCC === '21-30') return i >= 20 && i < 30;
+                  if (faixaDestaqueCC === '31+' || faixaDestaqueCC === 'demais') return i >= 30;
+                  if (faixaDestaqueCC === 'todos') return true;
+                  return true;
+                });
+
+                if (listCCFiltered.length === 0) {
+                  return (
+                    <div className="p-8 text-center bg-white rounded-2xl border border-purple-100 text-slate-400 font-bold text-xs">
+                      Nenhum aluno nesta faixa de ranking.
+                    </div>
+                  );
+                }
+
+                return listCCFiltered.map((s, idx) => {
+                  const rankPos = s.turmaRank || (idx + 1);
+                  const badgeLabel = rankPos === 1 ? '🥇' : rankPos === 2 ? '🥈' : rankPos === 3 ? '🥉' : `${rankPos}º`;
+                  const badgeBg = rankPos === 1 ? 'bg-amber-100 text-amber-800' : rankPos === 2 ? 'bg-slate-200 text-slate-800' : rankPos === 3 ? 'bg-amber-700/20 text-amber-900' : 'bg-slate-100 text-slate-600';
+                  const isPodium = rankPos <= 3;
+
                   return (
                     <div
                       key={s.nome || idx}
@@ -1851,11 +1916,11 @@ const ClassProfile = ({
                       role="button"
                       tabIndex={0}
                       title={`Abrir perfil individual de ${s.nome}`}
-                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 bg-white hover:shadow-md hover:border-purple-300 hover:scale-[1.01] cursor-pointer group ${idx < 3 ? 'border-purple-200 bg-purple-50/20' : 'border-slate-200'}`}
+                      className={`p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 bg-white hover:shadow-md hover:border-purple-300 hover:scale-[1.01] cursor-pointer group ${isPodium ? 'border-purple-200 bg-purple-50/20' : 'border-slate-200'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${idx === 0 ? 'bg-amber-100 text-amber-800' : idx === 1 ? 'bg-slate-200 text-slate-800' : idx === 2 ? 'bg-amber-700/20 text-amber-900' : 'bg-slate-100 text-slate-500'}`}>
-                          {medals[idx]}
+                        <span className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs shrink-0 ${badgeBg}`}>
+                          {badgeLabel}
                         </span>
                         <div className="min-w-0">
                           <p className="text-xs font-black text-slate-800 truncate group-hover:text-purple-600 transition-colors">
@@ -1879,8 +1944,8 @@ const ClassProfile = ({
                       </span>
                     </div>
                   );
-                })
-              )}
+                });
+              })()}
             </div>
           </div>
         </div>

@@ -587,6 +587,29 @@ const StudentProfile = ({
   const [studentSelections, setStudentSelections] = useState({});
   const [maximizedChart, setMaximizedChart] = useState(null);
 
+  const [sortFieldCC, setSortFieldCC] = useState('disciplina');
+  const [sortOrderCC, setSortOrderCC] = useState('asc');
+  const [sortFieldPP, setSortFieldPP] = useState('disciplina');
+  const [sortOrderPP, setSortOrderPP] = useState('asc');
+
+  const handleSortCC = (field) => {
+    if (sortFieldCC === field) {
+      setSortOrderCC(sortOrderCC === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortFieldCC(field);
+      setSortOrderCC(field === 'disciplina' ? 'asc' : 'desc');
+    }
+  };
+
+  const handleSortPP = (field) => {
+    if (sortFieldPP === field) {
+      setSortOrderPP(sortOrderPP === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortFieldPP(field);
+      setSortOrderPP(field === 'disciplina' ? 'asc' : 'desc');
+    }
+  };
+
   const bimestresDisponiveis = React.useMemo(() => {
     return Array.from(
       new Set([
@@ -647,7 +670,7 @@ const StudentProfile = ({
     });
     const disciplinas = Array.from(discSet);
     
-    return disciplinas.map(d => {
+    const list = disciplinas.map(d => {
       const notasPorBim = {};
       let soma = 0, count = 0;
       historico.forEach(b => {
@@ -658,9 +681,27 @@ const StudentProfile = ({
       });
       const media = count > 0 ? Number((soma / count).toFixed(1)) : null;
       return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
-    }).filter(item => item.media !== null && item.media > 0)
-      .sort((a, b) => a.disciplina.localeCompare(b.disciplina));
-  }, [studentProfile]);
+    }).filter(item => item.media !== null && item.media > 0);
+
+    return list.sort((a, b) => {
+      let valA, valB;
+      if (sortFieldCC === 'disciplina') {
+        return sortOrderCC === 'asc' 
+          ? a.disciplina.localeCompare(b.disciplina)
+          : b.disciplina.localeCompare(a.disciplina);
+      } else if (sortFieldCC === 'media') {
+        valA = a.media !== null ? a.media : -1;
+        valB = b.media !== null ? b.media : -1;
+      } else if (sortFieldCC === 'situacao') {
+        valA = a.media !== null ? (a.media >= 5 ? 1 : 0) : -1;
+        valB = b.media !== null ? (b.media >= 5 ? 1 : 0) : -1;
+      } else {
+        valA = parseGrade(a.notasPorBim[sortFieldCC]) || -1;
+        valB = parseGrade(b.notasPorBim[sortFieldCC]) || -1;
+      }
+      return sortOrderCC === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [studentProfile, sortFieldCC, sortOrderCC]);
 
   const disciplinasEvolucaoPP = React.useMemo(() => {
     const historico = studentProfile?.historicoProvas || [];
@@ -672,7 +713,7 @@ const StudentProfile = ({
     });
     const disciplinas = Array.from(discSet);
 
-    return disciplinas.map(d => {
+    const list = disciplinas.map(d => {
       const notasPorBim = {};
       let soma = 0, count = 0;
       historico.forEach(p => {
@@ -683,9 +724,24 @@ const StudentProfile = ({
       });
       const media = count > 0 ? Number((soma / count).toFixed(2)) : null;
       return { disciplina: formatDisciplina(d), rawName: d, notasPorBim, media };
-    }).filter(item => item.media !== null && item.media > 0)
-      .sort((a, b) => a.disciplina.localeCompare(b.disciplina));
-  }, [studentProfile]);
+    }).filter(item => item.media !== null && item.media > 0);
+
+    return list.sort((a, b) => {
+      let valA, valB;
+      if (sortFieldPP === 'disciplina') {
+        return sortOrderPP === 'asc'
+          ? a.disciplina.localeCompare(b.disciplina)
+          : b.disciplina.localeCompare(a.disciplina);
+      } else if (sortFieldPP === 'media') {
+        valA = a.media !== null ? a.media : -1;
+        valB = b.media !== null ? b.media : -1;
+      } else {
+        valA = toScale10(a.notasPorBim[sortFieldPP]) || -1;
+        valB = toScale10(b.notasPorBim[sortFieldPP]) || -1;
+      }
+      return sortOrderPP === 'asc' ? valA - valB : valB - valA;
+    });
+  }, [studentProfile, sortFieldPP, sortOrderPP]);
 
   // ── Cálculo da média do Conselho Bimestral ─────────────────
   const parseToNum = (v) => {
@@ -1992,13 +2048,21 @@ const StudentProfile = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left">
-                      <th className="p-4">Disciplina</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left select-none">
+                      <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortCC('disciplina')}>
+                        Disciplina {sortFieldCC === 'disciplina' && (sortOrderCC === 'asc' ? '↑' : '↓')}
+                      </th>
                       {bimestresDisponiveis.map(b => (
-                        <th key={b} className="p-4 text-center">{b.replace('º Bimestre', 'º Bi')}</th>
+                        <th key={b} className="p-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortCC(b)}>
+                          {b.replace('º Bimestre', 'º Bi')} {sortFieldCC === b && (sortOrderCC === 'asc' ? '↑' : '↓')}
+                        </th>
                       ))}
-                      <th className="p-4 text-center bg-blue-50 text-blue-700">Média Geral</th>
-                      <th className="p-4 text-center bg-blue-50/80 text-blue-800">Situação</th>
+                      <th className="p-4 text-center bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSortCC('media')}>
+                        Média Geral {sortFieldCC === 'media' && (sortOrderCC === 'asc' ? '↑' : '↓')}
+                      </th>
+                      <th className="p-4 text-center bg-blue-50/80 text-blue-800 cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => handleSortCC('situacao')}>
+                        Situação {sortFieldCC === 'situacao' && (sortOrderCC === 'asc' ? '↑' : '↓')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2084,12 +2148,18 @@ const StudentProfile = ({
               <div className="overflow-x-auto">
                 <table className="w-full text-xs border-collapse">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left">
-                      <th className="p-4">Disciplina</th>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase font-black text-left select-none">
+                      <th className="p-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortPP('disciplina')}>
+                        Disciplina {sortFieldPP === 'disciplina' && (sortOrderPP === 'asc' ? '↑' : '↓')}
+                      </th>
                       {bimestresDisponiveis.map(b => (
-                        <th key={b} className="p-4 text-center">{b.replace('º Bimestre', 'º Bi')}</th>
+                        <th key={b} className="p-4 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSortPP(b)}>
+                          {b.replace('º Bimestre', 'º Bi')} {sortFieldPP === b && (sortOrderPP === 'asc' ? '↑' : '↓')}
+                        </th>
                       ))}
-                      <th className="p-4 text-center bg-sky-50 text-sky-700">Média Geral</th>
+                      <th className="p-4 text-center bg-sky-50 text-sky-700 cursor-pointer hover:bg-sky-100 transition-colors" onClick={() => handleSortPP('media')}>
+                        Média Geral {sortFieldPP === 'media' && (sortOrderPP === 'asc' ? '↑' : '↓')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
