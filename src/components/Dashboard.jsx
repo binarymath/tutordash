@@ -2,7 +2,7 @@
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // ─────────────────────────────────────────────────────────────
 import React, { useState } from 'react';
-import { Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown, Table, Download } from 'lucide-react';
+import { Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown, Table, Download, AlertTriangle } from 'lucide-react';
 import { checkIsTutor } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
@@ -18,7 +18,7 @@ const Dashboard = ({
   allStudents, sortedData, filterMode, setFilterMode,
   selectedValue, setSelectedValue, optionsList, stats,
   searchTerm, setSearchTerm, setSelectedStudent, setSelectedTurma, sortConfig, handleSort,
-  showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel
+  showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel, onOpenLowGradesReport
 }) => {
   const [showRanking, setShowRanking] = useState(false);
   const [gradeViewMode, setGradeViewMode] = useState('geral');
@@ -221,6 +221,18 @@ const Dashboard = ({
                 >
                   Faltas e Freq.
                 </button>
+                {onOpenLowGradesReport && (
+                  <>
+                    <div className="w-px h-5 bg-slate-300 mx-1 self-center hidden sm:block" />
+                    <button
+                      onClick={onOpenLowGradesReport}
+                      title="Relatório do Conselho (< 5,0 e Sem Nota)"
+                      className="px-3 py-1.5 text-xs font-bold rounded-md transition-all text-blue-600 hover:text-blue-800 hover:bg-white/80 flex items-center gap-1"
+                    >
+                      <span>Alunos &lt; 5,0</span>
+                    </button>
+                  </>
+                )}
               </div>
               <div className="flex-1" />
               <button

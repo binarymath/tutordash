@@ -1819,6 +1819,7 @@ const StudentProfile = ({
           </div>
           <button
             onClick={() => setShowAnotacoes(!showAnotacoes)}
+            title={showAnotacoes ? "Recolher seção" : "Expandir seção"}
             className="px-4 py-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-600 hover:text-blue-600 font-black text-xs flex items-center gap-2 border border-slate-200"
           >
             {showAnotacoes ? <>Ocultar <ChevronUp className="w-4 h-4" /></> : <>Mostrar Registros ({studentProfile.notes?.length || 0}) <ChevronDown className="w-4 h-4" /></>}
@@ -2249,7 +2250,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Mapão */}
-                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart data-testid="radar-chart">
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarCC', title: `Radar de Equilíbrio — Conselho (${bimestreRadarLabel})` })}
@@ -2382,7 +2383,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Prova Paulista */}
-                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart data-testid="radar-chart">
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarPP', title: `Desempenho por Área — Prova Paulista (${bimestreRadarLabel})` })}

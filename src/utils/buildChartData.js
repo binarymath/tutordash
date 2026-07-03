@@ -13,7 +13,11 @@ const getProvaBimestre = (studentProfile, targetBimestre) => {
   if (targetBimestre && targetBimestre !== 'ultimo') {
     return historico.find(h => h.bimestre === targetBimestre) || null;
   }
-  return historico.length > 0 ? historico[historico.length - 1] : null;
+  if (historico.length > 0) return historico[historico.length - 1];
+  if (studentProfile?.provaPaulistaNotas) {
+    return { bimestre: 'Mais Recente', notas: studentProfile.provaPaulistaNotas };
+  }
+  return null;
 };
 
 export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData = [], allStudents = [], targetBimestre = 'ultimo') => {
@@ -79,7 +83,9 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
   );
 
   return Object.entries(bRegistro.notas).map(([disciplina, notaRaw]) => {
-    const notaAluno = parseGrade(notaRaw);
+    const notaNum = parseGrade(notaRaw);
+    const hasVal = notaRaw !== undefined && notaRaw !== null && String(notaRaw).trim() !== '' && String(notaRaw).trim() !== '-' && notaNum > 0;
+    const notaAluno = hasVal ? notaNum : null;
     let soma = 0;
     let count = 0;
 
@@ -103,6 +109,7 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
       fullSubject: displaySub,
       Aluno: notaAluno,
       Turma: count > 0 ? parseFloat((soma / count).toFixed(1)) : 0,
+      isMissing: notaAluno === null
     };
   }).filter(Boolean);
 };

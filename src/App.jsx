@@ -16,6 +16,7 @@ import Dashboard      from './components/Dashboard';
 import StudentProfile from './components/StudentProfile';
 import ClassProfile   from './components/ClassProfile';
 import LgpdBanner     from './components/LgpdBanner';
+import LowGradesReportModal from './components/LowGradesReportModal';
 
 const App = () => {
   const queryClient = useQueryClient();
@@ -112,6 +113,7 @@ const App = () => {
   const [sortConfig,            setSortConfig]            = useState({ key: 'turma', direction: 'asc' });
   const [showStickyName,        setShowStickyName]        = useState(false);
   const [showOnlyActive,        setShowOnlyActive]        = useState(true);
+  const [showLowGradesModal,    setShowLowGradesModal]    = useState(false);
 
   useEffect(() => { if (selectedStudent) setSelectedTurma(null); }, [selectedStudent]);
   useEffect(() => { if (selectedTurma) setSelectedStudent(null); }, [selectedTurma]);
@@ -754,6 +756,18 @@ const App = () => {
         />
       )}
 
+      {showLowGradesModal && (
+        <LowGradesReportModal
+          allStudents={allStudents}
+          onClose={() => setShowLowGradesModal(false)}
+          onSelectStudent={(nome) => {
+            setSelectedStudent(nome);
+            setSelectedTurma(null);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
       <Header
         selectedStudent={selectedStudent}
         studentProfile={studentProfile}
@@ -810,6 +824,7 @@ const App = () => {
                 setShowOnlyActive={setShowOnlyActive}
                 rankingStudents={rankingStudents}
                 filterLabel={filterLabel}
+                onOpenLowGradesReport={() => setShowLowGradesModal(true)}
               />
             ) : (
               <StudentProfile
