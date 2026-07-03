@@ -348,16 +348,14 @@ describe('StudentProfile — Prova Paulista', () => {
 // Seção Evolutivo Numérico
 // ─────────────────────────────────────────────────────────────────────────────
 describe('StudentProfile — Evolutivo Numérico', () => {
-  it('exibe o botão de Evolutivo', () => {
+  it('exibe o botão de Evolução Comparativa', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/evolutivo numérico/i)).toBeInTheDocument();
+    expect(screen.getByText(/Evolução Comparativa/i)).toBeInTheDocument();
   });
 
-  it('exibe mensagem "sem dados bimestrais" quando historicoConceitos é vazio', () => {
+  it('exibe mensagem "sem dados bimestrais" quando historicoConceitos é vazio no modo evolutivo', () => {
     render(<StudentProfile {...defaultProps} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    // O toggle do evolutivo é o 4º par (índices 4 e 5)
-    fireEvent.click(allToggles[4]);
+    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
     expect(screen.getByText(/sem dados bimestrais disponíveis/i)).toBeInTheDocument();
   });
 
@@ -369,9 +367,7 @@ describe('StudentProfile — Evolutivo Numérico', () => {
       ],
     });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[4]);
-    // O componente EvolutivoNumerico é renderizado — tabela de notas aparece
+    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
     expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
   });
 
@@ -382,8 +378,7 @@ describe('StudentProfile — Evolutivo Numérico', () => {
       ],
     });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[4]);
+    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
     expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
   });
 
@@ -394,9 +389,7 @@ describe('StudentProfile — Evolutivo Numérico', () => {
       ],
     });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[4]);
-    // "Total de Faltas" ou "Freqüencia" aparecem no EvolutivoNumerico
+    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
     const body = document.body.textContent;
     const hasAttendance = /faltas|frequ/i.test(body);
     expect(hasAttendance).toBe(true);
@@ -418,8 +411,7 @@ describe('StudentProfile — Evolutivo Numérico', () => {
       ],
     });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[4]);
+    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
     expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
   });
 });
@@ -428,15 +420,8 @@ describe('StudentProfile — Evolutivo Numérico', () => {
 // Seção de Gráficos
 // ─────────────────────────────────────────────────────────────────────────────
 describe('StudentProfile — Análise Gráfica', () => {
-  it('exibe o botão de Análise Gráfica', () => {
+  it('exibe a seção de gráficos diretamente sem sanfona', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/análise gráfica/i)).toBeInTheDocument();
-  });
-
-  it('expande a seção de gráficos ao clicar no toggle', () => {
-    render(<StudentProfile {...defaultProps} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[6]);
     expect(screen.getByText(/sem dados numéricos suficientes/i)).toBeInTheDocument();
   });
 
@@ -445,26 +430,20 @@ describe('StudentProfile — Análise Gráfica', () => {
       { subject: 'Mat', fullSubject: 'Matemática', Aluno: 8, Turma: 7 },
     ];
     render(<StudentProfile {...defaultProps} chartDataMapao={chartData} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[6]);
     expect(screen.getByTestId('radar-chart')).toBeInTheDocument();
   });
 
   it('renderiza RadarChart da Prova Paulista quando chartDataProva tem dados', () => {
     const provaData = [
-      { subject: 'Mat', fullSubject: 'Matemática', Desempenho: 8 },
+      { subject: 'Mat', fullSubject: 'Matemática', Aluno: 8 },
     ];
     render(<StudentProfile {...defaultProps} chartDataProva={provaData} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[6]);
     expect(screen.getAllByTestId('radar-chart').length).toBeGreaterThan(0);
   });
 
-  it('exibe mensagem "sem disciplinas" quando chartDataProva é vazio e gráfico está expandido', () => {
+  it('exibe mensagem apropriada quando chartDataProva é vazio e gráfico é exibido', () => {
     render(<StudentProfile {...defaultProps} chartDataProva={[]} />);
-    const allToggles = screen.getAllByTitle(/recolher|expandir/i);
-    fireEvent.click(allToggles[6]);
-    expect(screen.getByText(/sem disciplinas detalhadas na prova paulista/i)).toBeInTheDocument();
+    expect(screen.getByText(/nenhuma avaliação registrada/i)).toBeInTheDocument();
   });
 });
 
