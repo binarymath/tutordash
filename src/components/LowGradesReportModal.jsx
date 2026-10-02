@@ -268,13 +268,11 @@ const LowGradesReportModal = ({
       });
 
       groupedFiltered = Array.from(groupMap.values()).map(g => {
-        if (g.disciplinasList.length > 1) {
-          g.disciplina = g.disciplinasList.map((d, i) => {
-            const gradeStr = g.isMissingList[i] ? 'SN' : g.notasList[i];
-            return `${d} (${gradeStr})`;
-          }).join(', ');
-          g.nota = `${g.disciplinasList.length} disc.`;
-        }
+        g.disciplina = g.disciplinasList.map((d, i) => {
+          const gradeStr = g.isMissingList[i] ? 'SN' : g.notasList[i];
+          return `• ${d} (${gradeStr})`;
+        }).join('\n');
+        g.nota = g.disciplinasList.length === 1 ? '1 disc.' : `${g.disciplinasList.length} disc.`;
         return g;
       });
     }
@@ -434,12 +432,14 @@ const LowGradesReportModal = ({
       const notaBg = r.isMissing ? '#f1f5f9' : '#fee2e2';
       const notaColor = r.isMissing ? '#64748b' : '#991b1b';
       const notaBorder = r.isMissing ? '#cbd5e1' : '#fca5a5';
+      const printDisc = typeof r.disciplina === 'string' ? r.disciplina.replace(/\n/g, '<br/>') : r.disciplina;
+      
       return [
         `<tr class="${bg}">`,
         `<td style="font-weight:800;color:#0f172a;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.aluno}</td>`,
         `<td style="font-weight:700;color:#334155;text-align:center;width:50px">${r.turma}</td>`,
         `<td style="color:#475569;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.tutor}</td>`,
-        `<td style="font-weight:600;color:#1e293b;width:200px;line-height:1.2;padding-top:8px;padding-bottom:8px">${r.disciplina}</td>`,
+        `<td style="font-weight:600;color:#1e293b;width:200px;line-height:1.4;padding-top:8px;padding-bottom:8px">${printDisc}</td>`,
         `<td style="color:#64748b;width:68px;white-space:nowrap">${r.periodo}</td>`,
         `<td style="text-align:center;width:60px"><span style="display:inline-block;background:${notaBg};color:${notaColor};font-weight:900;padding:2px 7px;border-radius:4px;border:1px solid ${notaBorder};font-size:8.5px">${r.nota}</span></td>`,
         `<td style="text-align:center;color:#475569;font-size:8px;width:72px;white-space:nowrap">F:${r.faltas} ${r.frequencia}</td>`,
@@ -645,7 +645,7 @@ const LowGradesReportModal = ({
                     {renderSortHeader('Tutor(a)', 'tutor')}
                     {renderSortHeader('Disciplina', 'disciplina')}
                     {renderSortHeader('Período', 'periodo', 'text-center')}
-                    {renderSortHeader('Nota / Situação', 'notaNum', 'text-center', 'bg-blue-100/60 text-blue-900')}
+                    {renderSortHeader(selectedDiscipline === 'Todas' ? 'Qtde Disciplina' : 'Nota / Situação', 'notaNum', 'text-center', 'bg-blue-100/60 text-blue-900')}
                     {renderSortHeader('Assiduidade', 'faltas', 'text-center')}
                   </tr>
                 </thead>
@@ -678,7 +678,7 @@ const LowGradesReportModal = ({
                         </span>
                       </td>
                       <td className="px-5 py-3.5 font-bold text-slate-700">
-                        {r.disciplina}
+                        <div className="whitespace-pre-line leading-relaxed">{r.disciplina}</div>
                       </td>
                       <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
                         {r.periodo}
