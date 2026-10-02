@@ -235,8 +235,52 @@ const LowGradesReportModal = ({
       ? records.filter(r => !r.isMissing && r.nota !== 'Sem Nota (-)' && r.notaNum > 0)
       : records;
 
+    // AGRUPAMENTO QUANDO 'TODAS' DISCIPLINAS SÃO SELECIONADAS
+    let groupedFiltered = filtered;
+    if (selectedDiscipline === 'Todas') {
+      const groupMap = new Map();
+      filtered.forEach(r => {
+        const key = `${r.aluno}-${r.periodo}`;
+        if (!groupMap.has(key)) {
+          groupMap.set(key, {
+            ...r,
+            disciplinasList: [r.disciplina],
+            notasList: [r.nota],
+            notaNumList: [r.notaNum],
+            isMissingList: [r.isMissing]
+          });
+        } else {
+          const existing = groupMap.get(key);
+          existing.disciplinasList.push(r.disciplina);
+          existing.notasList.push(r.nota);
+          existing.notaNumList.push(r.notaNum);
+          existing.isMissingList.push(r.isMissing);
+          
+          const minNum = Math.min(
+             existing.notaNum,
+             r.isMissing ? -100 : r.notaNum
+          );
+          existing.notaNum = minNum;
+          if (r.isMissing) {
+            existing.isMissing = true;
+          }
+        }
+      });
+
+      groupedFiltered = Array.from(groupMap.values()).map(g => {
+        if (g.disciplinasList.length > 1) {
+          g.disciplina = g.disciplinasList.map((d, i) => {
+            const gradeStr = g.isMissingList[i] ? 'SN' : g.notasList[i];
+            return `${d} (${gradeStr})`;
+          }).join(', ');
+          g.nota = `${g.disciplinasList.length} disc.`;
+        }
+        return g;
+      });
+    }
+
     // Ordenação pura sem mutação do array base
-    return [...filtered].sort((a, b) => {
+    return [...groupedFiltered].sort((a, b) => {
       let valA = a[sortColumn];
       let valB = b[sortColumn];
 
@@ -272,7 +316,13 @@ const LowGradesReportModal = ({
     
     const discCounts = {};
     reportRecords.forEach(r => {
-      discCounts[r.disciplina] = (discCounts[r.disciplina] || 0) + 1;
+      if (r.disciplinasList) {
+        r.disciplinasList.forEach(d => {
+          discCounts[d] = (discCounts[d] || 0) + 1;
+        });
+      } else {
+        discCounts[r.disciplina] = (discCounts[r.disciplina] || 0) + 1;
+      }
     });
     let topDisc = '-';
     let maxDiscCount = 0;
@@ -389,7 +439,7 @@ const LowGradesReportModal = ({
         `<td style="font-weight:800;color:#0f172a;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.aluno}</td>`,
         `<td style="font-weight:700;color:#334155;text-align:center;width:50px">${r.turma}</td>`,
         `<td style="color:#475569;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.tutor}</td>`,
-        `<td style="font-weight:600;color:#1e293b;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.disciplina}</td>`,
+        `<td style="font-weight:600;color:#1e293b;width:200px;line-height:1.2;padding-top:8px;padding-bottom:8px">${r.disciplina}</td>`,
         `<td style="color:#64748b;width:68px;white-space:nowrap">${r.periodo}</td>`,
         `<td style="text-align:center;width:60px"><span style="display:inline-block;background:${notaBg};color:${notaColor};font-weight:900;padding:2px 7px;border-radius:4px;border:1px solid ${notaBorder};font-size:8.5px">${r.nota}</span></td>`,
         `<td style="text-align:center;color:#475569;font-size:8px;width:72px;white-space:nowrap">F:${r.faltas} ${r.frequencia}</td>`,
