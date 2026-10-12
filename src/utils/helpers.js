@@ -33,6 +33,26 @@ export const parseGrade = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+// Função auxiliar ultra-robusta para verificar se um valor de célula é "Sem Nota"
+export const checkIsMissing = (raw) => {
+  if (raw === undefined || raw === null) return true;
+  const str = String(raw).trim();
+  if (!str) return true;
+  
+  // Apenas traços, pontos ou espaços (ex: "-", "–", "—", ".")
+  if (/^[-–—_.\s]+$/.test(str)) return true;
+  
+  // Siglas ou palavras indicativas de ausência de nota
+  if (/^(S\/N|S\/D|S\/C|FALTA|AUSENTE|NC|NA|N\/A|N\/C|SEM\s*NOTA|DISP|DISPENSADO)$/i.test(str)) return true;
+  
+  // Textos que contenham palavras de ausência
+  if (/falta|sem\s*nota|ausente|dispensado/i.test(str)) return true;
+
+  const val = parseGrade(raw);
+  if (isNaN(val) || val <= 0) return true;
+  return false;
+};
+
 // Converte nota da Prova Paulista para escala 0–10.
 // O XLSX armazena células de percentual como decimal (53,75% → 0.5375).
 // Suporta: "53,75%" → 5.38 | "0.5375" → 5.38 | "5,37" → 5.37

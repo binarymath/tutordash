@@ -1,42 +1,29 @@
 // ─────────────────────────────────────────────────────────────
 // components/LowGradesReportModal.jsx — Relatório de Alunos < 5,0 e Sem Nota
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { flushSync } from 'react-dom';
-import { X, AlertCircle, Printer, Table as TableIcon, Search, UserCheck, BookOpen, Calendar, Filter, ArrowUpDown } from 'lucide-react';
-import { parseGrade, formatDisciplina, formatBimestre } from '../utils/helpers';
+import { 
+  X, AlertCircle, Printer, Table as TableIcon, Search, UserCheck, 
+  BookOpen, Calendar, Filter, ArrowUpDown, AlertTriangle, Users, 
+  ChevronRight, Sparkles 
+} from 'lucide-react';
+import { parseGrade, formatDisciplina, formatBimestre, checkIsMissing, isNonSubjectHeader } from '../utils/helpers';
 import { getXLSX } from '../services/api';
-
-// Função auxiliar ultra-robusta para verificar se um valor de célula é "Sem Nota"
-const checkIsMissing = (raw) => {
-  if (raw === undefined || raw === null) return true;
-  const str = String(raw).trim();
-  if (!str) return true;
-  
-  // Apenas traços, pontos ou espaços (ex: "-", "–", "—", ".")
-  if (/^[-–—_.\s]+$/.test(str)) return true;
-  
-  // Siglas ou palavras indicativas de ausência de nota
-  if (/^(S\/N|S\/D|S\/C|FALTA|AUSENTE|NC|NA|N\/A|N\/C|SEM\s*NOTA|DISP|DISPENSADO)$/i.test(str)) return true;
-  
-  // Textos que contenham palavras de ausência
-  if (/falta|sem\s*nota|ausente|dispensado/i.test(str)) return true;
-
-  const val = parseGrade(raw);
-  if (isNaN(val) || val <= 0) return true;
-  return false;
-};
 
 const LowGradesReportModal = ({
   allStudents = [],
   onClose,
   onSelectStudent,
-  initialPeriod = 'Média Geral'
+  initialPeriod = 'Média Geral',
+  initialTurma = 'Todas'
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
   const [selectedDiscipline, setSelectedDiscipline] = useState('Todas');
-  const [selectedTurma, setSelectedTurma] = useState('Todas');
+  const [selectedTurma, setSelectedTurma] = useState(() => {
+    return initialTurma && initialTurma !== 'Todas' ? String(initialTurma).trim() : 'Todas';
+  });
   const [removeMissing, setRemoveMissing] = useState(true); // false = mostra sem nota por padrão; true = remove sem nota
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -69,6 +56,7 @@ const LowGradesReportModal = ({
         const bFormatted = formatBimestre(b.bimestre);
         let hasGradeInBim = false;
         Object.keys(b.notas || {}).forEach(d => {
+          if (isNonSubjectHeader(d)) return;
           const raw = b.notas[d];
           if (!checkIsMissing(raw)) {
             hasGradeInBim = true;
@@ -100,10 +88,32 @@ const LowGradesReportModal = ({
     };
   }, [allStudents]);
 
+  // Sincronizar período inicial se prop mudar
+  useEffect(() => {
+    if (initialPeriod) {
+      setSelectedPeriod(initialPeriod);
+    }
+  }, [initialPeriod]);
+
+  // Sincronizar turma inicial com as turmas disponíveis na montagem/atualização
+  useEffect(() => {
+    if (!initialTurma || initialTurma === 'Todas') {
+      setSelectedTurma('Todas');
+      return;
+    }
+    const cleanTarget = String(initialTurma).trim().toLowerCase();
+    const matched = availableTurmas.find(t => t.toLowerCase() === cleanTarget);
+    if (matched) {
+      setSelectedTurma(matched);
+    } else {
+      setSelectedTurma(String(initialTurma).trim());
+    }
+  }, [initialTurma, availableTurmas]);
+
   // ── Extração, Filtragem e Ordenação unificadas e rigorosas ────────────────
   const reportRecords = useMemo(() => {
     const records = [];
-    const targetTurmaClean = String(selectedTurma || '').trim();
+    const targetTurmaClean = String(selectedTurma || '').trim().toLowerCase();
     const targetSearchClean = String(searchTerm || '').trim().toLowerCase();
 
     const formatFreqSafe = (val) => {
@@ -115,14 +125,15 @@ const LowGradesReportModal = ({
 
     allStudents.forEach(s => {
       if (s.situacao && String(s.situacao).trim() !== 'Ativo') return;
-      const turmaAluno = String(s.turma || '').trim();
-      if (targetTurmaClean !== 'Todas' && turmaAluno !== targetTurmaClean) return;
+      const turmaAluno = String(s.turma || '').trim().toLowerCase();
+      if (targetTurmaClean !== 'todas' && turmaAluno !== targetTurmaClean) return;
       if (targetSearchClean && !String(s.nome || '').toLowerCase().includes(targetSearchClean)) return;
 
       const hist = s.historicoConceitos || [];
       const discKeysMap = new Map();
       hist.forEach(b => {
         Object.keys(b.notas || {}).forEach(d => {
+          if (isNonSubjectHeader(d)) return;
           discKeysMap.set(formatDisciplina(d), d);
         });
       });
@@ -273,7 +284,8 @@ const LowGradesReportModal = ({
           const gradeStr = g.isMissingList[i] ? 'SN' : g.notasList[i];
           return `• ${d} (${gradeStr})`;
         }).join('\n');
-        g.nota = g.disciplinasList.length === 1 ? '1 disc.' : `${g.disciplinasList.length} disc.`;
+        g.nota = String(g.disciplinasList.length);
+        g.notaNum = g.disciplinasList.length;
         return g;
       });
     }
@@ -308,28 +320,43 @@ const LowGradesReportModal = ({
     });
   }, [allStudents, selectedTurma, selectedDiscipline, selectedPeriod, searchTerm, availableDisciplines, removeMissing, sortColumn, sortDirection]);
 
-  // ── Estatísticas do Relatório ─────────────────────────────────────────────
+  // ── Estatísticas e Indicadores Rápidos do Relatório ────────────────────────
   const stats = useMemo(() => {
     const totalRecords = reportRecords.length;
     const uniqueStudents = new Set(reportRecords.map(r => r.aluno)).size;
     
+    let totalLowGradesCount = 0;
     const discCounts = {};
+    let freqSum = 0;
+    let freqCount = 0;
+
     reportRecords.forEach(r => {
       if (r.disciplinasList) {
+        totalLowGradesCount += r.disciplinasList.length;
         r.disciplinasList.forEach(d => {
           discCounts[d] = (discCounts[d] || 0) + 1;
         });
       } else {
+        totalLowGradesCount += 1;
         discCounts[r.disciplina] = (discCounts[r.disciplina] || 0) + 1;
       }
+
+      const freqNum = parseFloat(String(r.frequencia || '').replace('%', '').replace(',', '.'));
+      if (!isNaN(freqNum) && freqNum >= 0) {
+        freqSum += freqNum;
+        freqCount++;
+      }
     });
+
     let topDisc = '-';
     let maxDiscCount = 0;
     Object.entries(discCounts).forEach(([disc, count]) => {
       if (count > maxDiscCount) { maxDiscCount = count; topDisc = disc; }
     });
 
-    return { totalRecords, uniqueStudents, topDisc, maxDiscCount };
+    const avgFreq = freqCount > 0 ? (freqSum / freqCount).toFixed(1) + '%' : '-';
+
+    return { totalRecords, uniqueStudents, topDisc, maxDiscCount, totalLowGradesCount, avgFreq };
   }, [reportRecords]);
 
   // ── Exportação Excel ──────────────────────────────────────────────────────
@@ -366,10 +393,13 @@ const LowGradesReportModal = ({
   // ── Renderização de cabeçalho ordenável ───────────────────────────────────
   const renderSortHeader = (label, colKey, alignClass = 'text-left', extraClass = '') => {
     const isActive = sortColumn === colKey;
+    const isStudentCol = colKey === 'aluno';
     return (
       <th
         onClick={() => handleSort(colKey)}
-        className={`px-5 py-3.5 cursor-pointer hover:bg-slate-200/80 transition-colors select-none ${alignClass} ${extraClass}`}
+        className={`px-5 py-3.5 cursor-pointer hover:bg-slate-200/80 transition-colors select-none border-b-2 border-slate-300 ${
+          isStudentCol ? 'sticky left-0 z-20 bg-slate-50 border-r border-slate-200/70 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)]' : ''
+        } ${alignClass} ${extraClass}`}
         title={`Classificar por ${label}`}
       >
         <div className={`flex items-center gap-1.5 ${alignClass === 'text-center' ? 'justify-center' : 'justify-start'}`}>
@@ -442,7 +472,7 @@ const LowGradesReportModal = ({
         `<td style="color:#475569;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.tutor}</td>`,
         `<td style="font-weight:600;color:#1e293b;width:200px;line-height:1.4;padding-top:8px;padding-bottom:8px">${printDisc}</td>`,
         `<td style="color:#64748b;width:68px;white-space:nowrap">${r.periodo}</td>`,
-        `<td style="text-align:center;width:60px"><span style="display:inline-block;background:${notaBg};color:${notaColor};font-weight:900;padding:2px 7px;border-radius:4px;border:1px solid ${notaBorder};font-size:8.5px">${r.nota}</span></td>`,
+        `<td style="text-align:center;width:60px;font-weight:900;color:${notaColor};font-size:12px">${r.nota}</td>`,
         `<td style="text-align:center;color:#475569;font-size:8px;width:72px;white-space:nowrap">F:${r.faltas} ${r.frequencia}</td>`,
         '</tr>',
       ].join('');
@@ -454,7 +484,7 @@ const LowGradesReportModal = ({
 <div style="border-top:5px solid #1e3a8a;padding:8px 0 8px;border-bottom:1.5px solid #e2e8f0;margin-bottom:10px;display:flex;justify-content:space-between;align-items:flex-start">
   <div>
     <span style="display:inline-block;background:#eff6ff;color:#1e3a8a;font-size:7.5px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;padding:2px 7px;border-radius:4px;border:1px solid #bfdbfe;margin-bottom:4px">📋 Conselho de Classe — Relatório Oficial</span>
-    <div style="font-size:15px;font-weight:900;color:#0f172a;line-height:1.1">Acompanhamento Pedagógico — Notas &lt; 5,0${!removeMissing ? ' e Sem Nota' : ''}</div>
+    <div style="font-size:15px;font-weight:900;color:#0f172a;line-height:1.1">Acompanhamento Pedagógico — Foco de Atenção${!removeMissing ? ' e Sem Nota' : ''}</div>
   </div>
   <div style="text-align:right;font-size:8px;color:#475569;font-weight:700;background:#f8fafc;padding:6px 10px;border-radius:6px;border:1px solid #e2e8f0;line-height:1.5">
     <div style="color:#0f172a;font-weight:900;font-size:8.5px">EMISSÃO DO DOSSIÊ</div>
@@ -492,42 +522,142 @@ const LowGradesReportModal = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-6xl max-h-[90vh] rounded-3xl border border-slate-200 shadow-2xl flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-hidden animate-in fade-in duration-200">
+      <div className="bg-white w-[98vw] max-w-[1640px] h-[95vh] max-h-[96vh] rounded-2xl sm:rounded-3xl border border-slate-200/80 shadow-2xl flex flex-col overflow-hidden">
         
-        {/* Cabeçalho do Modal (Tons de Azul Institucional) */}
-        <div className="p-6 sm:p-8 bg-gradient-to-r from-blue-700 to-indigo-800 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-              <AlertCircle className="w-8 h-8 text-blue-200" />
+        {/* Cabeçalho do Modal (Clean & Executivo) */}
+        <div className="px-6 sm:px-8 py-4 bg-white border-b border-slate-200/80 flex items-center justify-between gap-4 shrink-0">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-100/80 flex items-center justify-center shrink-0">
+              <AlertCircle className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-blue-200 block">
-                📋 Conselho de Classe — Acompanhamento
-              </span>
-              <h2 className="text-2xl font-black tracking-tight mt-0.5">
-                Relatório de Alunos (&lt; 5,0 {!removeMissing ? 'e Sem Nota' : ''})
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50/80 px-2.5 py-0.5 rounded-full border border-blue-100">
+                  Conselho de Classe — Diagnóstico e Acompanhamento
+                </span>
+                {selectedTurma !== 'Todas' && (
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200/60">
+                    Turma {selectedTurma}
+                  </span>
+                )}
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60">
+                  {selectedPeriod}
+                </span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-0.5">
+                Relatório de Alunos — Foco de Atenção
               </h2>
             </div>
           </div>
+
           <button
             onClick={onClose}
-            className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all cursor-pointer"
+            title="Fechar"
+            aria-label="Fechar janela"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Barra de Filtros */}
-        <div className="p-6 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4 shrink-0 items-end">
+        {/* Painel de Indicadores Rápidos (KPIs) */}
+        <div className="px-6 sm:px-8 py-3 bg-slate-50/70 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-3 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 flex-1 max-w-4xl">
+            {/* KPI 1: Estudantes */}
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight">
+                  Estudantes
+                </span>
+                <span className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.uniqueStudents}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 2: Registros */}
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <AlertCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight">
+                  Registros
+                </span>
+                <span className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.totalLowGradesCount || stats.totalRecords}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 3: Maior Incidência */}
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight truncate">
+                  Maior Incidência
+                </span>
+                <span className="text-xs font-black text-slate-900 leading-tight truncate block" title={stats.topDisc}>
+                  {stats.topDisc !== '-' ? `${stats.topDisc} (${stats.maxDiscCount})` : 'Nenhuma'}
+                </span>
+              </div>
+            </div>
+
+            {/* KPI 4: Freq. Média */}
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                <UserCheck className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block leading-tight">
+                  Freq. Média
+                </span>
+                <span className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.avgFreq}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botões de Ação */}
+          <div className="flex items-center gap-2 shrink-0 ml-auto">
+            <button
+              onClick={handleExportExcel}
+              disabled={reportRecords.length === 0}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+            >
+              <TableIcon className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Exportar Excel</span>
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={reportRecords.length === 0}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Imprimir Relatório</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Barra de Filtros e Controles Integrada */}
+        <div className="px-6 sm:px-8 py-3.5 bg-white border-b border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 shrink-0 items-end">
+          {/* Seletor 1: Período */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
               <Calendar className="w-3.5 h-3.5 text-blue-600" /> Período Avaliado
             </label>
             <select
+              aria-label="Selecionar período avaliado"
               value={selectedPeriod}
               onChange={e => setSelectedPeriod(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all cursor-pointer"
             >
               {availablePeriods.map(p => (
                 <option key={p} value={p}>{p}</option>
@@ -535,14 +665,16 @@ const LowGradesReportModal = ({
             </select>
           </div>
 
+          {/* Seletor 2: Disciplina */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
               <BookOpen className="w-3.5 h-3.5 text-indigo-600" /> Disciplina
             </label>
             <select
+              aria-label="Filtrar por disciplina"
               value={selectedDiscipline}
               onChange={e => setSelectedDiscipline(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all cursor-pointer"
             >
               {availableDisciplines.map(d => (
                 <option key={d} value={d}>{d}</option>
@@ -550,14 +682,16 @@ const LowGradesReportModal = ({
             </select>
           </div>
 
+          {/* Seletor 3: Turma */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
               <Filter className="w-3.5 h-3.5 text-purple-600" /> Turma
             </label>
             <select
+              aria-label="Filtrar por turma"
               value={selectedTurma}
               onChange={e => setSelectedTurma(e.target.value)}
-              className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all cursor-pointer"
             >
               {availableTurmas.map(t => (
                 <option key={t} value={t}>{t === 'Todas' ? 'Todas as Turmas' : `Turma ${t}`}</option>
@@ -565,141 +699,221 @@ const LowGradesReportModal = ({
             </select>
           </div>
 
+          {/* Campo de Busca */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-              <Search className="w-3.5 h-3.5 text-slate-500" /> Buscar Aluno
+              <Search className="w-3.5 h-3.5 text-slate-400" /> Buscar Aluno
             </label>
             <div className="relative">
               <input
                 type="text"
-                placeholder="Nome do aluno..."
+                placeholder="Buscar por nome..."
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all"
               />
               {searchTerm && (
-                <button onClick={() => setSearchTerm('')} className="absolute right-3 top-2.5 text-slate-400 hover:text-blue-600">
-                  <X className="w-4 h-4" />
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
           </div>
 
-          <div className="flex items-center h-[42px]">
-            <button
-              type="button"
-              onClick={() => setRemoveMissing(prev => !prev)}
-              className="flex items-center gap-2.5 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 cursor-pointer hover:bg-slate-100 transition-colors w-full shadow-2xs select-none"
+          {/* Checkbox / Toggle Remover Sem Nota */}
+          <div>
+            <label
+              className="flex items-center gap-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-xl px-3 py-2 cursor-pointer transition-colors shadow-2xs select-none h-[38px]"
             >
               <input
                 type="checkbox"
                 checked={removeMissing}
-                onChange={() => {}}
-                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 pointer-events-none"
+                onChange={(e) => setRemoveMissing(e.target.checked)}
+                className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer"
               />
-              <span className="text-xs font-bold text-slate-700">Remover Sem Nota (-)</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Resumo de Indicadores Rápido */}
-        <div className="px-6 py-4 bg-blue-50/50 border-b border-blue-100 flex items-center justify-between flex-wrap gap-4 shrink-0">
-          <div className="flex items-center gap-6 flex-wrap">
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Estudantes</span>
-              <span className="text-2xl font-black text-blue-800">({stats.uniqueStudents})</span>
-            </div>
-            <div className="w-px h-6 bg-blue-200 hidden sm:block" />
-            <div className="flex items-baseline gap-2">
-              <span className="text-xs font-bold text-blue-700 uppercase tracking-wider">Registros</span>
-              <span className="text-2xl font-black text-blue-800">({stats.totalRecords})</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleExportExcel}
-              disabled={reportRecords.length === 0}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700 font-black text-xs uppercase tracking-wider hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
-            >
-              <TableIcon className="w-4 h-4 text-emerald-600" /> Exportar Excel
-            </button>
-            <button
-              onClick={handlePrint}
-              disabled={reportRecords.length === 0}
-              className="flex items-center gap-2 px-5 py-2 rounded-xl bg-blue-600 text-white font-black text-xs uppercase tracking-wider hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-blue-600/20"
-            >
-              <Printer className="w-4 h-4" /> Imprimir Relatório
-            </button>
+              <span className="text-xs font-bold text-slate-700">
+                Remover Sem Nota (-)
+              </span>
+            </label>
           </div>
         </div>
 
         {/* Tabela Rolável com Registros e Cabeçalhos Classificáveis */}
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <div className="flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
           {reportRecords.length > 0 ? (
-            <div className="rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs bg-white">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-wider select-none">
+                  <tr className="bg-slate-50 border-b-2 border-slate-300 text-[10px] font-black text-slate-500 uppercase tracking-wider select-none">
                     {renderSortHeader('Estudante', 'aluno')}
                     {renderSortHeader('Turma', 'turma', 'text-center')}
                     {renderSortHeader('Tutor(a)', 'tutor')}
-                    {renderSortHeader('Disciplina', 'disciplina')}
+                    {renderSortHeader('Disciplinas em Foco', 'disciplina')}
                     {renderSortHeader('Período', 'periodo', 'text-center')}
-                    {renderSortHeader(selectedDiscipline === 'Todas' ? 'Qtde Disciplina' : 'Nota / Situação', 'notaNum', 'text-center', 'bg-blue-100/60 text-blue-900')}
+                    {renderSortHeader(selectedDiscipline === 'Todas' ? 'Qtde Disciplina' : 'Nota / Situação', 'notaNum', 'text-center', 'bg-blue-50 text-blue-900')}
                     {renderSortHeader('Assiduidade', 'faltas', 'text-center')}
+                    {onSelectStudent && <th className="px-3 py-3.5 text-center w-12 border-b-2 border-slate-300">Ação</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {reportRecords.map((r, i) => (
-                    <tr key={r.id} className={`hover:bg-blue-50/40 transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                      <td className="px-5 py-3.5 font-bold text-slate-800">
-                        {onSelectStudent ? (
-                          <button
-                            onClick={() => {
-                              onSelectStudent(r.aluno);
-                              onClose();
-                            }}
-                            className="text-left font-black text-blue-600 hover:text-blue-800 hover:underline transition-all flex items-center gap-1.5"
-                          >
-                            {r.aluno}
-                          </button>
-                        ) : (
-                          r.aluno
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-center font-bold">
-                        <span className="bg-slate-100 px-2.5 py-1 rounded-lg text-slate-700 text-[11px] font-black">
-                          {r.turma}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 font-semibold text-slate-500">
-                        <span className="flex items-center gap-1.5">
-                          <UserCheck className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {r.tutor}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 font-bold text-slate-700">
-                        <div className="whitespace-pre-line leading-relaxed">{r.disciplina}</div>
-                      </td>
-                      <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
-                        {r.periodo}
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className={`inline-flex items-center justify-center font-black text-xs px-3 py-1 rounded-xl border shadow-2xs ${
-                          r.isMissing
-                            ? 'bg-slate-100 text-slate-600 border-slate-200'
-                            : 'bg-blue-100/80 text-blue-800 border-blue-200'
+                <tbody className="text-xs">
+                  {reportRecords.map((r, i) => {
+                    const isEven = i % 2 === 0;
+                    const count = r.disciplinasList?.length || 1;
+                    const freqNum = parseFloat(String(r.frequencia || '').replace('%', '').replace(',', '.'));
+                    const isFreqRisk = !isNaN(freqNum) && freqNum < 75.0;
+
+                    return (
+                      <tr 
+                        key={r.id} 
+                        className={`transition-colors group ${
+                          isEven 
+                            ? 'bg-white hover:bg-blue-50/50' 
+                            : 'bg-slate-100 hover:bg-blue-50/60'
+                        }`}
+                      >
+                        {/* Estudante */}
+                        <td className={`px-5 py-3.5 sticky left-0 z-10 min-w-[220px] max-w-[320px] border-b border-slate-300 border-r border-slate-200/70 shadow-[4px_0_6px_-2px_rgba(0,0,0,0.06)] transition-colors ${
+                          isEven 
+                            ? 'bg-white group-hover:bg-blue-50/70' 
+                            : 'bg-slate-100 group-hover:bg-blue-50/70'
                         }`}>
-                          {r.nota}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-center font-semibold text-slate-600">
-                        <span className="text-[11px] bg-slate-100 px-2.5 py-1 rounded-lg">
-                          Faltas: <strong className="text-slate-800">{r.faltas}</strong> • Freq: <strong className="text-slate-800">{r.frequencia}</strong>
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                          {onSelectStudent ? (
+                            <button
+                              onClick={() => {
+                                onSelectStudent(r.aluno);
+                                onClose();
+                              }}
+                              className="text-left font-black text-slate-900 hover:text-blue-600 transition-colors flex items-center gap-2.5 group/student cursor-pointer w-full"
+                              title="Abrir perfil detalhado do aluno"
+                            >
+                              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/70 font-bold text-xs flex items-center justify-center shrink-0 group-hover/student:bg-blue-600 group-hover/student:text-white transition-colors">
+                                {r.aluno.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="group-hover/student:underline truncate">{r.aluno}</span>
+                            </button>
+                          ) : (
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center shrink-0">
+                                {r.aluno.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="font-bold text-slate-900 truncate">{r.aluno}</span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Turma */}
+                        <td className="px-4 py-3.5 text-center font-bold whitespace-nowrap border-b border-slate-300">
+                          <span className="bg-white border border-slate-200/90 shadow-2xs px-2.5 py-1 rounded-lg text-slate-700 text-[11px] font-black uppercase">
+                            {r.turma}
+                          </span>
+                        </td>
+
+                        {/* Tutor */}
+                        <td className="px-4 py-3.5 whitespace-nowrap border-b border-slate-300 font-semibold text-slate-600">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded-md font-semibold border bg-white border-slate-200/80 shadow-2xs text-slate-600">
+                            <UserCheck className="w-3 h-3 text-slate-400 shrink-0" />
+                            <span>{r.tutor}</span>
+                          </span>
+                        </td>
+
+                        {/* Disciplinas em Foco com Badges Elegantes */}
+                        <td className="px-5 py-3 border-b border-slate-300">
+                          {r.disciplinasList && r.disciplinasList.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5 py-1">
+                              {r.disciplinasList.map((d, idx) => {
+                                const isMissing = r.isMissingList?.[idx];
+                                const gradeVal = r.notasList?.[idx];
+                                return (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-colors"
+                                  >
+                                    <span className="text-slate-700">{d}</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[11px] font-black ${
+                                      isMissing 
+                                        ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                        : 'bg-rose-50 text-rose-700 border border-rose-200/80'
+                                    }`}>
+                                      {isMissing ? 'S/N' : gradeVal}
+                                    </span>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-white border border-slate-200/90 shadow-2xs">
+                              <span className="text-slate-700">{r.disciplina}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[11px] font-black ${
+                                r.isMissing 
+                                  ? 'bg-slate-100 text-slate-600 border border-slate-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200/80'
+                              }`}>
+                                {r.isMissing ? 'S/N' : r.nota}
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Período */}
+                        <td className="px-4 py-3.5 text-center font-medium text-slate-500 whitespace-nowrap border-b border-slate-300">
+                          {r.periodo}
+                        </td>
+
+                        {/* Qtde Disciplina / Nota — Apenas número, fora de tag, fonte preta, excelente visual e leitura */}
+                        <td className="px-4 py-3.5 text-center border-b border-slate-300">
+                          {selectedDiscipline === 'Todas' ? (
+                            <span
+                              className="text-lg font-black tracking-tight inline-block select-none text-slate-900"
+                              title={`${count} disciplina${count > 1 ? 's' : ''} em foco`}
+                            >
+                              {count}
+                            </span>
+                          ) : (
+                            <span
+                              className={`text-base font-black tracking-tight inline-block select-none ${
+                                r.isMissing ? 'text-slate-500 text-xs font-bold' : 'text-slate-900'
+                              }`}
+                            >
+                              {r.nota}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Assiduidade com Alerta de Infrequência (< 75%) */}
+                        <td className="px-4 py-3.5 text-center whitespace-nowrap border-b border-slate-300">
+                          <span className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg font-bold border shadow-2xs ${
+                            isFreqRisk 
+                              ? 'bg-rose-50 text-rose-700 border-rose-200/80' 
+                              : 'bg-white text-slate-700 border-slate-200/80'
+                          }`}>
+                            {isFreqRisk && <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />}
+                            <span>Freq: {r.frequencia}</span>
+                            <span className="text-slate-400 font-normal">({r.faltas}f)</span>
+                          </span>
+                        </td>
+
+                        {/* Ação */}
+                        {onSelectStudent && (
+                          <td className="px-3 py-3.5 text-center border-b border-slate-300">
+                            <button
+                              onClick={() => {
+                                onSelectStudent(r.aluno);
+                                onClose();
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-white hover:shadow-2xs transition-colors cursor-pointer"
+                              title={`Abrir perfil de ${r.aluno}`}
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -719,16 +933,21 @@ const LowGradesReportModal = ({
         </div>
 
         {/* Rodapé do Modal */}
-        <div className="p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
-          <span className="text-xs font-bold text-slate-400">
+        <div className="px-6 sm:px-8 py-3.5 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-3 shrink-0">
+          <span className="text-xs font-semibold text-slate-400">
             Dica: Clique em qualquer cabeçalho da tabela para classificar por coluna (A-Z ou Numérico). Clique no nome para abrir o aluno.
           </span>
-          <button
-            onClick={onClose}
-            className="px-6 py-2.5 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-black text-xs uppercase tracking-wider transition-colors"
-          >
-            Fechar Janela
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-500">
+              {reportRecords.length} estudante{reportRecords.length !== 1 ? 's' : ''} em exibição
+            </span>
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Fechar Janela
+            </button>
+          </div>
         </div>
 
       </div>

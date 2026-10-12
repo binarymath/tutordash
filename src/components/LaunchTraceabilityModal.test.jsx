@@ -184,4 +184,20 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     fireEvent.click(screen.getByRole('button', { name: /Fechar modal de rastreabilidade/i }));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('inicializa com a turma passada em initialTurma', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="1A"
+      />
+    );
+
+    // O select de turma deve estar com 1A selecionado
+    const selectTurma = screen.getByRole('combobox', { name: /Filtrar por Turma/i });
+    expect(selectTurma.value).toBe('1A');
+  });
 });

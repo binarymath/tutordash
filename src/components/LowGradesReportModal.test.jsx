@@ -114,4 +114,44 @@ describe('LowGradesReportModal revisado', () => {
     render(<LowGradesReportModal allStudents={studentsWithTransferred} onClose={onClose} />);
     expect(screen.queryByText('Aluno Transferido Risco')).not.toBeInTheDocument();
   });
+
+  it('inicializa com a turma passada em initialTurma e filtra os alunos da sala', () => {
+    const multiTurmaStudents = [
+      {
+        nome: 'Aluno Turma 101',
+        turma: '101',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '3.0' } }
+        ]
+      },
+      {
+        nome: 'Aluno Turma 202',
+        turma: '202',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '4.0' } }
+        ]
+      }
+    ];
+    const onClose = vi.fn();
+    render(
+      <LowGradesReportModal
+        allStudents={multiTurmaStudents}
+        initialTurma="101"
+        initialPeriod="1º Bimestre"
+        onClose={onClose}
+      />
+    );
+
+    // Deve exibir o aluno da turma 101
+    expect(screen.getByText('Aluno Turma 101')).toBeInTheDocument();
+    // NÃO deve exibir o aluno da turma 202
+    expect(screen.queryByText('Aluno Turma 202')).not.toBeInTheDocument();
+
+    // Select de turma deve estar com 101 selecionado
+    const selectTurma = screen.getAllByRole('combobox')[2];
+    expect(selectTurma.value).toBe('101');
+  });
 });
+
