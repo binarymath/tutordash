@@ -22,6 +22,108 @@ export const formatBimestre = (text) => {
   return text.trim();
 };
 
+export const getBimestreNum = (text) => {
+  if (!text) return 0;
+  const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (t.includes('1') || t.includes('primeiro')) return 1;
+  if (t.includes('2') || t.includes('segundo')) return 2;
+  if (t.includes('3') || t.includes('terceiro')) return 3;
+  if (t.includes('4') || t.includes('quarto')) return 4;
+  return 0;
+};
+
+export const matchesBimestre = (bimName, selectedBim) => {
+  if (!bimName) return false;
+  const raw = String(bimName).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const target = String(selectedBim || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (target === '1' || target.includes('1º') || target.includes('1o') || target.includes('primeiro')) {
+    return raw.includes('1º') || raw.includes('1o') || raw.includes('1 bim') || raw.includes('1bim') || raw.includes('primeiro') || raw === '1' || raw.startsWith('1-');
+  }
+  if (target === '2' || target.includes('2º') || target.includes('2o') || target.includes('segundo')) {
+    return raw.includes('2º') || raw.includes('2o') || raw.includes('2 bim') || raw.includes('2bim') || raw.includes('segundo') || raw === '2' || raw.startsWith('2-');
+  }
+  if (target === '3' || target.includes('3º') || target.includes('3o') || target.includes('terceiro')) {
+    return raw.includes('3º') || raw.includes('3o') || raw.includes('3 bim') || raw.includes('3bim') || raw.includes('terceiro') || raw === '3' || raw.startsWith('3-');
+  }
+  if (target === '4' || target.includes('4º') || target.includes('4o') || target.includes('quarto')) {
+    return raw.includes('4º') || raw.includes('4o') || raw.includes('4 bim') || raw.includes('4bim') || raw.includes('quarto') || raw === '4' || raw.startsWith('4-');
+  }
+  if (target === 'geral' || target.includes('media')) return true;
+  return raw === target;
+};
+
+export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', conceitoData = [], provaData = []) => {
+  const norm = normalizeName(normalizedName);
+  const def = formatTurma(defaultTurma) || defaultTurma;
+  const historicoTurmas = {};
+
+  const isValidTurma = (t) => {
+    if (!t) return false;
+    const s = String(t).trim();
+    return s !== '' && !s.startsWith('405') && !s.startsWith('406') && s !== 'Sem Turma' && s !== 'Desconhecida';
+  };
+
+  // Coleta registros do Mapão
+  (conceitoData || []).forEach(c => {
+    if (c.normalizedName === norm && isValidTurma(c.turmaPlanilha)) {
+      const bNum = getBimestreNum(c.bimestre);
+      if (bNum > 0) {
+        // Prioriza registro ativo ou mais recente do mesmo bimestre
+        const current = historicoTurmas[bNum];
+        if (!current || (c.situacao === 'Ativo' && current.situacao !== 'Ativo')) {
+          historicoTurmas[bNum] = {
+            turma: formatTurma(c.turmaPlanilha),
+            situacao: c.situacao || 'Ativo',
+            origem: 'mapao'
+          };
+        }
+      }
+    }
+  });
+
+  // Coleta registros da Prova Paulista como fallback para bimestres sem Mapão
+  (provaData || []).forEach(p => {
+    if (p.normalizedName === norm && isValidTurma(p.turmaPlanilha)) {
+      const bNum = getBimestreNum(p.bimestre);
+      if (bNum > 0 && !historicoTurmas[bNum]) {
+        historicoTurmas[bNum] = {
+          turma: formatTurma(p.turmaPlanilha),
+          situacao: 'Ativo',
+          origem: 'prova'
+        };
+      }
+    }
+  });
+
+  // Identifica a turma do bimestre mais recente
+  let highestBim = 0;
+  let turmaAtiva = def;
+  [4, 3, 2, 1].forEach(b => {
+    if (highestBim === 0 && historicoTurmas[b]?.turma) {
+      highestBim = b;
+      turmaAtiva = historicoTurmas[b].turma;
+    }
+  });
+
+  // Mapeia histórico simples { 1: "7D", 2: "7D", 3: "7A" }
+  const turmasPorBimestre = {};
+  [1, 2, 3, 4].forEach(b => {
+    if (historicoTurmas[b]?.turma) {
+      turmasPorBimestre[b] = historicoTurmas[b].turma;
+    }
+  });
+
+  const isTransferido = (turmaAtiva && def && formatTurma(turmaAtiva) !== formatTurma(def)) ||
+    Object.values(turmasPorBimestre).some(t => formatTurma(t) !== formatTurma(turmaAtiva));
+
+  return {
+    turmaAtiva: turmaAtiva || def || 'Sem Turma',
+    turmaOriginal: def || 'Sem Turma',
+    isTransferido,
+    historicoTurmas: turmasPorBimestre
+  };
+};
+
 export const parseGrade = (val) => {
   if (val === undefined || val === null || val === '-') return 0;
   const str = String(val).toUpperCase().trim();

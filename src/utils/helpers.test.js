@@ -11,6 +11,9 @@ import {
   checkIsTutor,
   formatDisciplina,
   fetchWithFallback,
+  getBimestreNum,
+  matchesBimestre,
+  resolveStudentActiveTurma,
 } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -283,5 +286,84 @@ describe('fetchWithFallback', () => {
 
     const res = await fetchWithFallback('https://example.com/data.csv');
     expect(res).toBe(fakeResponse);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getBimestreNum & matchesBimestre
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getBimestreNum & matchesBimestre', () => {
+  it('extrai o número correto do bimestre', () => {
+    expect(getBimestreNum('1º Bimestre')).toBe(1);
+    expect(getBimestreNum('Segundo Bimestre')).toBe(2);
+    expect(getBimestreNum('3º')).toBe(3);
+    expect(getBimestreNum('4bim')).toBe(4);
+    expect(getBimestreNum('Geral')).toBe(0);
+  });
+
+  it('compara bimestres corretamente com matchesBimestre', () => {
+    expect(matchesBimestre('3º Bimestre', '3')).toBe(true);
+    expect(matchesBimestre('Terceiro Bimestre', '3º Bimestre')).toBe(true);
+    expect(matchesBimestre('2º Bimestre', '3')).toBe(false);
+    expect(matchesBimestre('1º Bimestre', 'geral')).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// resolveStudentActiveTurma
+// ─────────────────────────────────────────────────────────────────────────────
+describe('resolveStudentActiveTurma', () => {
+  it('mantém a turma padrão quando o aluno não tem registros no Mapão ou Prova', () => {
+    const res = resolveStudentActiveTurma('João Silva', '7D', [], []);
+    expect(res.turmaAtiva).toBe('7D');
+    expect(res.isTransferido).toBe(false);
+    expect(res.turmaOriginal).toBe('7D');
+  });
+
+  it('identifica corretamente aluno transferido do 7D para o 7A no 3º Bimestre', () => {
+    const mockConceitos = [
+      {
+        normalizedName: 'maria oliveira',
+        bimestre: '1º Bimestre',
+        turmaPlanilha: '7D',
+        situacao: 'Ativo'
+      },
+      {
+        normalizedName: 'maria oliveira',
+        bimestre: '2º Bimestre',
+        turmaPlanilha: '7D',
+        situacao: 'Ativo'
+      },
+      {
+        normalizedName: 'maria oliveira',
+        bimestre: '3º Bimestre',
+        turmaPlanilha: '7A',
+        situacao: 'Ativo'
+      }
+    ];
+
+    const res = resolveStudentActiveTurma('Maria Oliveira', '7D', mockConceitos, []);
+    expect(res.turmaAtiva).toBe('7A');
+    expect(res.turmaOriginal).toBe('7D');
+    expect(res.isTransferido).toBe(true);
+    expect(res.historicoTurmas).toEqual({
+      1: '7D',
+      2: '7D',
+      3: '7A'
+    });
+  });
+
+  it('usa Prova Paulista como fallback quando Mapão não tem o bimestre', () => {
+    const mockProvas = [
+      {
+        normalizedName: 'carlos eduardo',
+        bimestre: '3º Bimestre',
+        turmaPlanilha: '8B'
+      }
+    ];
+
+    const res = resolveStudentActiveTurma('Carlos Eduardo', '8A', [], mockProvas);
+    expect(res.turmaAtiva).toBe('8B');
+    expect(res.isTransferido).toBe(true);
   });
 });

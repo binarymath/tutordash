@@ -200,4 +200,140 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     const selectTurma = screen.getByRole('combobox', { name: /Filtrar por Turma/i });
     expect(selectTurma.value).toBe('1A');
   });
+
+  it('classifica turma sem mapão como Sem Mapão e não gera furos falsos para seus alunos', () => {
+    const studentsWithUnstartedClass = [
+      {
+        nome: 'Aluno 7D Um',
+        turma: '7D',
+        situacao: 'Ativo',
+        historicoConceitos: [],
+      },
+      {
+        nome: 'Aluno 7D Dois',
+        turma: '7D',
+        situacao: 'Ativo',
+        historicoConceitos: [],
+      },
+    ];
+
+    const mockConceitoData = [
+      // Apenas 7A possui mapão no 3º Bimestre
+      {
+        nomeOriginal: 'Outro Aluno',
+        normalizedName: 'outro aluno',
+        bimestre: '3º Bimestre',
+        turmaPlanilha: '7A',
+        notas: { 'MATEMÁTICA': '9.0' },
+      },
+    ];
+
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={studentsWithUnstartedClass}
+        conceitoData={mockConceitoData}
+        selectedBimestre="3"
+        initialTurma="7D"
+      />
+    );
+
+    // Na aba Visão por Turma, 7D deve aparecer como Sem Mapão
+    fireEvent.click(screen.getByRole('button', { name: /Visão por Turma/i }));
+    expect(screen.getByText('Sem Mapão')).toBeInTheDocument();
+
+    // Na aba Alunos com Pendência, filtrando por Furos, nenhum aluno do 7D deve ser apontado como furo
+    fireEvent.click(screen.getByRole('button', { name: /Alunos com Pendência/i }));
+    const selectFiltro = screen.getByRole('combobox', { name: /Tipo de Pendência/i });
+    fireEvent.change(selectFiltro, { target: { value: 'furos' } });
+
+    expect(screen.getByText(/Nenhuma pendência encontrada/i)).toBeInTheDocument();
+  });
+
+  it('isola notas de aluno transferido para que notas do 7A não contaminem o 7D no 3º Bimestre', () => {
+    const studentsWithTransfer = [
+      {
+        nome: 'Aluna Transferida',
+        turma: '7A', // turma ativa resolvida no 3º bimestre
+        turmaOriginal: '7D',
+        transferido: true,
+        historicoTurmas: { 1: '7D', 2: '7D', 3: '7A' },
+        situacao: 'Ativo',
+        historicoConceitos: [
+          {
+            bimestre: '2º Bimestre',
+            turmaPlanilha: '7D',
+            notas: { 'MATEMÁTICA': '8.0' },
+          },
+          {
+            bimestre: '3º Bimestre',
+            turmaPlanilha: '7A',
+            notas: { 'MATEMÁTICA': '9.0', 'PORTUGUÊS': '8.5' },
+          },
+        ],
+      },
+      {
+        nome: 'Aluno Nativo 7D',
+        turma: '7D',
+        situacao: 'Ativo',
+        historicoConceitos: [],
+      },
+    ];
+
+    const mockConceitoData = [
+      {
+        nomeOriginal: 'Aluna Transferida',
+        normalizedName: 'aluna transferida',
+        bimestre: '3º Bimestre',
+        turmaPlanilha: '7A',
+        notas: { 'MATEMÁTICA': '9.0', 'PORTUGUÊS': '8.5' },
+      },
+    ];
+
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={studentsWithTransfer}
+        conceitoData={mockConceitoData}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Visão por Turma/i }));
+    // 7A tem mapão
+    expect(screen.getAllByText(/Turma 7A/i).length).toBeGreaterThan(0);
+    // 7D continua como Sem Mapão e não é poluída
+    expect(screen.getAllByText(/Turma 7D/i).length).toBeGreaterThan(0);
+  });
+
+  it('atualiza dinamicamente os 4 cards de KPIs ao selecionar uma turma específica', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    // Em modo Global (Todas as Turmas):
+    expect(screen.getByText('Alunos Ativos')).toBeInTheDocument();
+    expect(screen.getByText('Pendências no Grupo')).toBeInTheDocument();
+    expect(screen.getByText('Turmas com Dados')).toBeInTheDocument();
+    expect(screen.getByText('Conclusão Global')).toBeInTheDocument();
+
+    // Seleciona a Turma 1A no dropdown
+    const selectTurma = screen.getByRole('combobox', { name: /Filtrar por Turma/i });
+    fireEvent.change(selectTurma, { target: { value: '1A' } });
+
+    // Em modo Turma Específica (1A):
+    expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
+    expect(screen.getByText('Pendências na Turma')).toBeInTheDocument();
+    expect(screen.getByText('Disciplinas com Dados')).toBeInTheDocument();
+    expect(screen.getByText('Conclusão da Turma')).toBeInTheDocument();
+  });
 });
