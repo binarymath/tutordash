@@ -91,11 +91,18 @@ const isAttendanceIndexHeader = (value) => {
   return compact === 'F' ||
     compact === 'AC' ||
     compact === 'FTAN' ||
+    compact === 'FRE' ||
+    compact === 'FREQ' ||
     compact === 'FREAN' ||
     compact === 'FREANPERCENT' ||
     compact === 'FREAN%' ||
     compact === 'FREQUENCIAANUAL' ||
-    compact === 'FREQUENCIAAN';
+    compact === 'FREQUENCIAAN' ||
+    compact === 'FREQUENCIA' ||
+    compact.startsWith('FRE') ||
+    compact.startsWith('FREQ') ||
+    compact.includes('FALTA') ||
+    compact.includes('FREQUEN');
 };
 
 const isRefSpreadsheetError = (value) => {
@@ -518,14 +525,39 @@ export const fetchConceitos = async (url) => {
         headerRowIdx++;
         }
 
+        const rowsAfterHeader = jsonData.slice(headerRowIdx + 1);
+
+        // A coluna de frequencia é a ultima coluna com dados da planilha do conselho de classe (mapão)
+        let lastDataColIdx = -1;
+        for (let i = headers.length - 1; i >= 0; i--) {
+          if (headers[i] !== undefined && headers[i] !== null && String(headers[i]).trim() !== '') {
+            lastDataColIdx = i;
+            break;
+          }
+        }
+        for (let r = 0; r < Math.min(rowsAfterHeader.length, 30); r++) {
+          const row = rowsAfterHeader[r];
+          if (!row || !row[0]) continue;
+          const nomeTest = String(row[0]).trim().toUpperCase();
+          if (nomeTest.includes('LEGENDA') || nomeTest.startsWith('C -')) break;
+          for (let c = row.length - 1; c >= 0; c--) {
+            if (row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '') {
+              if (c > lastDataColIdx) {
+                lastDataColIdx = c;
+              }
+              break;
+            }
+          }
+        }
+
         const subjects = [];
         const attendanceIndexColumns = [];
         let tfIdx = -1;
-        let freqIdx = -1;
+        let freqIdx = lastDataColIdx;
         let situacaoIdx = -1;
 
         headers.forEach((h, idx) => {
-        if (typeof h === 'string') {
+          if (typeof h === 'string') {
             const upperH = normalizeHeader(h);
             const compact = upperH.replace(/\s+/g, '');
 
@@ -537,22 +569,12 @@ export const fetchConceitos = async (url) => {
                         compact.includes('TOTALDEFALTA') ||
                         (compact.includes('TOTAL') && compact.includes('FALTA'));
 
-            const isFreq = compact.includes('FREQ') ||
-                            compact.includes('FRE(') ||
-                            compact.includes('FRE%') ||
-                            compact === 'FRE' ||
-                            compact.includes('TOTAL:FRE');
-
             if (tfIdx === -1 && isTf) {
-            tfIdx = idx;
-            }
-
-            if (freqIdx === -1 && isFreq) {
-            freqIdx = idx;
+              tfIdx = idx;
             }
 
             if (situacaoIdx === -1 && (compact === 'SITUACAO' || compact.includes('SITUACAO'))) {
-            situacaoIdx = idx;
+              situacaoIdx = idx;
             }
 
             const nonSubjectKeywords = ['ALUNO', 'RA', 'NÚMERO', 'Nº', 'SITUAÇÃO', 'TOTAL', 'CH'];
@@ -569,16 +591,17 @@ export const fetchConceitos = async (url) => {
               attendanceIndexColumns.push({ index: idx, name: subjectName || String(h).trim() });
             }
 
-            if (!isTf && !isFreq && !isExcluded && !isAttendanceIndex) {
+            // A última coluna com dados é a coluna de frequência (não deve ser matéria)
+            if (idx !== freqIdx && !isTf && !isExcluded && !isAttendanceIndex) {
               if (subjectName) {
                 subjects.push({ index: idx, name: subjectName });
               }
             }
-        }
+          }
         });
 
         if (tfIdx === -1) {
-        tfIdx = headers.findIndex((h) => {
+          tfIdx = headers.findIndex((h) => {
             const upperH = normalizeHeader(h);
             const compact = upperH.replace(/\s+/g, '');
             return compact === 'TF' || 
@@ -586,21 +609,12 @@ export const fetchConceitos = async (url) => {
                     compact.includes('TOTALDEFALTA') || 
                     (compact.includes('TOTAL') && compact.includes('FALTA')) ||
                     ((compact.startsWith('TF') || compact.includes('TOTALFALTA')) && !compact.includes('AN'));
-        });
-        }
-
-        if (freqIdx === -1) {
-        freqIdx = headers.findIndex((h) => {
-            const upperH = normalizeHeader(h);
-            const compact = upperH.replace(/\s+/g, '');
-            return (compact.includes('FRE') || compact.includes('FREQ')) && !compact.includes('AN');
-        });
+          });
         }
 
         if (situacaoIdx === -1) situacaoIdx = 1;
 
         const dadosDaGuia = [];
-        const rowsAfterHeader = jsonData.slice(headerRowIdx + 1);
 
         for (const row of rowsAfterHeader) {
           const alunoNome = row[0];
@@ -625,9 +639,19 @@ export const fetchConceitos = async (url) => {
           const tfBimestre = tfIdx !== -1 && row[tfIdx] !== undefined && row[tfIdx] !== null && String(row[tfIdx]).trim() !== ''
               ? String(row[tfIdx]).trim()
               : '-';
-          const freqBimestre = freqIdx !== -1 && row[freqIdx] !== undefined && row[freqIdx] !== null && String(row[freqIdx]).trim() !== ''
-              ? String(row[freqIdx]).trim()
-              : '-';
+          
+          // A coluna de frequência é a última coluna com dados da planilha do conselho de classe (mapão)
+          let freqBimestre = '-';
+          if (freqIdx !== -1 && row[freqIdx] !== undefined && row[freqIdx] !== null && String(row[freqIdx]).trim() !== '') {
+            freqBimestre = String(row[freqIdx]).trim();
+          } else {
+            for (let c = row.length - 1; c >= 1; c--) {
+              if (row[c] !== undefined && row[c] !== null && String(row[c]).trim() !== '') {
+                freqBimestre = String(row[c]).trim();
+                break;
+              }
+            }
+          }
               
           const situacaoRaw = row[situacaoIdx];
           const situacao = situacaoRaw && String(situacaoRaw).trim() !== '' ? String(situacaoRaw).trim() : 'Ativo';
@@ -641,6 +665,8 @@ export const fetchConceitos = async (url) => {
               attendanceIndexes,
               tfBimestre,
               freqBimestre,
+              frequencia: freqBimestre,
+              frequenciaGeral: freqBimestre,
               faltas: tfBimestre,
               situacao
           });

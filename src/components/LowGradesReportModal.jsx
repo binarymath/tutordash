@@ -31,9 +31,10 @@ const checkIsMissing = (raw) => {
 const LowGradesReportModal = ({
   allStudents = [],
   onClose,
-  onSelectStudent
+  onSelectStudent,
+  initialPeriod = 'Média Geral'
 }) => {
-  const [selectedPeriod, setSelectedPeriod] = useState('Média Geral');
+  const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
   const [selectedDiscipline, setSelectedDiscipline] = useState('Todas');
   const [selectedTurma, setSelectedTurma] = useState('Todas');
   const [removeMissing, setRemoveMissing] = useState(true); // false = mostra sem nota por padrão; true = remove sem nota

@@ -73,6 +73,10 @@ describe('LowGradesReportModal revisado', () => {
     const checkbox = screen.getByRole('checkbox');
     fireEvent.click(checkbox);
 
+    // Selecionar LÍNGUA PORTUGUESA para visualizar a nota individual
+    const selectDisciplina = screen.getAllByRole('combobox')[1];
+    fireEvent.change(selectDisciplina, { target: { value: 'LÍNGUA PORTUGUESA' } });
+
     // Agora (removeMissing = false): deve mostrar Sem Nota (-)
     expect(screen.getAllByText('Sem Nota (-)').length).toBeGreaterThan(0);
 
