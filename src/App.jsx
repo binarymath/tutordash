@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { normalizeName, parseGrade, formatDisciplina, toScale10, getSerieFromTurma } from './utils/helpers';
+import { normalizeName, parseGrade, formatDisciplina, toScale10, getSerieFromTurma, formatTurma, resolveStudentActiveTurma } from './utils/helpers';
 import { buildChartDataMapao, buildChartDataProva } from './utils/buildChartData';
 import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
@@ -162,11 +162,36 @@ const App = () => {
       }
     });
 
+    // Detecta alunos transferidos/remanejados para uma nova turma em bimestres mais recentes
+    const transferredStudents = [];
+    const updatedResolvedData = resolvedDataRaw.map(group => {
+      const remainingTutorados = [];
+      group.tutorados.forEach(nome => {
+        const { turmaAtiva, isTransferido } = resolveStudentActiveTurma(
+          nome,
+          group.turma,
+          conceitoData,
+          provaData
+        );
+        if (isTransferido && turmaAtiva && formatTurma(turmaAtiva) !== formatTurma(group.turma)) {
+          transferredStudents.push({
+            nomeOriginal: nome,
+            turma: turmaAtiva,
+            tutor: group.tutor || 'Sem Tutor'
+          });
+        } else {
+          remainingTutorados.push(nome);
+        }
+      });
+      return { ...group, tutorados: remainingTutorados };
+    }).filter(group => group.tutorados.length > 0);
+
     // 1. Set de nomes que já possuem tutor atribuído e estão em turmas válidas
     const tutoredSet = new Set();
-    resolvedDataRaw.forEach(item =>
+    updatedResolvedData.forEach(item =>
       item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)))
     );
+    transferredStudents.forEach(t => tutoredSet.add(normalizeName(t.nomeOriginal)));
 
     // 2. Mapa de órfãos E alunos realocados: normalizedName → { nomeOriginal, turma, tutor }
     const orphanMap = new Map();
@@ -218,12 +243,27 @@ const App = () => {
       }
     });
 
-    // 3. Agrupa órfãos e alunos realocados por turma + tutor
+    // 3. Agrupa órfãos e alunos transferidos por turma + tutor
     const byTurmaTutor = new Map(); // key: "turma|tutor"
     for (const { nomeOriginal, turma, tutor } of orphanMap.values()) {
       const key = `${turma}|${tutor}`;
       if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
       byTurmaTutor.get(key).tutorados.push(nomeOriginal);
+    }
+
+    for (const { nomeOriginal, turma, tutor } of transferredStudents) {
+      const existingGroup = updatedResolvedData.find(g => formatTurma(g.turma) === formatTurma(turma) && g.tutor === tutor);
+      if (existingGroup) {
+        if (!existingGroup.tutorados.includes(nomeOriginal)) {
+          existingGroup.tutorados.push(nomeOriginal);
+        }
+      } else {
+        const key = `${turma}|${tutor}`;
+        if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
+        if (!byTurmaTutor.get(key).tutorados.includes(nomeOriginal)) {
+          byTurmaTutor.get(key).tutorados.push(nomeOriginal);
+        }
+      }
     }
 
     // 4. Gera os novos grupos
@@ -238,7 +278,7 @@ const App = () => {
       });
     }
 
-    return [...resolvedDataRaw, ...additionalGroups];
+    return [...updatedResolvedData, ...additionalGroups];
   }, [dataRaw, conceitoData, provaData]);
 
   const isLoading = hasLgpdConsent && (isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos);
@@ -300,6 +340,14 @@ const App = () => {
         
         let conceitosDoAluno = Array.from(conceitosMap.values());
         conceitosDoAluno.sort((a, b) => a.bimestre.localeCompare(b.bimestre));
+
+        const { turmaAtiva, turmaOriginal, isTransferido, historicoTurmas } = resolveStudentActiveTurma(
+          nomeOriginal,
+          item.turma,
+          conceitoData,
+          provaData
+        );
+
         const ultimoBimestre = conceitosDoAluno.length > 0 ? conceitosDoAluno[conceitosDoAluno.length - 1] : null;
         let quickMat = '-', quickPort = '-';
         // Calcula CC: média de todas as notas do último bimestre (Conselho Bimestral)
@@ -412,7 +460,11 @@ const App = () => {
 
           list.push({
             nome: nomeOriginal, normalizedName: normName,
-            turma: item.turma, tutor: item.tutor,
+            turma: turmaAtiva || item.turma,
+            turmaOriginal: turmaOriginal || item.turma,
+            transferido: isTransferido,
+            historicoTurmas,
+            tutor: item.tutor,
             notes: studentNotes, noteCount: studentNotes.length,
             lastNoteDate: studentNotes.length > 0 ? studentNotes[0].displayDate : null,
             provaPaulista: (() => {
@@ -805,6 +857,7 @@ const App = () => {
           isOpen={showTraceabilityModal}
           onClose={() => setShowTraceabilityModal(false)}
           allStudents={allStudents}
+          conceitoData={conceitoData}
           selectedBimestre={traceabilityPeriod}
           initialTurma={traceabilityTurma}
           onSelectStudent={(nome) => {

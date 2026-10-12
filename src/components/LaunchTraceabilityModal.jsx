@@ -8,7 +8,7 @@ import {
   Check, ArrowUpDown, School,
   FileSpreadsheet, Eye
 } from 'lucide-react';
-import { parseGrade, formatDisciplina, formatBimestre } from '../utils/helpers';
+import { parseGrade, formatDisciplina, formatBimestre, formatTurma, matchesBimestre, getBimestreNum } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 
 // Verificação robusta de célula sem nota
@@ -28,6 +28,7 @@ const LaunchTraceabilityModal = ({
   isOpen = false,
   onClose,
   allStudents = [],
+  conceitoData = [],
   selectedBimestre = '3',
   initialTurma = 'Todas',
   onSelectStudent
@@ -64,76 +65,129 @@ const LaunchTraceabilityModal = ({
     // 1. Filtrar estritamente alunos ativos
     const activeStudents = allStudents.filter(s => !s.situacao || String(s.situacao).trim() === 'Ativo');
 
-    // 2. Mapear disciplinas esperadas por turma a partir do histórico curricular
-    const turmasDisciplinasMap = new Map(); // turma -> Set(disciplinas formatadas)
-    allStudents.forEach(s => {
-      const t = String(s.turma || '').trim();
-      if (!t) return;
-      if (!turmasDisciplinasMap.has(t)) turmasDisciplinasMap.set(t, new Set());
-      const discSet = turmasDisciplinasMap.get(t);
-      (s.historicoConceitos || []).forEach(b => {
-        Object.keys(b.notas || {}).forEach(rawDisc => {
-          const formatted = formatDisciplina(rawDisc);
-          if (formatted && formatted !== '-' && formatted !== 'SITUAÇÃO' && formatted !== 'TOTAL') {
-            discSet.add(formatted);
-          }
-        });
-      });
-    });
-
-    // 3. Mapear todas as turmas cadastradas com alunos ativos
+    // 2. Mapear todas as turmas cadastradas com alunos ativos
+    const bimNum = getBimestreNum(selectedBimestre);
     const turmasSet = new Set();
     activeStudents.forEach(s => {
-      const t = String(s.turma || '').trim();
+      const t = String(s.historicoTurmas?.[bimNum] || s.turma || '').trim();
       if (t) turmasSet.add(t);
     });
+    // Adiciona também turmas presentes no próprio Mapão para este bimestre
+    (conceitoData || []).forEach(c => {
+      if (matchesBimestre(c.bimestre, selectedBimestre) && c.turmaPlanilha) {
+        const t = formatTurma(c.turmaPlanilha);
+        if (t && t !== 'Sem Turma' && t !== 'Desconhecida') turmasSet.add(t);
+      }
+    });
+
     const turmasList = Array.from(turmasSet).sort((a, b) => 
       a.localeCompare(b, undefined, { numeric: true })
     );
+
+    // 3. Mapear disciplinas esperadas e existência de Mapão por turma
+    const turmasDisciplinasMap = new Map(); // turma -> Set(disciplinas formatadas)
+    const turmasHasMapaoMap = new Map(); // turma -> boolean
+
+    turmasList.forEach(turmaName => {
+      const normT = formatTurma(turmaName);
+      let hasMapao = false;
+      const discSet = new Set();
+
+      // Checa se há linhas na planilha do Mapão para esta turma neste bimestre
+      if (conceitoData && conceitoData.length > 0) {
+        conceitoData.forEach(c => {
+          if (formatTurma(c.turmaPlanilha) === normT && matchesBimestre(c.bimestre, selectedBimestre)) {
+            hasMapao = true;
+            Object.keys(c.notas || {}).forEach(rawDisc => {
+              const formatted = formatDisciplina(rawDisc);
+              if (formatted && formatted !== '-' && formatted !== 'SITUAÇÃO' && formatted !== 'TOTAL') {
+                discSet.add(formatted);
+              }
+            });
+          }
+        });
+      }
+
+      // Se não encontrou via conceitoData (ex.: ambiente de teste isolado ou mock)
+      if (!hasMapao) {
+        const alunosDaTurma = activeStudents.filter(s => {
+          const tAluno = s.historicoTurmas?.[bimNum] || s.turma;
+          return formatTurma(tAluno) === normT;
+        });
+        alunosDaTurma.forEach(s => {
+          (s.historicoConceitos || []).forEach(b => {
+            if (matchesBimestre(b.bimestre, selectedBimestre) && formatTurma(b.turmaPlanilha || s.turma) === normT) {
+              const hasTyped = Object.values(b.notas || {}).some(v => !checkIsMissing(v));
+              if (hasTyped) hasMapao = true;
+              Object.keys(b.notas || {}).forEach(rawDisc => {
+                const formatted = formatDisciplina(rawDisc);
+                if (formatted && formatted !== '-' && formatted !== 'SITUAÇÃO' && formatted !== 'TOTAL') {
+                  discSet.add(formatted);
+                }
+              });
+            }
+          });
+        });
+      }
+
+      turmasHasMapaoMap.set(turmaName, hasMapao);
+      turmasDisciplinasMap.set(turmaName, discSet);
+    });
 
     // 4. Analisar por turma e disciplina para descobrir quem já lançou
     const turmasAudit = new Map();
 
     turmasList.forEach(turmaName => {
-      const alunosDaTurma = activeStudents.filter(s => String(s.turma || '').trim() === turmaName);
+      const normT = formatTurma(turmaName);
+      const hasMapao = turmasHasMapaoMap.get(turmaName) || false;
+      const alunosDaTurma = activeStudents.filter(s => {
+        const tAluno = s.historicoTurmas?.[bimNum] || s.turma;
+        return formatTurma(tAluno) === normT;
+      });
       const discList = Array.from(turmasDisciplinasMap.get(turmaName) || []).sort();
 
       const discAudit = {};
       let totalNotasLancadasTurma = 0;
-      let totalNotasEsperadasTurma = alunosDaTurma.length * (discList.length > 0 ? discList.length : 1);
+      let totalNotasEsperadasTurma = hasMapao 
+        ? alunosDaTurma.length * (discList.length > 0 ? discList.length : 1)
+        : 0;
 
       discList.forEach(disc => {
         discAudit[disc] = { comNota: [], semNota: [] };
       });
 
-      alunosDaTurma.forEach(aluno => {
-        const hist = aluno.historicoConceitos || [];
-        const bimRecord = hist.find(b => {
-          const bFormatted = formatBimestre(b.bimestre);
-          return bFormatted === bimestreLabel || String(b.bimestre).includes(selectedBimestre);
-        });
+      if (hasMapao) {
+        alunosDaTurma.forEach(aluno => {
+          const hist = aluno.historicoConceitos || [];
+          const bimRecord = hist.find(b => {
+            const matchesBim = matchesBimestre(b.bimestre, selectedBimestre);
+            const matchesTurma = formatTurma(b.turmaPlanilha || aluno.turma) === normT;
+            return matchesBim && matchesTurma;
+          });
 
-        discList.forEach(disc => {
-          let rawNota = null;
-          if (bimRecord && bimRecord.notas) {
-            const chaves = Object.keys(bimRecord.notas);
-            const foundKey = chaves.find(k => formatDisciplina(k) === disc);
-            if (foundKey) rawNota = bimRecord.notas[foundKey];
-          }
+          discList.forEach(disc => {
+            let rawNota = null;
+            if (bimRecord && bimRecord.notas) {
+              const chaves = Object.keys(bimRecord.notas);
+              const foundKey = chaves.find(k => formatDisciplina(k) === disc);
+              if (foundKey) rawNota = bimRecord.notas[foundKey];
+            }
 
-          if (checkIsMissing(rawNota)) {
-            discAudit[disc].semNota.push(aluno);
-          } else {
-            discAudit[disc].comNota.push(aluno);
-            totalNotasLancadasTurma++;
-          }
+            if (checkIsMissing(rawNota)) {
+              discAudit[disc].semNota.push(aluno);
+            } else {
+              discAudit[disc].comNota.push(aluno);
+              totalNotasLancadasTurma++;
+            }
+          });
         });
-      });
+      }
 
       const hasAnyGrade = totalNotasLancadasTurma > 0;
       const isComplete = totalNotasEsperadasTurma > 0 && totalNotasLancadasTurma === totalNotasEsperadasTurma;
       let turmaStatus = 'nao_iniciada';
-      if (isComplete) turmaStatus = 'concluida';
+      if (!hasMapao) turmaStatus = 'sem_mapao';
+      else if (isComplete) turmaStatus = 'concluida';
       else if (hasAnyGrade) turmaStatus = 'em_andamento';
 
       turmasAudit.set(turmaName, {
@@ -142,6 +196,7 @@ const LaunchTraceabilityModal = ({
         alunos: alunosDaTurma,
         disciplinas: discAudit,
         discList,
+        hasMapao,
         totalNotasLancadas: totalNotasLancadasTurma,
         totalNotasEsperadas: totalNotasEsperadasTurma,
         porcentagemConcluida: totalNotasEsperadasTurma > 0 ? Math.round((totalNotasLancadasTurma / totalNotasEsperadasTurma) * 100) : 0,
@@ -155,60 +210,68 @@ const LaunchTraceabilityModal = ({
     let alunosComPendenciaCount = 0;
 
     activeStudents.forEach(aluno => {
-      const turmaName = String(aluno.turma || '').trim();
-      const turmaInfo = turmasAudit.get(turmaName);
+      const turmaAlunoNoBim = aluno.historicoTurmas?.[bimNum] || aluno.turma;
+      const turmaName = String(turmaAlunoNoBim || aluno.turma || '').trim();
+      const turmaInfo = turmasAudit.get(turmaName) || turmasAudit.get(aluno.turma);
       const discList = turmaInfo ? turmaInfo.discList : [];
+      const hasMapao = turmaInfo ? turmaInfo.hasMapao : false;
 
       const hist = aluno.historicoConceitos || [];
       const bimRecord = hist.find(b => {
-        const bFormatted = formatBimestre(b.bimestre);
-        return bFormatted === bimestreLabel || String(b.bimestre).includes(selectedBimestre);
+        const matchesBim = matchesBimestre(b.bimestre, selectedBimestre);
+        const matchesTurma = formatTurma(b.turmaPlanilha || aluno.turma) === formatTurma(turmaName);
+        return matchesBim && matchesTurma;
       });
 
       const furosDeDigitacao = [];
       const materiasNaoLancadasNaTurma = [];
       const materiasComNota = [];
 
-      discList.forEach(disc => {
-        let rawNota = null;
-        if (bimRecord && bimRecord.notas) {
-          const chaves = Object.keys(bimRecord.notas);
-          const foundKey = chaves.find(k => formatDisciplina(k) === disc);
-          if (foundKey) rawNota = bimRecord.notas[foundKey];
-        }
-
-        if (checkIsMissing(rawNota)) {
-          const discStats = turmaInfo?.disciplinas?.[disc];
-          const outrosAlunosTemNota = discStats && discStats.comNota.length > 0;
-          if (outrosAlunosTemNota) {
-            furosDeDigitacao.push({
-              disciplina: disc,
-              colegasComNota: discStats.comNota.length,
-              totalTurma: turmaInfo.totalAtivos
-            });
-          } else {
-            materiasNaoLancadasNaTurma.push(disc);
+      if (hasMapao) {
+        discList.forEach(disc => {
+          let rawNota = null;
+          if (bimRecord && bimRecord.notas) {
+            const chaves = Object.keys(bimRecord.notas);
+            const foundKey = chaves.find(k => formatDisciplina(k) === disc);
+            if (foundKey) rawNota = bimRecord.notas[foundKey];
           }
-        } else {
-          materiasComNota.push({
-            disciplina: disc,
-            nota: rawNota
-          });
-        }
-      });
 
-      const isTurmaNaoIniciada = turmaInfo ? turmaInfo.status === 'nao_iniciada' : true;
-      const temPendencia = furosDeDigitacao.length > 0 || materiasNaoLancadasNaTurma.length > 0;
+          if (checkIsMissing(rawNota)) {
+            const discStats = turmaInfo?.disciplinas?.[disc];
+            const outrosAlunosTemNota = discStats && discStats.comNota.length > 0;
+            if (outrosAlunosTemNota) {
+              furosDeDigitacao.push({
+                disciplina: disc,
+                colegasComNota: discStats.comNota.length,
+                totalTurma: turmaInfo.totalAtivos
+              });
+            } else {
+              materiasNaoLancadasNaTurma.push(disc);
+            }
+          } else {
+            materiasComNota.push({
+              disciplina: disc,
+              nota: rawNota
+            });
+          }
+        });
+      }
 
-      if (temPendencia) alunosComPendenciaCount++;
+      const isTurmaNaoIniciada = !hasMapao || (turmaInfo ? (turmaInfo.status === 'nao_iniciada' || turmaInfo.status === 'sem_mapao') : true);
+      const temPendencia = furosDeDigitacao.length > 0 || (hasMapao && materiasNaoLancadasNaTurma.length > 0);
+
       if (furosDeDigitacao.length > 0) totalFurosGeral += furosDeDigitacao.length;
+      if (temPendencia || !hasMapao) alunosComPendenciaCount++;
 
       alunosAuditList.push({
         id: `${aluno.nome}__${turmaName}`,
         nome: aluno.nome,
         turma: turmaName || '-',
+        turmaOriginal: aluno.turmaOriginal || aluno.turma,
+        transferido: aluno.transferido || false,
         tutor: aluno.tutor || 'Sem Tutor',
         isTurmaNaoIniciada,
+        hasMapao,
         materiasComNota,
         furosDeDigitacao,
         materiasNaoLancadasNaTurma,
@@ -263,7 +326,7 @@ const LaunchTraceabilityModal = ({
 
     // Métricas gerais de resumo
     const totalAlunosAtivos = activeStudents.length;
-    const turmasIniciadasCount = Array.from(turmasAudit.values()).filter(t => t.status !== 'nao_iniciada').length;
+    const turmasIniciadasCount = Array.from(turmasAudit.values()).filter(t => t.status !== 'nao_iniciada' && t.status !== 'sem_mapao').length;
     const turmasTotalCount = turmasList.length;
 
     let totalNotasEscolaLancadas = 0;
@@ -284,12 +347,116 @@ const LaunchTraceabilityModal = ({
       turmasIniciadasCount,
       turmasTotalCount,
       taxaGeralEscola,
+      totalNotasEscolaLancadas,
+      totalNotasEscolaEsperadas,
       turmasList,
       turmasAudit: Array.from(turmasAudit.values()),
       alunosAuditList,
       discAgregadaList
     };
-  }, [allStudents, selectedBimestre, bimestreLabel]);
+  }, [allStudents, conceitoData, selectedBimestre, bimestreLabel]);
+
+  // ── 2. KPIs Dinâmicos (Global vs Turma Analisada) ──────────────────────────
+  const activeKpis = useMemo(() => {
+    const isGlobal = selectedTurma === 'Todas';
+
+    if (isGlobal) {
+      return {
+        isGlobal: true,
+        card1: {
+          label: 'Alunos Ativos',
+          value: auditData.totalAlunosAtivos,
+          sub: `${auditData.alunosComPendenciaCount} com notas a lançar`
+        },
+        card2: {
+          label: 'Pendências no Grupo',
+          value: auditData.totalFurosGeral,
+          sub: auditData.totalFurosGeral > 0 ? 'Alunos aguardando nota nesta matéria' : 'Turmas em dia com as notas',
+          hasAlert: auditData.totalFurosGeral > 0
+        },
+        card3: {
+          label: 'Turmas com Dados',
+          value: `${auditData.turmasIniciadasCount}`,
+          valueComplement: `/ ${auditData.turmasTotalCount}`,
+          sub: `${auditData.turmasTotalCount - auditData.turmasIniciadasCount} turmas ainda não iniciadas`
+        },
+        card4: {
+          label: 'Conclusão Global',
+          value: `${auditData.taxaGeralEscola}%`,
+          percent: auditData.taxaGeralEscola,
+          sub: `${auditData.totalNotasEscolaLancadas} de ${auditData.totalNotasEscolaEsperadas} notas lançadas`
+        }
+      };
+    }
+
+    // Modo Turma Analisada
+    const turmaInfo = auditData.turmasAudit.find(t => t.turma === selectedTurma) || {
+      totalAtivos: 0,
+      status: 'nao_iniciada',
+      discList: [],
+      disciplinas: {},
+      totalNotasLancadas: 0,
+      totalNotasEsperadas: 0,
+      porcentagemConcluida: 0
+    };
+
+    const alunosDaTurma = auditData.alunosAuditList.filter(a => a.turma === selectedTurma);
+    const alunosComPendencia = alunosDaTurma.filter(a => a.totalPendencias > 0).length;
+    const furosDaTurma = alunosDaTurma.reduce((acc, a) => acc + (a.totalFuros || 0), 0);
+
+    const discIniciadas = (turmaInfo.discList || []).filter(disc => 
+      turmaInfo.disciplinas?.[disc]?.comNota?.length > 0
+    ).length;
+    const totalDisc = (turmaInfo.discList || []).length;
+
+    let card2Sub = 'Sem furos pontuais de digitação';
+    if (turmaInfo.status === 'sem_mapao') {
+      card2Sub = 'Turma sem mapão lançado';
+    } else if (furosDaTurma > 0) {
+      card2Sub = `${furosDaTurma} notas a preencher no grupo`;
+    } else if (turmaInfo.status === 'concluida') {
+      card2Sub = 'Todas as notas lançadas';
+    }
+
+    let card3Sub = `${totalDisc - discIniciadas} matérias sem lançamentos`;
+    if (turmaInfo.status === 'sem_mapao') {
+      card3Sub = 'Aba do Mapão não iniciada';
+    } else if (totalDisc === 0) {
+      card3Sub = 'Grade curricular não definida';
+    } else if (discIniciadas === totalDisc) {
+      card3Sub = 'Todas as matérias com dados';
+    }
+
+    return {
+      isGlobal: false,
+      turma: selectedTurma,
+      card1: {
+        label: `Alunos Ativos (${selectedTurma})`,
+        value: turmaInfo.totalAtivos,
+        sub: turmaInfo.status === 'sem_mapao' 
+          ? 'Aguardando abertura do mapão'
+          : `${alunosComPendencia} alunos com pendências`
+      },
+      card2: {
+        label: `Pendências na Turma`,
+        value: furosDaTurma,
+        sub: card2Sub,
+        hasAlert: furosDaTurma > 0
+      },
+      card3: {
+        label: `Disciplinas com Dados`,
+        value: `${discIniciadas}`,
+        valueComplement: `/ ${totalDisc}`,
+        sub: card3Sub
+      },
+      card4: {
+        label: `Conclusão da Turma`,
+        value: `${turmaInfo.porcentagemConcluida}%`,
+        percent: turmaInfo.porcentagemConcluida,
+        sub: `${turmaInfo.totalNotasLancadas} de ${turmaInfo.totalNotasEsperadas} notas lançadas`
+      }
+    };
+  }, [selectedTurma, auditData]);
 
   // ── Filtragem de Alunos com Pendência ───────────────────────────────────────
   const filteredAlunos = useMemo(() => {
@@ -458,60 +625,70 @@ const LaunchTraceabilityModal = ({
           </button>
         </div>
 
-        {/* ── 2. Cards de KPIs Rápidos (Centralizados e Harmoniosos) ────────── */}
+        {/* ── 2. Cards de KPIs Rápidos (Dinâmicos: Global vs Turma Analisada) ── */}
         <div className="px-5 sm:px-7 py-3 bg-slate-50/50 border-b border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
           <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               <Users className="w-3.5 h-3.5 text-slate-400" />
-              <span>Alunos Ativos</span>
+              <span>{activeKpis.card1.label}</span>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight my-0.5">
-              {auditData.totalAlunosAtivos}
+              {activeKpis.card1.value}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              {auditData.alunosComPendenciaCount} com notas a lançar
+              {activeKpis.card1.sub}
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
-              <span className={`w-1.5 h-1.5 rounded-full ${auditData.totalFurosGeral > 0 ? 'bg-amber-500' : 'bg-slate-300'}`} />
-              <span>Pendências no Grupo</span>
-              <AlertTriangle className={`w-3.5 h-3.5 ${auditData.totalFurosGeral > 0 ? 'text-amber-500' : 'text-slate-300'}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${activeKpis.card2.hasAlert ? 'bg-amber-500' : 'bg-slate-300'}`} />
+              <span>{activeKpis.card2.label}</span>
+              <AlertTriangle className={`w-3.5 h-3.5 ${activeKpis.card2.hasAlert ? 'text-amber-500' : 'text-slate-300'}`} />
             </div>
-            <div className={`text-2xl sm:text-3xl font-black tracking-tight my-0.5 ${auditData.totalFurosGeral > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
-              {auditData.totalFurosGeral}
+            <div className={`text-2xl sm:text-3xl font-black tracking-tight my-0.5 ${activeKpis.card2.hasAlert ? 'text-amber-600' : 'text-slate-900'}`}>
+              {activeKpis.card2.value}
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              {auditData.totalFurosGeral > 0 ? 'Alunos aguardando nota nesta matéria' : 'Turmas em dia com as notas'}
+              {activeKpis.card2.sub}
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
-              <School className="w-3.5 h-3.5 text-slate-400" />
-              <span>Turmas com Dados</span>
+              {activeKpis.isGlobal ? (
+                <School className="w-3.5 h-3.5 text-slate-400" />
+              ) : (
+                <BookOpen className="w-3.5 h-3.5 text-slate-400" />
+              )}
+              <span>{activeKpis.card3.label}</span>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight my-0.5">
-              {auditData.turmasIniciadasCount} <span className="text-sm sm:text-base font-semibold text-slate-400">/ {auditData.turmasTotalCount}</span>
+              {activeKpis.card3.value} <span className="text-sm sm:text-base font-semibold text-slate-400">{activeKpis.card3.valueComplement}</span>
             </div>
             <div className="text-[11px] text-slate-400 mt-0.5">
-              {auditData.turmasTotalCount - auditData.turmasIniciadasCount} turmas ainda não iniciadas
+              {activeKpis.card3.sub}
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
-              <span>Conclusão Global</span>
+              <span>{activeKpis.card4.label}</span>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight my-0.5">
-              {auditData.taxaGeralEscola}%
+              {activeKpis.card4.value}
             </div>
             <div className="w-full max-w-[140px] bg-slate-100 h-1.5 rounded-full mt-2 overflow-hidden mx-auto">
               <div 
-                className="bg-blue-600 h-full rounded-full transition-all"
-                style={{ width: `${auditData.taxaGeralEscola}%` }}
+                className={`h-full rounded-full transition-all ${
+                  activeKpis.card4.percent === 100 
+                    ? 'bg-emerald-500' 
+                    : activeKpis.card4.percent > 0 
+                      ? 'bg-blue-600' 
+                      : 'bg-slate-300'
+                }`}
+                style={{ width: `${activeKpis.card4.percent}%` }}
               />
             </div>
           </div>
@@ -825,7 +1002,7 @@ const LaunchTraceabilityModal = ({
                               ? 'bg-blue-50 text-blue-700 border border-blue-200/60' 
                               : 'bg-slate-100 text-slate-500'
                         }`}>
-                          {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Lançamento' : 'Não Iniciada'}
+                          {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Lançamento' : t.status === 'sem_mapao' ? 'Sem Mapão' : 'Não Iniciada'}
                         </span>
                       </div>
 
