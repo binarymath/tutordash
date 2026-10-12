@@ -73,7 +73,7 @@ const Header = ({
               rel="noopener noreferrer"
               className="flex items-center gap-2 bg-gradient-to-b from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold border border-blue-600 border-b-[3px] border-b-blue-800 shadow-xs hover:shadow active:border-b active:translate-y-[2px] transition-all cursor-pointer"
             >
-              <ExternalLink className="w-4 h-4" /> Link Anotações
+              <ExternalLink className="w-4 h-4" /> Anotações
             </a>
           )}
           <button 
