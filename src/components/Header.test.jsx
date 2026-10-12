@@ -60,12 +60,12 @@ describe('Header', () => {
 
   it('não mostra link de anotações quando config.formLink não está definido', () => {
     render(<Header {...defaultProps} config={{}} />);
-    expect(screen.queryByText(/link anotações/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/anotações/i)).not.toBeInTheDocument();
   });
 
   it('mostra link de anotações quando config.formLink está definido', () => {
     render(<Header {...defaultProps} config={{ formLink: 'https://forms.google.com/123' }} />);
-    expect(screen.getByText(/link anotações/i)).toBeInTheDocument();
+    expect(screen.getByText(/anotações/i)).toBeInTheDocument();
   });
 
   it('não exibe navegação de aluno quando selectedStudent é null', () => {
