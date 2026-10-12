@@ -17,6 +17,7 @@ import StudentProfile from './components/StudentProfile';
 import ClassProfile   from './components/ClassProfile';
 import LgpdBanner     from './components/LgpdBanner';
 import LowGradesReportModal from './components/LowGradesReportModal';
+import LaunchTraceabilityModal from './components/LaunchTraceabilityModal';
 
 const App = () => {
   const queryClient = useQueryClient();
@@ -114,6 +115,9 @@ const App = () => {
   const [showStickyName,        setShowStickyName]        = useState(false);
   const [showOnlyActive,        setShowOnlyActive]        = useState(true);
   const [showLowGradesModal,    setShowLowGradesModal]    = useState(false);
+  const [lowGradesInitialPeriod, setLowGradesInitialPeriod] = useState('Média Geral');
+  const [showTraceabilityModal, setShowTraceabilityModal] = useState(false);
+  const [traceabilityPeriod,    setTraceabilityPeriod]    = useState('3');
 
   useEffect(() => { if (selectedStudent) setSelectedTurma(null); }, [selectedStudent]);
   useEffect(() => { if (selectedTurma) setSelectedStudent(null); }, [selectedTurma]);
@@ -264,9 +268,14 @@ const App = () => {
   // ── Derivações computadas ──────────────────────────────────
   const allStudents = useMemo(() => {
     const list = [];
+    const seenStudentKeys = new Set();
     data.forEach(item => {
       item.tutorados.forEach(nomeOriginal => {
         const normName       = normalizeName(nomeOriginal);
+        const uniqueKey      = `${normName}__${item.turma}`;
+        if (seenStudentKeys.has(uniqueKey)) return;
+        seenStudentKeys.add(uniqueKey);
+
         const studentNotes   = annotations.filter(n => n.normalizedName === normName);
         let provasDoAlunoRaw = provaData.filter(p => p.normalizedName === normName);
         const provasMap = new Map();
@@ -335,7 +344,7 @@ const App = () => {
             }
           }
 
-          // ── Faltas e Frequência (acumulado de todos os bimestres) ─────────────
+          // ── Faltas e Frequência Geral (vinda da última coluna do conselho de classe / mapão) ──
           const _parseNum = (v) => {
             if (v == null) return null;
             const n = parseFloat(String(v).replace('%','').replace(',','.'));
@@ -346,7 +355,7 @@ const App = () => {
           conceitosDoAluno.forEach(bim => {
             const tf = _parseNum(bim.tfBimestre ?? bim.faltas);
             if (tf !== null) _faltasTotal += tf;
-            const freqRaw = bim.freqBimestre ?? '-';
+            const freqRaw = bim.freqBimestre ?? bim.frequencia ?? '-';
             const freqParsed = _parseNum(freqRaw);
             if (freqParsed !== null) {
               const freq = freqParsed <= 1 && !String(freqRaw).includes('%')
@@ -356,9 +365,26 @@ const App = () => {
             }
           });
           const totalFaltas = conceitosDoAluno.length > 0 ? _faltasTotal : null;
-          const frequenciaMedia = _freqVals.length > 0
-            ? _freqVals.reduce((s, v) => s + v, 0) / _freqVals.length
-            : null;
+
+          // A Frequência Geral do aluno vem diretamente da última coluna com dados do conselho de classe (mapão)
+          let frequenciaGeralRaw = ultimoBimestre?.freqBimestre || ultimoBimestre?.frequencia || null;
+          if ((!frequenciaGeralRaw || frequenciaGeralRaw === '-' || frequenciaGeralRaw === 'S/D') && conceitosDoAluno.length > 0) {
+            for (let i = conceitosDoAluno.length - 1; i >= 0; i--) {
+              const f = conceitosDoAluno[i]?.freqBimestre || conceitosDoAluno[i]?.frequencia;
+              if (f && f !== '-' && f !== 'S/D' && f !== 'S/N') {
+                frequenciaGeralRaw = f;
+                break;
+              }
+            }
+          }
+          const freqGeralParsed = _parseNum(frequenciaGeralRaw);
+          const frequenciaGeralNum = freqGeralParsed !== null
+            ? (freqGeralParsed <= 1 && !String(frequenciaGeralRaw).includes('%')
+                ? Math.max(0, Math.min(100, freqGeralParsed * 100))
+                : Math.max(0, Math.min(100, freqGeralParsed)))
+            : (_freqVals.length > 0 ? _freqVals[_freqVals.length - 1] : null);
+
+          const frequenciaMedia = frequenciaGeralNum;
 
           // ── Status: prioridade para o bimestre mais recente ──────────────────
           // No mesmo bimestre, se houver "Ativo" entre os status, prevalece "Ativo"
@@ -406,6 +432,8 @@ const App = () => {
             todasSituacoes,
             totalFaltas,
             frequenciaMedia,
+            frequenciaGeral: frequenciaGeralNum,
+            frequenciaGeralRaw: frequenciaGeralRaw || '-',
           });
       });
 
@@ -759,7 +787,22 @@ const App = () => {
       {showLowGradesModal && (
         <LowGradesReportModal
           allStudents={allStudents}
+          initialPeriod={lowGradesInitialPeriod}
           onClose={() => setShowLowGradesModal(false)}
+          onSelectStudent={(nome) => {
+            setSelectedStudent(nome);
+            setSelectedTurma(null);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        />
+      )}
+
+      {showTraceabilityModal && (
+        <LaunchTraceabilityModal
+          isOpen={showTraceabilityModal}
+          onClose={() => setShowTraceabilityModal(false)}
+          allStudents={allStudents}
+          selectedBimestre={traceabilityPeriod}
           onSelectStudent={(nome) => {
             setSelectedStudent(nome);
             setSelectedTurma(null);
@@ -781,7 +824,7 @@ const App = () => {
         showStickyName={showStickyName}
       />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6">
         {!hasLgpdConsent ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
@@ -824,7 +867,17 @@ const App = () => {
                 setShowOnlyActive={setShowOnlyActive}
                 rankingStudents={rankingStudents}
                 filterLabel={filterLabel}
-                onOpenLowGradesReport={() => setShowLowGradesModal(true)}
+                onOpenLowGradesReport={(bim) => {
+                  if (bim === '1') setLowGradesInitialPeriod('1º Bimestre');
+                  else if (bim === '2') setLowGradesInitialPeriod('2º Bimestre');
+                  else if (bim === '3') setLowGradesInitialPeriod('3º Bimestre');
+                  else setLowGradesInitialPeriod('Média Geral');
+                  setShowLowGradesModal(true);
+                }}
+                onOpenTraceability={(bim) => {
+                  setTraceabilityPeriod(bim || '3');
+                  setShowTraceabilityModal(true);
+                }}
               />
             ) : (
               <StudentProfile

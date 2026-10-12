@@ -302,3 +302,43 @@ export const parseProvaPaulistaExcel = (arrayBuffer, studentName, allStudents, t
     return [];
   }
 };
+
+export const isNonSubjectHeader = (header) => {
+  if (!header) return true;
+  const raw = String(header).trim();
+  const compact = raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s():%._-]+/g, '')
+    .trim();
+
+  return (
+    compact === 'F' ||
+    compact === 'AC' ||
+    compact === 'FTAN' ||
+    compact === 'FRE' ||
+    compact === 'FREQ' ||
+    compact === 'FREAN' ||
+    compact === 'FREANPERCENT' ||
+    compact === 'FREQUENCIAANUAL' ||
+    compact === 'FREQUENCIAAN' ||
+    compact === 'FREQUENCIA' ||
+    compact.startsWith('FRE') ||
+    compact.startsWith('FREQ') ||
+    compact.includes('FALTA') ||
+    compact.includes('FREQUEN') ||
+    compact === 'TF' ||
+    compact === 'TOTALTF' ||
+    compact === 'TOTALFALTA' ||
+    compact === 'TOTALFALTAS' ||
+    compact.includes('TOTALFALTA') ||
+    compact.includes('TOTALDEFALTA') ||
+    compact === 'SITUACAO' ||
+    compact === 'CH' ||
+    compact === 'RA' ||
+    compact === 'ALUNO' ||
+    compact === 'NUMERO' ||
+    compact === 'N'
+  );
+};
