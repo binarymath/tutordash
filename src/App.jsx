@@ -116,8 +116,10 @@ const App = () => {
   const [showOnlyActive,        setShowOnlyActive]        = useState(true);
   const [showLowGradesModal,    setShowLowGradesModal]    = useState(false);
   const [lowGradesInitialPeriod, setLowGradesInitialPeriod] = useState('Média Geral');
+  const [lowGradesInitialTurma,  setLowGradesInitialTurma]  = useState('Todas');
   const [showTraceabilityModal, setShowTraceabilityModal] = useState(false);
   const [traceabilityPeriod,    setTraceabilityPeriod]    = useState('3');
+  const [traceabilityTurma,     setTraceabilityTurma]     = useState('Todas');
 
   useEffect(() => { if (selectedStudent) setSelectedTurma(null); }, [selectedStudent]);
   useEffect(() => { if (selectedTurma) setSelectedStudent(null); }, [selectedTurma]);
@@ -788,6 +790,7 @@ const App = () => {
         <LowGradesReportModal
           allStudents={allStudents}
           initialPeriod={lowGradesInitialPeriod}
+          initialTurma={lowGradesInitialTurma}
           onClose={() => setShowLowGradesModal(false)}
           onSelectStudent={(nome) => {
             setSelectedStudent(nome);
@@ -803,6 +806,7 @@ const App = () => {
           onClose={() => setShowTraceabilityModal(false)}
           allStudents={allStudents}
           selectedBimestre={traceabilityPeriod}
+          initialTurma={traceabilityTurma}
           onSelectStudent={(nome) => {
             setSelectedStudent(nome);
             setSelectedTurma(null);
@@ -867,15 +871,30 @@ const App = () => {
                 setShowOnlyActive={setShowOnlyActive}
                 rankingStudents={rankingStudents}
                 filterLabel={filterLabel}
-                onOpenLowGradesReport={(bim) => {
+                onOpenLowGradesReport={(bim, turma) => {
                   if (bim === '1') setLowGradesInitialPeriod('1º Bimestre');
                   else if (bim === '2') setLowGradesInitialPeriod('2º Bimestre');
                   else if (bim === '3') setLowGradesInitialPeriod('3º Bimestre');
                   else setLowGradesInitialPeriod('Média Geral');
+
+                  let targetTurma = turma;
+                  if (!targetTurma || targetTurma === 'Todas') {
+                    if (filterMode === 'turma' && selectedValue && selectedValue !== 'Todos') {
+                      targetTurma = selectedValue;
+                    }
+                  }
+                  setLowGradesInitialTurma(targetTurma || 'Todas');
                   setShowLowGradesModal(true);
                 }}
-                onOpenTraceability={(bim) => {
+                onOpenTraceability={(bim, turma) => {
                   setTraceabilityPeriod(bim || '3');
+                  let targetTurma = turma;
+                  if (!targetTurma || targetTurma === 'Todas') {
+                    if (filterMode === 'turma' && selectedValue && selectedValue !== 'Todos') {
+                      targetTurma = selectedValue;
+                    }
+                  }
+                  setTraceabilityTurma(targetTurma || 'Todas');
                   setShowTraceabilityModal(true);
                 }}
               />

@@ -8,9 +8,9 @@ import {
   Users, GraduationCap, Filter, FileSpreadsheet,
   AlertTriangle, Sparkles, ChevronRight, BookOpen,
   TrendingUp, TrendingDown, Minus, Calendar, CheckCircle2,
-  Clock, Compass, Info, ChevronDown
+  Clock, Compass, Info, ChevronDown, ClipboardList
 } from 'lucide-react';
-import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader } from '../utils/helpers';
+import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
 
@@ -487,6 +487,7 @@ const Dashboard = ({
     let consolidados = 0;
     let emApoio = 0;
     let emRisco = 0;
+    let totalNotasEmRisco = 0;
     let evoluindo = 0;
     let emLancamento = 0;
     let semTutor = 0;
@@ -552,13 +553,49 @@ const Dashboard = ({
         if (s.turma) turmasNoPeriodo.add(s.turma);
         if (grade >= 7.0) consolidados++;
         else if (grade >= 5.0) emApoio++;
-        else emRisco++;
       } else {
         if (selectedBimestre === '3') {
           emLancamento++;
-        } else if (selectedBimestre === 'geral') {
-          if (!isNaN(generalPP) && generalPP < 5.0) emRisco++;
         }
+      }
+
+      // ── Análise Alinhada ao Conselho de Classe (Notas < 5,0) ────
+      let alunoEmRiscoCC = false;
+      let qtdNotasRiscoCC = 0;
+
+      if (selectedBimestre !== 'geral') {
+        const hist = s.historicoConceitos || [];
+        const bimObj = hist.find(b => matchesBimestre(b.bimestre, selectedBimestre));
+        if (bimObj && bimObj.notas) {
+          Object.entries(bimObj.notas).forEach(([k, rawVal]) => {
+            if (isNonSubjectHeader(k)) return;
+            if (checkIsMissing(rawVal)) return;
+            const n = parseGrade(rawVal);
+            if (!isNaN(n) && n > 0 && n < 5.0) {
+              alunoEmRiscoCC = true;
+              qtdNotasRiscoCC++;
+            }
+          });
+        }
+        // Fallback: se a média geral do bimestre for < 5.0
+        if (!alunoEmRiscoCC && grade !== null && grade > 0 && grade < 5.0) {
+          alunoEmRiscoCC = true;
+          qtdNotasRiscoCC = 1;
+        }
+      } else {
+        // Média Geral
+        if (grade !== null && grade > 0 && grade < 5.0) {
+          alunoEmRiscoCC = true;
+          qtdNotasRiscoCC = 1;
+        } else if (grade === null && !isNaN(generalPP) && generalPP < 5.0) {
+          alunoEmRiscoCC = true;
+          qtdNotasRiscoCC = 1;
+        }
+      }
+
+      if (alunoEmRiscoCC) {
+        emRisco++;
+        totalNotasEmRisco += qtdNotasRiscoCC;
       }
     });
 
@@ -626,8 +663,12 @@ const Dashboard = ({
       card3Badge = '3º Bi';
       card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (3º Bi)' : 'Média diagnóstica do grupo';
       card4Badge = '3º Bi (Parcial)';
-      card4Subtitle = totalAvaliados > 0 
-        ? (emRisco > 0 ? `${emRisco} nota${emRisco > 1 ? 's' : ''} < 5,0 no 3º Bi` : 'Nenhum aluno < 5,0 no 3º Bi')
+      card4Subtitle = (totalAvaliados > 0 || emRisco > 0)
+        ? (emRisco > 0 
+            ? (totalNotasEmRisco > emRisco 
+                ? `${totalNotasEmRisco} notas < 5,0 (${emRisco} aluno${emRisco > 1 ? 's' : ''})` 
+                : `${emRisco} nota${emRisco > 1 ? 's' : ''} < 5,0 no 3º Bi`)
+            : 'Nenhum aluno < 5,0 no 3º Bi')
         : 'Nenhuma nota lançada no 3º Bi';
     } else if (selectedBimestre === 'geral') {
       cardCCBadge = 'Geral';
@@ -640,6 +681,7 @@ const Dashboard = ({
       consolidados,
       emApoio,
       emRisco,
+      totalNotasEmRisco,
       evoluindo,
       emLancamento,
       semTutor,
@@ -667,6 +709,20 @@ const Dashboard = ({
     if (filterMode === 'serie') return `Nível Escolar: ${selectedValue}`;
     return selectedValue;
   }, [selectedValue, filterMode]);
+
+  // Determina a turma/sala atualmente sendo analisada no Dashboard
+  const currentAnalyzedTurma = useMemo(() => {
+    if (filterMode === 'turma' && selectedValue && selectedValue !== 'Todos') {
+      return selectedValue;
+    }
+    if (sortedData && sortedData.length > 0) {
+      const distinctTurmas = [...new Set(sortedData.map(s => s.turma).filter(Boolean))];
+      if (distinctTurmas.length === 1) {
+        return distinctTurmas[0];
+      }
+    }
+    return 'Todas';
+  }, [filterMode, selectedValue, sortedData]);
 
   const handleExportExcel = async () => {
     try {
@@ -844,31 +900,29 @@ const Dashboard = ({
                     <ChevronDown className="w-4 h-4 text-slate-400 absolute right-2.5 pointer-events-none" />
                   </div>
 
-                  {/* Badges sutis de status */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
+                  {/* Badges sutis de status & Ações Rápidas */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-200/70">
                       <Users className="w-3.5 h-3.5 text-slate-500" />
                       {selectedBimestre === 'geral' ? pedagogicalStats.total : (pedagogicalStats.totalAvaliados || pedagogicalStats.total)} alunos
                     </span>
-                    {selectedBimestre === '3' && pedagogicalStats.emLancamento > 0 && (
-                      onOpenTraceability ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenTraceability(selectedBimestre)}
-                          className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 shadow-2xs transition-all cursor-pointer group"
-                          title="Clique para auditar turmas, disciplinas e alunos com notas a lançar"
-                          aria-label="Abrir auditoria de notas a lançar"
-                        >
-                          <Clock className="w-3.5 h-3.5 text-blue-600 group-hover:rotate-45 transition-transform" />
-                          <span>{pedagogicalStats.emLancamento} a lançar</span>
-                          <Search className="w-3 h-3 text-blue-500 opacity-70 group-hover:opacity-100 ml-0.5" />
-                        </button>
-                      ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-50 text-blue-800 border border-blue-200/80">
-                          <Clock className="w-3.5 h-3.5 text-blue-600" />
-                          {pedagogicalStats.emLancamento} a lançar
-                        </span>
-                      )
+
+                    {onOpenTraceability && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenTraceability(selectedBimestre, currentAnalyzedTurma)}
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-white hover:bg-slate-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-slate-300 shadow-2xs transition-all cursor-pointer group"
+                        title="Auditoria dos lançamentos de notas do conselho bimestral"
+                        aria-label="Abrir auditoria de lançamentos de notas"
+                      >
+                        <ClipboardList className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors" />
+                        <span>Lançamentos</span>
+                        {selectedBimestre === '3' && pedagogicalStats.emLancamento > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/60 ml-0.5">
+                            {pedagogicalStats.emLancamento}
+                          </span>
+                        )}
+                      </button>
                     )}
                   </div>
                 </div>
@@ -989,7 +1043,7 @@ const Dashboard = ({
               {onOpenTraceability && pedagogicalStats.emLancamento > 0 && (
                 <button
                   type="button"
-                  onClick={() => onOpenTraceability(selectedBimestre)}
+                  onClick={() => onOpenTraceability(selectedBimestre, currentAnalyzedTurma)}
                   className="mt-2.5 inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer transition-colors"
                   title="Auditar lançamentos do bimestre"
                 >
@@ -1055,8 +1109,9 @@ const Dashboard = ({
             </div>
 
             {/* Card 5: Alunos em Atenção (< 5,0) */}
+            {/* Card 4: Foco de Atenção (Conselho de Classe) */}
             <div 
-              onClick={() => onOpenLowGradesReport && onOpenLowGradesReport(selectedBimestre)}
+              onClick={() => onOpenLowGradesReport && onOpenLowGradesReport(selectedBimestre, currentAnalyzedTurma)}
               className={`rounded-2xl p-5 border shadow-2xs transition-all text-center flex flex-col items-center justify-center ${
                 onOpenLowGradesReport 
                   ? 'bg-white border-slate-200/90 hover:border-amber-300 hover:shadow-xs cursor-pointer group' 
@@ -1065,7 +1120,7 @@ const Dashboard = ({
             >
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-                <span>Alunos &lt; 5,0</span>
+                <span>Foco de Atenção</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 ml-1">
                   {pedagogicalStats.card4Badge}
                 </span>

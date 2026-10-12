@@ -409,11 +409,12 @@ describe('Dashboard — isolamento estrito de notas do 3º Bimestre', () => {
       />
     );
 
-    // Clica no badge "com notas a lançar"
-    const badgeBtn = screen.getByRole('button', { name: /Abrir auditoria de notas a lançar/i });
-    expect(badgeBtn).toBeInTheDocument();
-    fireEvent.click(badgeBtn);
-    expect(onOpenTraceability).toHaveBeenCalledWith('3');
+    // Clica no botão "Lançamentos"
+    const lancamentosBtn = screen.getByRole('button', { name: /Abrir auditoria de lançamentos de notas/i });
+    expect(lancamentosBtn).toBeInTheDocument();
+    expect(screen.getByText('Lançamentos')).toBeInTheDocument();
+    fireEvent.click(lancamentosBtn);
+    expect(onOpenTraceability).toHaveBeenCalledWith('3', '1A');
 
     // Clica no botão "Auditar lançamentos ↗" do Card 1
     const cardBtn = screen.getByRole('button', { name: /Auditar lançamentos ↗/i });
@@ -712,7 +713,37 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
     expect(alunoCell).toHaveClass('sticky');
     expect(alunoCell).toHaveClass('left-0');
   });
+
+  it('exibe o Card 4 com o título "Foco de Atenção" e passa a turma analisada ao abrir relatório', () => {
+    const onOpenLowGradesReport = vi.fn();
+    const studentsTurma3A = [
+      makeStudent('Aluno 1', { turma: '3A', situacao: 'Ativo' }),
+      makeStudent('Aluno 2', { turma: '3A', situacao: 'Ativo' })
+    ];
+
+    render(
+      <Dashboard
+        {...defaultProps}
+        allStudents={studentsTurma3A}
+        sortedData={studentsTurma3A}
+        filterMode="turma"
+        selectedValue="3A"
+        onOpenLowGradesReport={onOpenLowGradesReport}
+      />
+    );
+
+    // O título do Card 4 deve ser Foco de Atenção
+    expect(screen.getByText('Foco de Atenção')).toBeInTheDocument();
+    expect(screen.queryByText('Alunos < 5,0')).not.toBeInTheDocument();
+
+    // Ao clicar em Abrir Relatório, deve passar o bimestre selecionado ('3') e a turma '3A'
+    const btnRelatorio = screen.getByText('Abrir Relatório');
+    fireEvent.click(btnRelatorio);
+
+    expect(onOpenLowGradesReport).toHaveBeenCalledWith('3', '3A');
+  });
 });
+
 
 
 

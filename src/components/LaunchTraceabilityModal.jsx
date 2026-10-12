@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // components/LaunchTraceabilityModal.jsx — Auditoria e Rastreabilidade de Lançamentos
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, Search, AlertTriangle, CheckCircle2, Clock, 
   Copy, Users, BookOpen, 
@@ -29,13 +29,24 @@ const LaunchTraceabilityModal = ({
   onClose,
   allStudents = [],
   selectedBimestre = '3',
+  initialTurma = 'Todas',
   onSelectStudent
 }) => {
   const [activeTab, setActiveTab] = useState('alunos'); // 'alunos' | 'turmas' | 'disciplinas'
-  const [selectedTurma, setSelectedTurma] = useState('Todas');
+  const [selectedTurma, setSelectedTurma] = useState(() => {
+    return initialTurma && initialTurma !== 'Todas' ? String(initialTurma).trim() : 'Todas';
+  });
   const [pendingTypeFilter, setPendingTypeFilter] = useState('todos'); // 'todos' | 'furos' | 'parciais' | 'nao_iniciadas'
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedFeedback, setCopiedFeedback] = useState(false);
+
+  useEffect(() => {
+    if (initialTurma && initialTurma !== 'Todas') {
+      setSelectedTurma(String(initialTurma).trim());
+    } else {
+      setSelectedTurma('Todas');
+    }
+  }, [initialTurma]);
 
   // Ordenação de alunos
   const [sortField, setSortField] = useState('furos');
