@@ -620,12 +620,14 @@ const StudentProfile = ({
   }, [studentProfile]);
 
   const chartDataMapao = React.useMemo(() => {
+    if (_propMapao !== undefined) return _propMapao;
     return buildChartDataMapao(studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre);
-  }, [studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
+  }, [_propMapao, studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
 
   const chartDataProva = React.useMemo(() => {
+    if (_propProva !== undefined) return _propProva;
     return buildChartDataProva(studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre);
-  }, [studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
+  }, [_propProva, studentProfile, conceitoData, provaData, allStudents, selectedChartBimestre]);
 
   const evolucaoDados = React.useMemo(() => {
     return bimestresDisponiveis.map(bim => {
@@ -2250,7 +2252,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Mapão */}
-                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart data-testid="radar-chart">
+                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarCC', title: `Radar de Equilíbrio — Conselho (${bimestreRadarLabel})` })}
@@ -2383,7 +2385,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Prova Paulista */}
-                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart data-testid="radar-chart">
+                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarPP', title: `Desempenho por Área — Prova Paulista (${bimestreRadarLabel})` })}

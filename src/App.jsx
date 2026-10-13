@@ -881,7 +881,7 @@ const App = () => {
         showStickyName={showStickyName}
       />
 
-      <main className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6">
+      <main className={`w-full ${selectedTurma ? 'px-2 sm:px-4 lg:px-6 py-4' : 'px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6'}`}>
         {!hasLgpdConsent ? (
           <div className="flex flex-col items-center justify-center py-32 text-center">
             <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
