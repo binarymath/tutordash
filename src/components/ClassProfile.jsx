@@ -301,13 +301,14 @@ const ClassProfile = ({
     };
   }, [studentsInTurma, allStudents, allTurmasSorted, selectedTurma, serieLabel]);
 
-  // Colunas Oficiais Bimestre a Bimestre (Turma Inteira vs Nível)
+  // Colunas Oficiais Bimestre a Bimestre (Turma Inteira vs Nível e Escola)
   const officialBimestralData = useMemo(() => {
     const isPP = activeAvaliacao === 'PP';
     const targetSerie = serieLabel;
     const studentsInSerie = allStudents.filter(s => getSerieFromTurma(s.turma) === targetSerie);
     const normNamesSerieSet = new Set(studentsInSerie.map(s => s.normalizedName));
     const normNamesTurmaSet = new Set(studentsInTurma.map(s => s.normalizedName));
+    const normNamesSchoolSet = new Set(allStudents.map(s => s.normalizedName));
 
     const dataSet = isPP ? provaData : conceitoData;
 
@@ -317,11 +318,13 @@ const ClassProfile = ({
 
       let turmaSum = 0, turmaCnt = 0;
       let serieSum = 0, serieCnt = 0;
+      let escolaSum = 0, escolaCnt = 0;
 
       regsBim.forEach(reg => {
         const isMinhaTurma = normNamesTurmaSet.has(reg.normalizedName) || reg.turmaPlanilha === selectedTurma;
         const isMinhaSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === targetSerie;
-        if (!isMinhaSerie) return;
+        const isMinhaEscola = normNamesSchoolSet.has(reg.normalizedName) || Boolean(reg.turmaPlanilha);
+        if (!isMinhaEscola) return;
 
         Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
           const formatted = formatDisciplina(k);
@@ -329,7 +332,10 @@ const ClassProfile = ({
           if (match) {
             const nota = isPP ? toScale10(valRaw) : parseGrade(valRaw);
             if (nota !== null && (isPP ? nota >= 0 : nota > 0)) {
-              serieSum += nota; serieCnt++;
+              escolaSum += nota; escolaCnt++;
+              if (isMinhaSerie) {
+                serieSum += nota; serieCnt++;
+              }
               if (isMinhaTurma) {
                 turmaSum += nota; turmaCnt++;
               }
@@ -340,12 +346,14 @@ const ClassProfile = ({
 
       const turmaMedia = turmaCnt > 0 ? Number((turmaSum / turmaCnt).toFixed(isPP ? 2 : 1)) : 0;
       const serieMedia = serieCnt > 0 ? Number((serieSum / serieCnt).toFixed(isPP ? 2 : 1)) : 0;
+      const escolaMedia = escolaCnt > 0 ? Number((escolaSum / escolaCnt).toFixed(isPP ? 2 : 1)) : 0;
 
       return {
         bimestre: bimLabel,
         fullBimestre: bim,
         turmaMedia,
         serieMedia,
+        escolaMedia,
         diferenca: Number((turmaMedia - serieMedia).toFixed(isPP ? 2 : 1))
       };
     });
@@ -659,7 +667,7 @@ const ClassProfile = ({
             </div>
 
             {/* Cards Oficiais de Ranking e Médias */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full lg:w-auto">
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alunos Ativos</p>
                 <p className="text-2xl font-black text-slate-800 mt-1">{officialClassMetrics.total}</p>
@@ -683,7 +691,15 @@ const ClassProfile = ({
                 <p className="text-2xl font-black text-amber-700 mt-1">
                   {officialClassMetrics.rankPPSerie}º <span className="text-xs font-bold text-slate-400">/ {officialClassMetrics.totalPPSerie}</span>
                 </p>
-                <p className="text-[9px] text-slate-400 font-medium mt-0.5">na Escola: {officialClassMetrics.rankPP}º</p>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">entre as turmas de {serieLabel}</p>
+              </div>
+
+              <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs text-center min-w-[110px]">
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Posição na Escola</p>
+                <p className="text-2xl font-black text-emerald-700 mt-1">
+                  {officialClassMetrics.rankPP}º <span className="text-xs font-bold text-slate-400">/ {officialClassMetrics.totalPP}</span>
+                </p>
+                <p className="text-[9px] text-slate-400 font-medium mt-0.5">ranking geral das turmas</p>
               </div>
             </div>
           </div>
@@ -698,7 +714,7 @@ const ClassProfile = ({
                   Evolução Histórica Bimestral
                 </span>
                 <span className="text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md uppercase">
-                  Turma Inteira vs Nível ({serieLabel})
+                  Turma Inteira vs Nível ({serieLabel}) e Escola
                 </span>
               </div>
               <h3 className="text-xl font-black text-slate-800 tracking-tight mt-1">
@@ -725,6 +741,26 @@ const ClassProfile = ({
                 <BookOpen className="w-3.5 h-3.5" /> Conselho (CC)
               </button>
             </div>
+          </div>
+
+          {/* Barra de Disciplinas */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-100 max-w-full">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 ml-1">
+              Matéria Analisada:
+            </span>
+            {availableDisciplines.map(disc => (
+              <button
+                key={disc}
+                onClick={() => setSelectedDisc(disc)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap shrink-0 ${
+                  selectedDisc === disc
+                    ? 'bg-blue-600 text-white shadow-sm scale-[1.02]'
+                    : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60'
+                }`}
+              >
+                {disc === 'Geral' ? '🌟 Média Geral' : disc}
+              </button>
+            ))}
           </div>
 
           {/* Gráfico de Colunas */}
@@ -759,6 +795,20 @@ const ClassProfile = ({
                 >
                   <LabelList
                     dataKey="serieMedia"
+                    position="top"
+                    style={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }}
+                    formatter={(v) => v > 0 ? Number(v).toFixed(activeAvaliacao === 'PP' ? 2 : 1) : '-'}
+                  />
+                </Bar>
+                <Bar
+                  name="Média da Escola"
+                  dataKey="escolaMedia"
+                  fill="#94a3b8"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={55}
+                >
+                  <LabelList
+                    dataKey="escolaMedia"
                     position="top"
                     style={{ fontSize: 11, fontWeight: 700, fill: '#64748b' }}
                     formatter={(v) => v > 0 ? Number(v).toFixed(activeAvaliacao === 'PP' ? 2 : 1) : '-'}
@@ -853,26 +903,6 @@ const ClassProfile = ({
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Barra de Disciplinas */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-100 max-w-full">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 ml-1">
-            Matéria Analisada:
-          </span>
-          {availableDisciplines.map(disc => (
-            <button
-              key={disc}
-              onClick={() => setSelectedDisc(disc)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap shrink-0 ${
-                selectedDisc === disc
-                  ? 'bg-blue-600 text-white shadow-sm scale-[1.02]'
-                  : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60'
-              }`}
-            >
-              {disc === 'Geral' ? '🌟 Média Geral' : disc}
-            </button>
-          ))}
         </div>
 
         {/* SE MODO SLICE GERAL: PAINEL DE CONTROLE MESTRE SINCRONIZADO */}
@@ -1109,7 +1139,7 @@ const ClassProfile = ({
               Posicionamento Individual & Notas Bimestrais
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Alunos classificados por nota. A linha divisória abaixo indica onde ocorre o maior degrau de nota.
+              Alunos classificados por nota, com histórico bimestral e médias consolidadas.
             </p>
           </div>
 
@@ -1156,11 +1186,8 @@ const ClassProfile = ({
                 <th className="py-3.5 px-4 text-right rounded-r-2xl">Média Consolidada</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700">
+            <tbody className="text-xs font-bold text-slate-700">
               {tableStudents.map((item, idx) => {
-                const isPodium = item.turmaRank <= 3;
-                const isBreakPoint = item.turmaRank === rankingAnalysis.breakRank;
-
                 const badgeClass =
                   item.turmaRank === 1
                     ? 'bg-amber-100 text-amber-800 border-amber-300'
@@ -1177,9 +1204,9 @@ const ClassProfile = ({
                   <React.Fragment key={item.nome || idx}>
                     <tr
                       onClick={() => onSelectStudent && onSelectStudent(item.nome)}
-                      className={`hover:bg-blue-50/50 transition-colors cursor-pointer group ${
-                        isPodium ? 'bg-amber-50/20' : ''
-                      }`}
+                      className={`border-b border-slate-200/80 transition-colors cursor-pointer group ${
+                        idx % 2 === 0 ? 'bg-white' : 'bg-slate-50'
+                      } hover:bg-blue-50/50`}
                       title={`Clique para abrir o perfil individual de ${item.nome}`}
                     >
                       {/* Posição na Turma */}
@@ -1241,19 +1268,6 @@ const ClassProfile = ({
                       </td>
                     </tr>
 
-                    {/* DIVISÓRIA CLEAN DE DEGRAU DE NOTA */}
-                    {isBreakPoint && rankingAnalysis.maxDrop >= 0.4 && (
-                      <tr>
-                        <td colSpan={5 + bimestresDisponiveis.length} className="py-1.5 px-4">
-                          <div className="border-b-2 border-dashed border-amber-300/80 flex items-center justify-between py-1 text-amber-700 text-[11px] font-bold">
-                            <span className="flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-amber-500" />
-                              <span>Degrau de Nota (-{rankingAnalysis.maxDrop.toFixed(2)} pts)</span>
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
                   </React.Fragment>
                 );
               })}

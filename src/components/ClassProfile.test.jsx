@@ -154,7 +154,7 @@ describe('ClassProfile Component — Storytelling Dashboard', () => {
     expect(screen.getByText(/Ponto de Quebra \(2\)/i)).toBeInTheDocument();
   });
 
-  it('renderiza o Ato 3 com o Raio-X dos Alunos e a divisória de Degrau de Nota', () => {
+  it('renderiza o Ato 3 como uma tabela sem tags de Degrau de Nota', () => {
     const onSelectStudent = vi.fn();
     render(
       <ClassProfile
@@ -172,8 +172,8 @@ describe('ClassProfile Component — Storytelling Dashboard', () => {
     expect(screen.getByText('Bruno Souza')).toBeInTheDocument();
     expect(screen.getByText('Carlos Lima')).toBeInTheDocument();
 
-    // Divisória de degrau de nota
-    expect(screen.getAllByText(/Degrau de Nota/i).length).toBeGreaterThan(0);
+    // A lista não deve exibir tags de degrau de nota
+    expect(screen.queryByText(/Degrau de Nota/i)).not.toBeInTheDocument();
 
     // Clicar no aluno abre o perfil individual
     fireEvent.click(screen.getByText('Ana Silva'));
