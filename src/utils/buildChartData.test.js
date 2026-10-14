@@ -74,6 +74,8 @@ describe('buildChartData', () => {
       fullSubject: 'Matemática',
       Aluno: 8,
       Turma: 7,
+      Nivel: 7,
+      Escola: 7,
     });
   });
 
@@ -86,6 +88,8 @@ describe('buildChartData', () => {
       fullSubject: 'Matemática',
       Aluno: 8,
       Turma: 7,
+      Nivel: 7,
+      Escola: 7,
     });
   });
 });

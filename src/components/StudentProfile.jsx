@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import {
   ChevronLeft, ChevronRight, UserCheck, TrendingUp,
-  LineChart as LineChartIcon, History, BarChart2,
+  History, BarChart2,
   User, Calendar, ChevronDown, ChevronUp, Download, Printer, BookOpen, Maximize2, Minimize2, X
 } from 'lucide-react';
 import {
@@ -105,6 +105,145 @@ const getNotaStyle = (nota) => {
   if (up === 'R')  return 'text-amber-700 bg-amber-50 font-black';
   if (up === 'I')  return 'text-red-700 bg-red-50 font-black';
   return 'text-slate-600 bg-white font-bold';
+};
+
+const parseOccurrenceDate = (value) => {
+  if (!value) return null;
+  const text = String(value).trim();
+  const brDate = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (brDate) {
+    const [, day, month, year] = brDate;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+  }
+
+  const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return isoDate ? isoDate[0] : null;
+};
+
+const formatOccurrenceDateTime = (value) => {
+  if (!value) return '-';
+  const text = String(value).trim();
+  const brDate = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+  if (brDate) {
+    const [, day, month, year, hour, minute] = brDate;
+    const date = `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+    return hour === undefined ? date : `${date} ${hour.padStart(2, '0')}:${minute}`;
+  }
+
+  const parsedDate = new Date(text);
+  if (Number.isNaN(parsedDate.getTime())) return text;
+  const hasTime = /T|\s+\d{1,2}:\d{2}/.test(text);
+  return hasTime
+    ? parsedDate.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : parsedDate.toLocaleDateString('pt-BR');
+};
+
+const buildAnalysisSummary = (data) => {
+  const values = (key) => data.map((item) => item[key]).filter((value) => typeof value === 'number');
+  const average = (key) => {
+    const list = values(key);
+    return list.length ? list.reduce((sum, value) => sum + value, 0) / list.length : null;
+  };
+  const aluno = average('aluno');
+  if (aluno === null) return null;
+  return {
+    aluno,
+    turma: average('turma'),
+    nivel: average('nivel'),
+    escola: average('escola'),
+    first: values('aluno')[0],
+    last: values('aluno').at(-1),
+  };
+};
+
+const GuidedAnalysisPanel = ({ title, accent, options, selectedValue, onChange, analysis, decimals = 1, onPrint }) => {
+  const formatValue = (value) => value === null || value === undefined ? 'S/D' : value.toFixed(decimals);
+  const difference = (reference) => analysis.summary?.[reference] == null
+    ? null
+    : analysis.summary.aluno - analysis.summary[reference];
+  const differenceText = (reference) => {
+    const value = difference(reference);
+    if (value === null) return 'Sem comparação';
+    return `${value >= 0 ? '+' : ''}${value.toFixed(decimals)} vs ${reference}`;
+  };
+
+  return (
+    <div className="relative rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" data-chart>
+      {onPrint && (
+        <button
+          type="button"
+          aria-label={`Imprimir ${title}`}
+          title={`Imprimir ${title}`}
+          onClick={(event) => onPrint(event.currentTarget.closest('[data-chart]'), title)}
+          className="absolute right-4 top-4 z-10 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+        >
+          <Printer className="h-4 w-4" />
+        </button>
+      )}
+      <div className="flex flex-col gap-4 border-b border-slate-100 pb-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className={onPrint ? 'pr-8' : ''}>
+          <h4 className={`text-xs font-black uppercase tracking-widest ${accent}`}>{title}</h4>
+          <p className="mt-1 text-[11px] text-slate-500">Selecione uma disciplina para comparar o aluno com a turma, o nível e a escola.</p>
+        </div>
+        <label className="flex w-full flex-col gap-1 text-[10px] font-black uppercase tracking-widest text-slate-500 sm:max-w-[230px]">
+          Disciplina analisada
+          <select value={selectedValue} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold normal-case tracking-normal text-slate-700 outline-none focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100">
+            {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+        </label>
+      </div>
+
+      {analysis.summary && (
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+            {[
+              ['Aluno', analysis.summary.aluno, 'bg-blue-50 text-blue-700'],
+              ['Turma', analysis.summary.turma, 'bg-slate-50 text-slate-700'],
+              ['Nível', analysis.summary.nivel, 'bg-emerald-50 text-emerald-700'],
+              ['Escola', analysis.summary.escola, 'bg-amber-50 text-amber-700'],
+            ].map(([label, value, className]) => (
+              <div key={label} className={`rounded-xl px-3 py-2 ${className}`}>
+                <span className="block text-[9px] font-black uppercase tracking-widest opacity-70">{label}</span>
+                <strong className="text-lg font-black">{formatValue(value)}</strong>
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-xs font-bold text-slate-600">
+            {analysis.label}: de {formatValue(analysis.summary.first)} para {formatValue(analysis.summary.last)}.
+            <span className="ml-2 text-blue-700">{differenceText('turma')}</span>
+            <span className="ml-2 text-emerald-700">{differenceText('nivel')}</span>
+            <span className="ml-2 text-amber-700">{differenceText('escola')}</span>
+          </p>
+        </>
+      )}
+
+      {analysis.data.length > 0 ? (
+        <div className="mt-3 h-[330px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={analysis.data} margin={{ top: 12, right: 12, left: -15, bottom: 8 }} barCategoryGap="18%">
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis dataKey="bimestre" tick={{ fill: '#64748b', fontSize: 11, fontWeight: 700 }} axisLine={false} tickLine={false} />
+              <YAxis domain={[0, 10]} tick={{ fill: '#94a3b8', fontSize: 10 }} axisLine={false} tickLine={false} />
+              <RechartsTooltip content={<CustomTooltip />} />
+              <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 700 }} />
+              <Bar dataKey="aluno" name="Aluno" fill="#2563eb" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <LabelList dataKey="aluno" position="top" formatter={(value) => typeof value === 'number' ? value.toFixed(decimals) : ''} style={{ fill: '#1d4ed8', fontSize: 10, fontWeight: 800 }} />
+              </Bar>
+              <Bar dataKey="turma" name="Média da Turma" fill="#64748b" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <LabelList dataKey="turma" position="top" formatter={(value) => typeof value === 'number' ? value.toFixed(decimals) : ''} style={{ fill: '#475569', fontSize: 10, fontWeight: 800 }} />
+              </Bar>
+              <Bar dataKey="nivel" name="Média do Nível" fill="#059669" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <LabelList dataKey="nivel" position="top" formatter={(value) => typeof value === 'number' ? value.toFixed(decimals) : ''} style={{ fill: '#047857', fontSize: 10, fontWeight: 800 }} />
+              </Bar>
+              <Bar dataKey="escola" name="Média da Escola" fill="#d97706" radius={[4, 4, 0, 0]} maxBarSize={28}>
+                <LabelList dataKey="escola" position="top" formatter={(value) => typeof value === 'number' ? value.toFixed(decimals) : ''} style={{ fill: '#b45309', fontSize: 10, fontWeight: 800 }} />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      ) : <p className="py-20 text-center text-xs font-bold text-slate-400">Sem notas para comparar nesta disciplina.</p>}
+    </div>
+  );
 };
 
 
@@ -574,23 +713,47 @@ const EvolutivoNumerico = ({ historicoConceitos }) => {
 
 // ── Componente principal: StudentProfile ─────────────────────
 const StudentProfile = ({
-  studentProfile, filteredNotes, studentSessions, studentSessionCounts,
+  studentProfile, filteredNotes = studentProfile?.notes || [], studentSessions, studentSessionCounts,
   selectedSessionFilters, setSelectedSessionFilters,
   prevStudent, nextStudent, setSelectedStudent,
   chartDataMapao: _propMapao, chartDataProva: _propProva,
   filteredStudents = [], conceitoData = [], provaData = [], allStudents = []
 }) => {
-  const [showAnotacoes, setShowAnotacoes] = useState(true);
-  const [selectedChartBimestre, setSelectedChartBimestre] = useState('ultimo');
+  const [isNotesSidebarExpanded, setIsNotesSidebarExpanded] = useState(false);
+  const [selectedChartBimestre, setSelectedChartBimestre] = useState('evolucao');
   const [isExporting, setIsExporting] = useState(false);
   const [showPrintSelection, setShowPrintSelection] = useState(false);
   const [studentSelections, setStudentSelections] = useState({});
   const [maximizedChart, setMaximizedChart] = useState(null);
+  const [occurrenceStartDate, setOccurrenceStartDate] = useState('');
+  const [occurrenceEndDate, setOccurrenceEndDate] = useState('');
+
+  const toggleNotesSidebar = () => {
+    setIsNotesSidebarExpanded((isExpanded) => !isExpanded);
+  };
+
+  React.useEffect(() => {
+    if (!isNotesSidebarExpanded) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [isNotesSidebarExpanded]);
+
+  React.useEffect(() => {
+    setOccurrenceStartDate('');
+    setOccurrenceEndDate('');
+  }, [studentProfile?.nome]);
 
   const [sortFieldCC, setSortFieldCC] = useState('disciplina');
   const [sortOrderCC, setSortOrderCC] = useState('asc');
   const [sortFieldPP, setSortFieldPP] = useState('disciplina');
   const [sortOrderPP, setSortOrderPP] = useState('asc');
+  const [selectedAnalysisCC, setSelectedAnalysisCC] = useState('');
+  const [selectedAnalysisPP, setSelectedAnalysisPP] = useState('');
 
   const handleSortCC = (field) => {
     if (sortFieldCC === field) {
@@ -609,6 +772,24 @@ const StudentProfile = ({
       setSortOrderPP(field === 'disciplina' ? 'asc' : 'desc');
     }
   };
+
+  const occurrenceDateRangeInvalid = Boolean(
+    occurrenceStartDate && occurrenceEndDate && occurrenceStartDate > occurrenceEndDate
+  );
+
+  const notesForSelectedFilters = React.useMemo(() => {
+    const notes = filteredNotes;
+    if (occurrenceDateRangeInvalid) return [];
+
+    return notes.filter((note) => {
+      const noteDate = parseOccurrenceDate(note.displayDate || note.date || note.createdAt);
+      if (occurrenceStartDate && (!noteDate || noteDate < occurrenceStartDate)) return false;
+      if (occurrenceEndDate && (!noteDate || noteDate > occurrenceEndDate)) return false;
+      if (selectedSessionFilters.length === 0) return true;
+      const sessionType = note.tipoSessao && String(note.tipoSessao).trim() ? note.tipoSessao : 'Sem tipo';
+      return selectedSessionFilters.includes(sessionType);
+    });
+  }, [filteredNotes, studentProfile, selectedSessionFilters, occurrenceStartDate, occurrenceEndDate, occurrenceDateRangeInvalid]);
 
   const bimestresDisponiveis = React.useMemo(() => {
     return Array.from(
@@ -745,6 +926,128 @@ const StudentProfile = ({
     });
   }, [studentProfile, sortFieldPP, sortOrderPP]);
 
+  const tabelasBimestraisCC = React.useMemo(() => {
+    return (studentProfile?.historicoConceitos || []).map((bimestre) => {
+      const rows = Object.entries(bimestre.notas || {})
+        .filter(([disciplina]) => !isAttendanceIndexDisciplina(disciplina))
+        .map(([disciplina, notaRaw]) => ({
+          disciplina: formatDisciplina(disciplina),
+          rawName: disciplina,
+          nota: parseGrade(notaRaw),
+        }))
+        .filter((row) => row.nota !== null && row.nota > 0);
+      const media = rows.length > 0
+        ? rows.reduce((sum, row) => sum + row.nota, 0) / rows.length
+        : null;
+      return { bimestre: bimestre.bimestre, rows, media };
+    });
+  }, [studentProfile]);
+
+  const tabelasBimestraisPP = React.useMemo(() => {
+    return (studentProfile?.historicoProvas || []).map((bimestre) => {
+      const rows = Object.entries(bimestre.notas || {})
+        .map(([disciplina, notaRaw]) => ({
+          disciplina: formatDisciplina(disciplina),
+          rawName: disciplina,
+          nota: toScale10(notaRaw),
+        }))
+        .filter((row) => row.nota !== null);
+      const media = rows.length > 0
+        ? rows.reduce((sum, row) => sum + row.nota, 0) / rows.length
+        : null;
+      return { bimestre: bimestre.bimestre, rows, media };
+    });
+  }, [studentProfile]);
+
+  const evolucaoDisciplinasCC = React.useMemo(() => {
+    const historico = studentProfile?.historicoConceitos || [];
+    const bimestres = historico.map((item) => item.bimestre).filter(Boolean);
+    const disciplinas = Array.from(new Set(
+      historico.flatMap((item) => Object.keys(item.notas || {}).filter((disciplina) => !isAttendanceIndexDisciplina(disciplina)))
+    )).sort((a, b) => formatDisciplina(a).localeCompare(formatDisciplina(b), 'pt-BR'));
+
+    return {
+      bimestres,
+      disciplinas: disciplinas.map((disciplina) => ({
+        disciplina,
+        label: formatDisciplina(disciplina),
+        values: bimestres.map((bimestre) => {
+          const registro = historico.find((item) => item.bimestre === bimestre);
+          const nota = parseGrade(registro?.notas?.[disciplina]);
+          return nota !== null && nota > 0 ? Number(nota.toFixed(1)) : null;
+        }),
+      })),
+    };
+  }, [studentProfile]);
+
+  const evolucaoDisciplinasPP = React.useMemo(() => {
+    const historico = studentProfile?.historicoProvas || [];
+    const bimestres = historico.map((item) => item.bimestre).filter(Boolean);
+    const disciplinas = Array.from(new Set(
+      historico.flatMap((item) => Object.keys(item.notas || {}))
+    )).sort((a, b) => formatDisciplina(a).localeCompare(formatDisciplina(b), 'pt-BR'));
+
+    return {
+      bimestres,
+      disciplinas: disciplinas.map((disciplina) => ({
+        disciplina,
+        label: formatDisciplina(disciplina),
+        values: bimestres.map((bimestre) => {
+          const registro = historico.find((item) => item.bimestre === bimestre);
+          const nota = toScale10(registro?.notas?.[disciplina]);
+          return nota !== null ? Number(nota.toFixed(2)) : null;
+        }),
+      })),
+    };
+  }, [studentProfile]);
+
+  const analysisOptionsCC = React.useMemo(
+    () => evolucaoDisciplinasCC.disciplinas.map((item) => ({ value: item.disciplina, label: item.label })),
+    [evolucaoDisciplinasCC]
+  );
+
+  const analysisOptionsPP = React.useMemo(
+    () => evolucaoDisciplinasPP.disciplinas.map((item) => ({ value: item.disciplina, label: item.label })),
+    [evolucaoDisciplinasPP]
+  );
+
+  const activeAnalysisCC = selectedAnalysisCC || analysisOptionsCC[0]?.value || '';
+  const activeAnalysisPP = selectedAnalysisPP || analysisOptionsPP[0]?.value || '';
+
+  const guidedAnalysisCC = React.useMemo(() => {
+    if (!activeAnalysisCC) return { label: '', data: [], summary: null };
+    const label = formatDisciplina(activeAnalysisCC);
+    const data = (studentProfile?.historicoConceitos || []).map((bimestre) => {
+      const point = buildChartDataMapao(studentProfile, conceitoData, provaData, allStudents, bimestre.bimestre)
+        .find((item) => item.fullSubject === label);
+      return {
+        bimestre: String(bimestre.bimestre || '').replace('º Bimestre', 'º Bi'),
+        aluno: point?.Aluno ?? null,
+        turma: point?.Turma > 0 ? point.Turma : null,
+        nivel: point?.Nivel > 0 ? point.Nivel : null,
+        escola: point?.Escola > 0 ? point.Escola : null,
+      };
+    }).filter((item) => item.aluno !== null || item.turma !== null || item.nivel !== null || item.escola !== null);
+    return { label, data, summary: buildAnalysisSummary(data) };
+  }, [activeAnalysisCC, studentProfile, conceitoData, provaData, allStudents]);
+
+  const guidedAnalysisPP = React.useMemo(() => {
+    if (!activeAnalysisPP) return { label: '', data: [], summary: null };
+    const label = formatDisciplina(activeAnalysisPP);
+    const data = (studentProfile?.historicoProvas || []).map((bimestre) => {
+      const point = buildChartDataProva(studentProfile, conceitoData, provaData, allStudents, bimestre.bimestre)
+        .find((item) => item.fullSubject === label);
+      return {
+        bimestre: String(bimestre.bimestre || '').replace('º Bimestre', 'º Bi'),
+        aluno: point?.Aluno ?? null,
+        turma: point?.Turma > 0 ? point.Turma : null,
+        nivel: point?.Nivel > 0 ? point.Nivel : null,
+        escola: point?.Escola > 0 ? point.Escola : null,
+      };
+    }).filter((item) => item.aluno !== null || item.turma !== null || item.nivel !== null || item.escola !== null);
+    return { label, data, summary: buildAnalysisSummary(data) };
+  }, [activeAnalysisPP, studentProfile, conceitoData, provaData, allStudents]);
+
   // ── Cálculo da média do Conselho Bimestral ─────────────────
   const parseToNum = (v) => {
     if (v === undefined || v === null) return null;
@@ -818,8 +1121,30 @@ const StudentProfile = ({
       const clone = chartRef.cloneNode(true);
       
       // Oculta o botão de impressora do clone
-      const btn = clone.querySelector('button[title="Imprimir este gráfico"]');
+      const btn = clone.querySelector('button[data-print-control], button[title="Imprimir este gráfico"]');
       if (btn) btn.remove();
+
+      if (title === 'Anotações e Sessões') {
+        const formatPrintDate = (value) => {
+          if (!value) return '';
+          const [year, month, day] = value.split('-');
+          return year && month && day ? `${day}/${month}/${year}` : value;
+        };
+
+        clone.querySelectorAll('input').forEach((input) => {
+          const value = input.value || '';
+          input.setAttribute('value', input.type === 'date' ? formatPrintDate(value) : value);
+          if (input.type === 'date') input.setAttribute('type', 'text');
+        });
+
+        clone.querySelectorAll('*').forEach((element) => {
+          if (element.scrollHeight > element.clientHeight || element.classList.contains('custom-scrollbar')) {
+            element.style.overflow = 'visible';
+            element.style.maxHeight = 'none';
+            element.style.height = 'auto';
+          }
+        });
+      }
 
       // Ajusta o SVG principal do Recharts para escalar proporcionalmente e ficar nítido.
       // O seletor pela largura (> 100px) garante que não vamos afetar os pequenos SVGs das legendas!
@@ -1671,6 +1996,8 @@ const StudentProfile = ({
               <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={45}>
                 <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
               </Bar>
+              <Bar name="Média do Nível" dataKey="Nivel" fill="#a7f3d0" radius={[4, 4, 0, 0]} maxBarSize={45} />
+              <Bar name="Média da Escola" dataKey="Escola" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={45} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -1703,6 +2030,8 @@ const StudentProfile = ({
               <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={45}>
                 <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
               </Bar>
+              <Bar name="Média do Nível" dataKey="Nivel" fill="#a7f3d0" radius={[4, 4, 0, 0]} maxBarSize={45} />
+              <Bar name="Média da Escola" dataKey="Escola" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={45} />
             </BarChart>
           </ResponsiveContainer>
         );
@@ -1714,8 +2043,10 @@ const StudentProfile = ({
   if (!studentProfile) return null;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-right-8 duration-300">
+    <div className="mx-auto w-full max-w-none space-y-6 animate-in slide-in-from-right-8 duration-300">
 
+      {!isNotesSidebarExpanded && (
+      <div className="space-y-6">
       {/* Navegação */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <button
@@ -1744,44 +2075,19 @@ const StudentProfile = ({
 
       {/* Cabeçalho do aluno */}
       <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-        <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
-        <div className="flex flex-wrap items-center gap-2 mt-4 mb-3 bg-slate-100 p-2 rounded-2xl border border-slate-200 shadow-inner">
-          <span className="text-xs font-black text-slate-500 uppercase px-3 tracking-wider flex items-center gap-1.5"><Calendar className="w-4 h-4 text-blue-600" /> Período:</span>
-          <button
-            onClick={() => setSelectedChartBimestre('ultimo')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${selectedChartBimestre === 'ultimo' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
-          >
-            ⚡ Mais Recente
-          </button>
-          {bimestresDisponiveis.map(bim => (
-            <button
-              key={bim}
-              onClick={() => setSelectedChartBimestre(bim)}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${selectedChartBimestre === bim ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
-            >
-              {bim}
-            </button>
-          ))}
-          <button
-            onClick={() => setSelectedChartBimestre('evolucao')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${selectedChartBimestre === 'evolucao' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-white'}`}
-          >
-            📈 Evolução Comparativa
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
+          <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
+            studentProfile.situacao === 'Ativo'
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              : 'border-rose-200 bg-rose-50 text-rose-600'
+          }`}>
+            {studentProfile.situacao}
+          </span>
         </div>
         <div className="flex gap-4 mt-3 text-xs font-bold text-slate-500 uppercase flex-wrap">
           <span className="bg-slate-100 px-4 py-2 rounded-lg text-slate-700">Turma: {studentProfile.turma}</span>
           <span className="bg-slate-100 px-4 py-2 rounded-lg flex items-center gap-1"><UserCheck className="w-3 h-3" /> Tutor: {studentProfile.tutor}</span>
-        </div>
-        {/* Badge de situação atual */}
-        <div className="flex items-center gap-2 mt-3 flex-wrap">
-          <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-lg border ${
-            studentProfile.situacao === 'Ativo'
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-              : 'bg-rose-50 text-rose-600 border-rose-200'
-          }`}>
-            {studentProfile.situacao}
-          </span>
         </div>
         <div className="flex gap-2 mt-4 flex-wrap">
           <button
@@ -1791,54 +2097,153 @@ const StudentProfile = ({
           >
             <Download className="w-4 h-4" /> Baixar PDF
           </button>
-          <button
-            onClick={handleExportDocx}
-            disabled={isExporting}
-            className={`flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border transition-colors ${isExporting ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' : 'bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300'}`}
-          >
-            <Download className="w-4 h-4" /> Baixar DOCX
-          </button>
-          <button
-            onClick={() => setShowPrintSelection(true)}
-            className="flex items-center gap-2 text-xs font-black uppercase tracking-widest px-4 py-2 rounded-xl border bg-white text-slate-600 border-slate-200 hover:text-blue-600 hover:border-blue-300 transition-colors"
-          >
-            <Printer className="w-4 h-4" /> Imprimir Gráficos
-          </button>
         </div>
       </div>
+      </div>
+      )}
 
-      {/* ── ANOTAÇÕES E SESSÕES (OBSERVAÇÕES DO TUTOR) — PRIMEIRO PLANO ABSOLUTO ── */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 mt-6 mb-8">
-        <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-5">
-          <div className="flex items-center gap-3">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.8fr)]">
+        {/* ── ANOTAÇÕES E SESSÕES ── */}
+        {isNotesSidebarExpanded && (
+          <div
+            aria-hidden="true"
+            className="fixed inset-0 z-30 bg-slate-900/5 backdrop-blur-[2px]"
+          />
+        )}
+        <aside className={`${isNotesSidebarExpanded ? 'fixed inset-2 z-40 h-[calc(100vh-1rem)] w-auto lg:inset-x-auto lg:left-[10vw] lg:right-[10vw] lg:top-4 lg:h-[calc(100vh-2rem)]' : 'lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]'}`}>
+        <div className={`flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ${isNotesSidebarExpanded ? 'overflow-hidden text-center lg:p-6' : 'overflow-hidden'}`} data-chart>
+        {isNotesSidebarExpanded && (
+          <div className="mb-6 border-b border-slate-100 pb-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-left">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Perfil do estudante</span>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-800">{studentProfile.nome}</h2>
+                <div className="mt-2 flex flex-wrap gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <span className="rounded-lg bg-slate-100 px-3 py-1.5">Turma: {studentProfile.turma}</span>
+                  <span className="rounded-lg bg-slate-100 px-3 py-1.5">Tutor: {studentProfile.tutor}</span>
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => prevStudent && setSelectedStudent(prevStudent)}
+                  disabled={!prevStudent}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Anterior
+                </button>
+                <button
+                  type="button"
+                  onClick={() => nextStudent && setSelectedStudent(nextStudent)}
+                  disabled={!nextStudent}
+                  className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:text-slate-300"
+                >
+                  Próximo <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <div className={`mb-5 flex items-center justify-between border-b border-slate-100 pb-5 ${isNotesSidebarExpanded ? 'text-center' : ''}`}>
+          <div className={`flex items-center gap-3 ${isNotesSidebarExpanded ? 'mx-auto' : ''}`}>
             <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl">
               <History className="w-6 h-6" />
             </div>
-            <div>
-              <h3 className="text-lg font-black text-slate-800 tracking-tight">Anotações Pedagógicas e Sessões</h3>
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Histórico de Atendimentos do Aluno</p>
+            <div className="min-w-0">
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Anotações e Sessões</h3>
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5">Anotações pedagógicas e histórico de atendimentos</p>
             </div>
           </div>
-          <button
-            onClick={() => setShowAnotacoes(!showAnotacoes)}
-            title={showAnotacoes ? "Recolher seção" : "Expandir seção"}
-            className="px-4 py-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-600 hover:text-blue-600 font-black text-xs flex items-center gap-2 border border-slate-200"
-          >
-            {showAnotacoes ? <>Ocultar <ChevronUp className="w-4 h-4" /></> : <>Mostrar Registros ({studentProfile.notes?.length || 0}) <ChevronDown className="w-4 h-4" /></>}
-          </button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {isNotesSidebarExpanded && (
+              <button
+                type="button"
+                data-print-control
+                aria-label="Imprimir anotações e sessões"
+                title="Imprimir anotações e sessões"
+                onClick={(event) => printChart(event.currentTarget.closest('[data-chart]'), 'Anotações e Sessões')}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+              >
+                <Printer className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={toggleNotesSidebar}
+              title={isNotesSidebarExpanded ? "Fechar sidebar expandida" : "Expandir sidebar lateralmente"}
+              aria-label={isNotesSidebarExpanded ? "Fechar sidebar expandida" : "Expandir sidebar lateralmente"}
+              className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-black text-slate-500 transition-colors hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 ${isNotesSidebarExpanded ? 'min-w-[76px]' : 'w-9'}`}
+            >
+              {isNotesSidebarExpanded ? <X className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              {isNotesSidebarExpanded && <span>Fechar</span>}
+            </button>
+          </div>
         </div>
 
-        {showAnotacoes && (
-          <div className="space-y-6">
+        <div className="flex min-h-0 flex-1 flex-col space-y-6">
+          <div className={`flex flex-col gap-6 ${isNotesSidebarExpanded ? 'lg:flex-row lg:items-center lg:justify-center lg:gap-4' : ''}`}>
+            {studentProfile.notes?.length > 0 && (
+              <div className={`rounded-2xl border border-slate-200 bg-white p-4 ${isNotesSidebarExpanded ? 'lg:w-auto lg:max-w-none' : ''}`}>
+                <div className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between ${isNotesSidebarExpanded ? 'sm:justify-center' : ''}`}>
+                  <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${isNotesSidebarExpanded ? 'mx-auto' : ''}`}>
+                    <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Data inicial
+                      <input
+                        aria-label="Data inicial das ocorrências"
+                        type="date"
+                        value={occurrenceStartDate}
+                        max={occurrenceEndDate || undefined}
+                        onChange={(event) => setOccurrenceStartDate(event.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold normal-case tracking-normal text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      Data final
+                      <input
+                        aria-label="Data final das ocorrências"
+                        type="date"
+                        value={occurrenceEndDate}
+                        min={occurrenceStartDate || undefined}
+                        onChange={(event) => setOccurrenceEndDate(event.target.value)}
+                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold normal-case tracking-normal text-slate-700 outline-none transition focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-100"
+                      />
+                    </label>
+                  </div>
+                  {(occurrenceStartDate || occurrenceEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOccurrenceStartDate('');
+                        setOccurrenceEndDate('');
+                      }}
+                      className={`self-start text-[10px] font-black uppercase tracking-widest text-blue-600 hover:text-blue-800 sm:self-end ${isNotesSidebarExpanded ? 'mx-auto' : ''}`}
+                    >
+                      Limpar período
+                    </button>
+                  )}
+                </div>
+                {occurrenceDateRangeInvalid && (
+                  <p role="alert" className="mt-3 text-xs font-bold text-rose-600">
+                    A data inicial deve ser anterior ou igual à data final.
+                  </p>
+                )}
+                {!occurrenceDateRangeInvalid && (occurrenceStartDate || occurrenceEndDate) && (
+                  <p className="mt-3 text-[10px] font-bold text-slate-400">
+                    Exibindo {notesForSelectedFilters.length} de {studentProfile.notes.length} ocorrências no período selecionado.
+                  </p>
+                )}
+              </div>
+            )}
+
             {studentProfile.notes?.length > 0 && studentSessions.length > 0 && (
-              <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80">
-                <div className="flex items-center justify-between mb-3">
+              <div className={`p-5 bg-slate-50/80 rounded-2xl border border-slate-200/80 ${isNotesSidebarExpanded ? 'lg:w-auto lg:max-w-none' : ''}`}>
+                <div className={`flex items-center justify-between mb-3 ${isNotesSidebarExpanded ? 'justify-center' : ''}`}>
                   <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Filtrar por Tipo de Sessão</span>
                   {selectedSessionFilters.length > 0 && (
                     <button onClick={() => setSelectedSessionFilters([])} className="text-[10px] font-black text-blue-600 hover:underline uppercase">Limpar filtros</button>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2.5">
+                <div className={`flex flex-wrap gap-2.5 ${isNotesSidebarExpanded ? 'justify-center' : ''}`}>
                   <label className={`flex items-center gap-2 cursor-pointer px-4 py-2 rounded-xl border text-xs font-bold transition-all ${selectedSessionFilters.length === 0 ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-blue-300'}`}>
                     <input type="checkbox" checked={selectedSessionFilters.length === 0} onChange={() => setSelectedSessionFilters([])} className="sr-only" />
                     <span>Todos</span>
@@ -1855,74 +2260,78 @@ const StudentProfile = ({
                 </div>
               </div>
             )}
+          </div>
 
-            <div className="space-y-4 max-h-[460px] overflow-y-auto pr-2 custom-scrollbar">
+            <div className={`min-h-0 flex-1 space-y-4 pr-2 ${isNotesSidebarExpanded ? 'overflow-y-auto custom-scrollbar lg:mx-auto lg:w-full lg:max-w-4xl' : 'overflow-y-auto custom-scrollbar'}`}>
               {studentProfile.notes?.length === 0 ? (
                 <div className="border border-dashed border-slate-200 p-12 rounded-3xl text-center bg-slate-50/40">
-                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Este estudante ainda não possui anotações.</p>
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Este aluno ainda não possui anotações.</p>
                 </div>
-              ) : filteredNotes.length > 0 ? (
-                filteredNotes.map(n => (
-                  <div key={n.id} className="bg-slate-50/70 p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden transition-all hover:bg-slate-50 hover:border-slate-300">
-                    {n.tipoSessao && (
-                      <div className="absolute top-0 right-0 bg-indigo-100 text-indigo-800 px-4 py-1.5 rounded-bl-2xl font-black text-[10px] uppercase tracking-wider">
-                        {n.tipoSessao}
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase mb-4 border-b border-slate-200/60 pb-3">
-                      <span className="text-slate-700 flex items-center gap-1.5 font-black">
-                        <User className="w-3.5 h-3.5 text-blue-600" /> Autor: {n.teacher}
+              ) : notesForSelectedFilters.length > 0 ? (
+                notesForSelectedFilters.map(n => (
+                  <div key={n.id} className={`bg-slate-50/70 p-6 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden transition-all hover:bg-slate-50 hover:border-slate-300 ${isNotesSidebarExpanded ? 'text-center' : ''}`}>
+                    <div className={`flex flex-wrap items-center gap-3 text-[11px] font-bold text-slate-400 uppercase mb-4 border-b border-slate-200/60 pb-3 ${isNotesSidebarExpanded ? 'justify-center' : 'justify-between'}`}>
+                      <span className="flex items-center gap-1.5 font-black text-slate-700">
+                        <User className="h-3.5 w-3.5 text-blue-600" /> Autor: {n.teacher}
                       </span>
-                      <span className="flex items-center gap-1.5 text-slate-500"><Calendar className="w-3.5 h-3.5 text-slate-400" /> {n.displayDate}</span>
+                      <span className="flex items-center gap-1.5 text-slate-500">
+                        <Calendar className="h-3.5 w-3.5 text-slate-400" /> {formatOccurrenceDateTime(n.displayDate || n.date || n.createdAt)}
+                      </span>
+                      {n.tipoSessao && (
+                        <span className="rounded-full bg-indigo-100 px-3 py-1 text-[10px] font-black tracking-wider text-indigo-800">
+                          {n.tipoSessao}
+                        </span>
+                      )}
                     </div>
-                    <p className="text-slate-700 text-xs leading-relaxed font-medium mt-2">{n.note || 'Registo sem descrição.'}</p>
+                    <p className="text-left text-slate-700 text-xs leading-relaxed font-medium mt-2">{n.note || 'Registo sem descrição.'}</p>
                   </div>
                 ))
               ) : (
                 <div className="border border-dashed border-slate-200 p-12 rounded-3xl text-center bg-slate-50/40">
-                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Nenhum registro encontrado para este filtro.</p>
+                  <p className="text-slate-400 font-bold text-xs uppercase tracking-wider">Sem anotações registradas para este filtro.</p>
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
+        </div>
+        </div>
+        </aside>
 
+        <main className="min-w-0 space-y-6">
       {/* ── SEÇÃO HERO: RESUMO DO PERÍODO SELECIONADO ── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-8">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {/* Card Média Conselho */}
         {heroMetrics.mediaCC != null && (
-          <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1">
+          <div className="bg-white p-5 rounded-2xl text-slate-900 border border-blue-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
             <div>
-              <div className="flex items-center justify-between text-blue-100 font-black text-[11px] uppercase tracking-widest">
+              <div className="flex items-center justify-between text-blue-700 font-black text-[11px] uppercase tracking-widest">
                 <span>📋 Conselho Bimestral</span>
-                <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
+                <span className="bg-blue-50 px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
               </div>
               <div className="mt-5 flex items-baseline gap-2">
                 <span className="text-6xl font-black tracking-tight">{heroMetrics.mediaCC}</span>
-                <span className="text-blue-200 text-xs font-black uppercase tracking-wider">Média Geral</span>
+                <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Média Geral</span>
               </div>
             </div>
-            <p className="mt-6 text-[11px] text-blue-100/90 font-medium">Índice consolidado das notas escolares</p>
+            <p className="mt-4 text-[11px] text-slate-500 font-medium">Índice consolidado das notas escolares</p>
           </div>
         )}
 
         {/* Card Prova Paulista */}
         {heroMetrics.mediaPP != null && (
-          <div className={`p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1 ${heroMetrics.mediaPP === 'S/N' ? 'bg-gradient-to-br from-amber-600 to-rose-700' : 'bg-gradient-to-br from-sky-500 to-blue-600'}`}>
+          <div className="bg-white p-5 rounded-2xl text-slate-900 border border-sky-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
             <div>
-              <div className="flex items-center justify-between font-black text-[11px] uppercase tracking-widest opacity-90">
+              <div className="flex items-center justify-between text-sky-700 font-black text-[11px] uppercase tracking-widest opacity-90">
                 <span>🎯 Prova Paulista</span>
-                <span className="bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
+                <span className="bg-sky-50 px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
               </div>
               <div className="mt-5 flex items-baseline gap-2">
-                <span className={`font-black tracking-tight ${heroMetrics.mediaPP === 'S/N' ? 'text-5xl text-amber-100' : 'text-6xl'}`}>{heroMetrics.mediaPP}</span>
-                {heroMetrics.mediaPP !== 'S/N' && <span className="text-sky-200 text-xs font-black uppercase tracking-wider">Consolidado</span>}
+                <span className={`font-black tracking-tight text-sky-700 ${heroMetrics.mediaPP === 'S/N' ? 'text-5xl' : 'text-6xl'}`}>{heroMetrics.mediaPP}</span>
+                {heroMetrics.mediaPP !== 'S/N' && <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Consolidado</span>}
               </div>
             </div>
-            <p className="mt-6 text-[11px] opacity-90 font-medium">
+            <p className="mt-4 text-[11px] text-slate-500 font-medium">
               {heroMetrics.mediaPP === 'S/N' 
                 ? '⚠️ Sem registros de Prova Paulista neste período (S/N)' 
                 : heroMetrics.naoEfetuouPPCount > 0 
@@ -1934,19 +2343,19 @@ const StudentProfile = ({
 
         {/* Card Frequência */}
         {heroMetrics.frequencia != null && heroMetrics.frequencia !== '-' && (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-7 rounded-3xl text-white shadow-xl relative overflow-hidden flex flex-col justify-between transform transition-all hover:-translate-y-1">
+          <div className="bg-white p-5 rounded-2xl text-slate-900 border border-emerald-200 shadow-sm relative overflow-hidden flex flex-col justify-between">
             <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
             <div>
-              <div className="flex items-center justify-between text-slate-400 font-black text-[11px] uppercase tracking-widest">
+              <div className="flex items-center justify-between text-slate-500 font-black text-[11px] uppercase tracking-widest">
                 <span>📅 Assiduidade</span>
-                <span className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] text-slate-300">{heroMetrics.label}</span>
+                <span className="bg-slate-100 px-3 py-1 rounded-full text-[10px]">{heroMetrics.label}</span>
               </div>
               <div className="mt-5 flex items-baseline gap-2">
                 <span className="text-6xl font-black tracking-tight text-emerald-400">{heroMetrics.frequencia}</span>
                 <span className="text-slate-400 text-xs font-black uppercase tracking-wider">Presença</span>
               </div>
             </div>
-            <p className="mt-6 text-[11px] text-slate-400 font-medium">Comparecimento registrado às aulas</p>
+            <p className="mt-4 text-[11px] text-slate-500 font-medium">Comparecimento registrado às aulas</p>
           </div>
         )}
       </div>
@@ -2044,6 +2453,45 @@ const StudentProfile = ({
             </div>
 
             {/* Tabela Conselho */}
+            <div className="hidden space-y-4">
+              {tabelasBimestraisCC.map((bimestre) => (
+                <div key={`cc-${bimestre.bimestre}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50 px-5 py-3">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-blue-700">Conselho de Classe — {bimestre.bimestre}</h4>
+                    <span className="text-xs font-black text-blue-700">
+                      Média: {bimestre.media !== null ? bimestre.media.toFixed(1) : '-'}
+                      <span className={`ml-3 rounded-lg border px-2 py-1 text-[10px] ${bimestre.media !== null && bimestre.media >= 5 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                        {bimestre.media !== null && bimestre.media >= 5 ? 'Ok' : 'Recuperação'}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-left uppercase tracking-wider text-slate-500">
+                        <tr><th className="px-5 py-3 font-black">Disciplina</th><th className="px-5 py-3 text-center font-black">Nota</th><th className="px-5 py-3 text-center font-black">Situação</th></tr>
+                      </thead>
+                      <tbody>
+                        {bimestre.rows.map((row, index) => (
+                          <tr key={row.rawName} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                            <td className="border-t border-slate-100 px-5 py-3 font-bold text-slate-700">{row.disciplina}</td>
+                            <td className="border-t border-slate-100 px-5 py-3 text-center font-black text-blue-700">{row.nota.toFixed(1)}</td>
+                            <td className="border-t border-slate-100 px-5 py-3 text-center">
+                              <span className={`inline-flex rounded-lg border px-2.5 py-1 text-[10px] font-black ${row.nota >= 5 ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'}`}>
+                                {row.nota >= 5 ? 'Ok' : 'Recuperação'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {bimestre.rows.length === 0 && <tr><td colSpan={3} className="px-5 py-6 text-center font-bold text-slate-400">Sem notas neste bimestre.</td></tr>}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+              {tabelasBimestraisCC.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-xs font-bold text-slate-400">Sem histórico de Conselho de Classe.</div>}
+            </div>
+
+            {/* Tabela única de Conselho por disciplina e bimestre */}
             <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
               <h4 className="text-xs font-black text-blue-600 uppercase mb-5 tracking-widest">
                 📋 Conselho — Evolução por Disciplina e Média Geral
@@ -2099,51 +2547,38 @@ const StudentProfile = ({
                 </table>
               </div>
 
-              {/* Tabela Detalhamento CC no Período */}
-              {chartDataMapao.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas do Conselho de Classe no Período</h4>
-                  <div className="rounded-2xl overflow-hidden border border-slate-200">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-5 py-3.5 font-black text-slate-500 uppercase tracking-wider">Disciplina</th>
-                          <th className="px-5 py-3.5 font-black text-blue-600 uppercase tracking-wider text-center">Nota Aluno</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Desempenho</th>
-                        </tr>
+            </div>
+
+            {/* Tabela Prova Paulista */}
+            <div className="hidden space-y-4">
+              {tabelasBimestraisPP.map((bimestre) => (
+                <div key={`pp-${bimestre.bimestre}`} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-slate-200 bg-sky-50 px-5 py-3">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-sky-700">Prova Paulista — {bimestre.bimestre}</h4>
+                    <span className="text-xs font-black text-sky-700">Média: {bimestre.media !== null ? bimestre.media.toFixed(2) : '-'}</span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50 text-left uppercase tracking-wider text-slate-500">
+                        <tr><th className="px-5 py-3 font-black">Disciplina</th><th className="px-5 py-3 text-center font-black">Nota</th></tr>
                       </thead>
                       <tbody>
-                        {chartDataMapao.map((item, idx) => {
-                          const alunoVal = item.Aluno != null ? Number(item.Aluno) : null;
-                          const turmaVal = item.Turma != null ? Number(item.Turma) : null;
-                          const diff = alunoVal != null && turmaVal != null ? (alunoVal - turmaVal).toFixed(1) : null;
-                          return (
-                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className="px-5 py-3.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
-                              <td className="px-5 py-3.5 text-center font-black text-blue-700 text-sm">
-                                {alunoVal != null ? alunoVal.toFixed(1) : '-'}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
-                                {turmaVal != null ? turmaVal.toFixed(1) : '-'}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-bold">
-                                {diff != null ? (
-                                  diff >= 0 ? <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-[11px] border border-emerald-100">+{diff} vs Turma</span>
-                                            : <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-xl text-[11px] border border-rose-100">{diff} vs Turma</span>
-                                ) : '-'}
-                              </td>
-                            </tr>
-                          );
-                        })}
+                        {bimestre.rows.map((row, index) => (
+                          <tr key={row.rawName} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50/60'}>
+                            <td className="border-t border-slate-100 px-5 py-3 font-bold text-slate-700">{row.disciplina}</td>
+                            <td className="border-t border-slate-100 px-5 py-3 text-center font-black text-sky-700">{row.nota.toFixed(2)}</td>
+                          </tr>
+                        ))}
+                        {bimestre.rows.length === 0 && <tr><td colSpan={2} className="px-5 py-6 text-center font-bold text-slate-400">Sem notas neste bimestre.</td></tr>}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              )}
+              ))}
+              {tabelasBimestraisPP.length === 0 && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-xs font-bold text-slate-400">Sem histórico de Prova Paulista.</div>}
             </div>
 
-            {/* Tabela Prova Paulista */}
+            {/* Tabela única de Prova Paulista por disciplina e bimestre */}
             <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
               <h4 className="text-xs font-black text-sky-600 uppercase mb-5 tracking-widest">
                 🎯 Prova Paulista — Evolução por Disciplina e Média Geral
@@ -2181,54 +2616,35 @@ const StudentProfile = ({
                         </tr>
                       ))
                     ) : (
-                      <tr><td colSpan={bimestresDisponiveis.length + 2} className="p-8 text-center text-slate-400 font-bold">Sem disciplinas detalhadas na Prova Paulista</td></tr>
+                      <tr><td colSpan={bimestresDisponiveis.length + 3} className="p-8 text-center text-slate-400 font-bold">Sem disciplinas detalhadas na Prova Paulista</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
 
-              {/* Tabela Detalhamento PP no Período */}
-              {chartDataProva.length > 0 && (
-                <div className="mt-8 pt-8 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas da Prova Paulista no Período</h4>
-                  <div className="rounded-2xl overflow-hidden border border-slate-200">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-5 py-3.5 font-black text-slate-500 uppercase tracking-wider">Disciplina</th>
-                          <th className="px-5 py-3.5 font-black text-sky-600 uppercase tracking-wider text-center">Nota Aluno</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Desempenho</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chartDataProva.map((item, idx) => {
-                          const alunoVal = item.Aluno != null ? Number(item.Aluno) : null;
-                          const turmaVal = item.Turma != null ? Number(item.Turma) : null;
-                          const diff = alunoVal != null && turmaVal != null ? (alunoVal - turmaVal).toFixed(2) : null;
-                          return (
-                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className="px-5 py-3.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
-                              <td className="px-5 py-3.5 text-center font-black text-sky-700 text-sm">
-                                {alunoVal != null ? alunoVal.toFixed(2) : '-'}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
-                                {turmaVal != null ? turmaVal.toFixed(2) : '-'}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-bold">
-                                {diff != null ? (
-                                  diff >= 0 ? <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-[11px] border border-emerald-100">+{diff} vs Turma</span>
-                                            : <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-xl text-[11px] border border-rose-100">{diff} vs Turma</span>
-                                ) : '-'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <GuidedAnalysisPanel
+                title="Análise por disciplina — Conselho de Classe"
+                accent="text-blue-700"
+                options={analysisOptionsCC}
+                selectedValue={activeAnalysisCC}
+                onChange={setSelectedAnalysisCC}
+                analysis={guidedAnalysisCC}
+                decimals={1}
+                onPrint={printChart}
+              />
+              <GuidedAnalysisPanel
+                title="Análise por disciplina — Prova Paulista"
+                accent="text-sky-700"
+                options={analysisOptionsPP}
+                selectedValue={activeAnalysisPP}
+                onChange={setSelectedAnalysisPP}
+                analysis={guidedAnalysisPP}
+                decimals={2}
+                onPrint={printChart}
+              />
             </div>
           </div>
         ) : (
@@ -2318,13 +2734,15 @@ const StudentProfile = ({
                           <Bar name="Média da Turma" dataKey="Turma" fill="#cbd5e1" radius={[4, 4, 0, 0]} maxBarSize={45}>
                             <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(1) : ''} />
                           </Bar>
+                          <Bar name="Média do Nível" dataKey="Nivel" fill="#a7f3d0" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                          <Bar name="Média da Escola" dataKey="Escola" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={45} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
 
                   {/* Tabela de Matérias CC Integrada */}
-                  <div className="mt-10 pt-8 border-t border-slate-100">
+                  <div className="hidden mt-10 pt-8 border-t border-slate-100">
                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas de Conselho de Classe no Período</h4>
                     <div className="rounded-2xl overflow-hidden border border-slate-200">
                       <table className="w-full text-xs border-collapse">
@@ -2451,52 +2869,14 @@ const StudentProfile = ({
                           <Bar name="Média da Turma" dataKey="Turma" fill="#94a3b8" radius={[4, 4, 0, 0]} maxBarSize={45}>
                             <LabelList dataKey="Turma" position="top" style={{ fontSize: 10, fontWeight: 700, fill: '#94a3b8' }} formatter={(v) => v != null ? Number(v).toFixed(2) : ''} />
                           </Bar>
+                          <Bar name="Média do Nível" dataKey="Nivel" fill="#a7f3d0" radius={[4, 4, 0, 0]} maxBarSize={45} />
+                          <Bar name="Média da Escola" dataKey="Escola" fill="#e2e8f0" radius={[4, 4, 0, 0]} maxBarSize={45} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
                 </div>
 
-                {/* Tabela de Matérias PP Integrada */}
-                <div className="mt-10 pt-8 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Detalhamento de Notas da Prova Paulista no Período</h4>
-                  <div className="rounded-2xl overflow-hidden border border-slate-200">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                          <th className="text-left px-5 py-3.5 font-black text-slate-500 uppercase tracking-wider">Disciplina</th>
-                          <th className="px-5 py-3.5 font-black text-sky-600 uppercase tracking-wider text-center">Nota Aluno</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Média Turma</th>
-                          <th className="px-5 py-3.5 font-black text-slate-400 uppercase tracking-wider text-center">Desempenho</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {chartDataProva.map((item, idx) => {
-                          const alunoVal = item.Aluno != null ? Number(item.Aluno) : null;
-                          const turmaVal = item.Turma != null ? Number(item.Turma) : null;
-                          const diff = alunoVal != null && turmaVal != null ? (alunoVal - turmaVal).toFixed(2) : null;
-                          return (
-                            <tr key={idx} className={`border-b border-slate-50 ${idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}>
-                              <td className="px-5 py-3.5 font-bold text-slate-700">{item.fullSubject || item.subject}</td>
-                              <td className="px-5 py-3.5 text-center font-black text-sky-700 text-sm">
-                                {alunoVal != null ? alunoVal.toFixed(2) : (item.naoEfetuou ? <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-xl text-[11px] font-black uppercase tracking-wider border border-amber-200" title="Avaliação não efetuada pelo estudante">S/N</span> : '-')}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-semibold text-slate-500">
-                                {turmaVal != null ? turmaVal.toFixed(2) : '-'}
-                              </td>
-                              <td className="px-5 py-3.5 text-center font-bold">
-                                {diff != null ? (
-                                  diff >= 0 ? <span className="text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl text-[11px] border border-emerald-100">+{diff} vs Turma</span>
-                                            : <span className="text-rose-700 bg-rose-50 px-3 py-1 rounded-xl text-[11px] border border-rose-100">{diff} vs Turma</span>
-                                ) : '-'}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
               </div>
             )}
 
@@ -2510,6 +2890,9 @@ const StudentProfile = ({
             )}
           </div>
         )}
+      </div>
+
+        </main>
       </div>
 
       {/* Modal Maximizado */}

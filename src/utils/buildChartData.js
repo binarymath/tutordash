@@ -20,6 +20,44 @@ const getProvaBimestre = (studentProfile, targetBimestre) => {
   return null;
 };
 
+const normalizeStudentKey = (value) => String(value || '').trim().toLowerCase();
+
+const getRecordTurma = (record, allStudentsByName) =>
+  record?.turmaPlanilha || allStudentsByName.get(normalizeStudentKey(record?.normalizedName))?.turma || record?.turma || null;
+
+const buildReferenceAverages = ({ records, disciplina, bimestre, studentProfile, allStudents, parseValue }) => {
+  const allStudentsByName = new Map((allStudents || []).map((student) => [normalizeStudentKey(student.normalizedName), student]));
+  const targetTurma = studentProfile?.turma;
+  const targetNivel = getSerieFromTurma(targetTurma);
+  const totals = { turma: { sum: 0, count: 0 }, nivel: { sum: 0, count: 0 }, escola: { sum: 0, count: 0 } };
+
+  records
+    .filter((record) => !bimestre || !record.bimestre || record.bimestre === bimestre)
+    .forEach((record) => {
+      const turma = getRecordTurma(record, allStudentsByName);
+      const value = parseValue(record.notas?.[disciplina]);
+      if (value === null || value === undefined || Number.isNaN(value)) return;
+
+      totals.escola.sum += value;
+      totals.escola.count += 1;
+      if (turma === targetTurma) {
+        totals.turma.sum += value;
+        totals.turma.count += 1;
+      }
+      if (getSerieFromTurma(turma) === targetNivel) {
+        totals.nivel.sum += value;
+        totals.nivel.count += 1;
+      }
+    });
+
+  const average = (item, decimals) => item.count > 0 ? Number((item.sum / item.count).toFixed(decimals)) : 0;
+  return {
+    Turma: average(totals.turma, 1),
+    Nivel: average(totals.nivel, 1),
+    Escola: average(totals.escola, 1),
+  };
+};
+
 export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData = [], allStudents = [], targetBimestre = 'ultimo') => {
   void provaData;
   void allStudents;
@@ -103,12 +141,22 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
 
     const displaySub = formatDisciplina(disciplina);
     const shortName = displaySub.length > 12 ? `${displaySub.substring(0, 10)}.` : displaySub;
+    const references = buildReferenceAverages({
+      records: conceitoData,
+      disciplina,
+      bimestre: bRegistro.bimestre,
+      studentProfile,
+      allStudents,
+      parseValue: parseGrade,
+    });
 
     return {
       subject: shortName,
       fullSubject: displaySub,
       Aluno: notaAluno,
-      Turma: count > 0 ? parseFloat((soma / count).toFixed(1)) : 0,
+      Turma: references.Turma || (count > 0 ? parseFloat((soma / count).toFixed(1)) : 0),
+      Nivel: references.Nivel,
+      Escola: references.Escola,
       isMissing: notaAluno === null
     };
   }).filter(Boolean);
@@ -204,12 +252,22 @@ export const buildChartDataProva = (studentProfile, conceitoData = [], provaData
 
       const displaySub = formatDisciplina(disciplina);
       const shortName = displaySub.length > 12 ? `${displaySub.substring(0, 10)}.` : displaySub;
+      const references = buildReferenceAverages({
+        records: provaData,
+        disciplina,
+        bimestre: pRegistro.bimestre,
+        studentProfile,
+        allStudents,
+        parseValue: toScale10,
+      });
 
       return {
         subject: shortName,
         fullSubject: displaySub,
         Aluno: notaAluno !== null ? Math.round(notaAluno * 100) / 100 : null,
-        Turma: count > 0 ? Math.round((soma / count) * 100) / 100 : 0,
+        Turma: references.Turma || (count > 0 ? Math.round((soma / count) * 100) / 100 : 0),
+        Nivel: references.Nivel,
+        Escola: references.Escola,
         naoEfetuou: notaAluno === null
       };
     })

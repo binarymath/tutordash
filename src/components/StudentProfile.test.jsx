@@ -16,7 +16,9 @@ vi.mock('recharts', () => ({
   PolarRadiusAxis: () => null,
   ResponsiveContainer: ({ children }) => <div>{children}</div>,
   BarChart: ({ children }) => <div data-testid="bar-chart">{children}</div>,
+  LineChart: ({ children }) => <div data-testid="line-chart">{children}</div>,
   Bar: () => null,
+  Line: () => null,
   XAxis: () => null,
   YAxis: () => null,
   CartesianGrid: () => null,
@@ -156,9 +158,10 @@ describe('StudentProfile — cabeçalho', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('exibe o botão de impressão no perfil individual', () => {
+  it('não exibe os botões removidos do cabeçalho', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/imprimir/i)).toBeInTheDocument();
+    expect(screen.queryByText(/baixar docx/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/imprimir gráficos/i)).not.toBeInTheDocument();
   });
 });
 
@@ -197,6 +200,17 @@ describe('StudentProfile — navegação', () => {
     render(<StudentProfile {...defaultProps} prevStudent={prev} setSelectedStudent={setSelectedStudent} />);
     fireEvent.click(screen.getByText('Anterior').closest('button'));
     expect(setSelectedStudent).toHaveBeenCalledWith(prev);
+  });
+
+  it('mantém a navegação disponível com a sidebar expandida', () => {
+    const setSelectedStudent = vi.fn();
+    const next = { nome: 'Maria' };
+    render(<StudentProfile {...defaultProps} nextStudent={next} setSelectedStudent={setSelectedStudent} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
+    fireEvent.click(screen.getByText('Próximo').closest('button'));
+
+    expect(setSelectedStudent).toHaveBeenCalledWith(next);
   });
 });
 
@@ -240,16 +254,53 @@ describe('StudentProfile — seção de anotações', () => {
     const note = makeNote();
     const profile = makeProfile({ notes: [note] });
     render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[]} />);
-    expect(screen.getByText(/sem anotações registadas para este filtro/i)).toBeInTheDocument();
+    expect(screen.getByText(/sem anotações registradas para este filtro/i)).toBeInTheDocument();
   });
 
-  it('recolhe a seção ao clicar no botão toggle', () => {
+  it('mantém as ocorrências visíveis e exibe somente um botão de expansão', () => {
     render(<StudentProfile {...defaultProps} />);
-    // A seção começa aberta (showAnotacoes = true por padrão)
-    const toggleBtn = screen.getAllByTitle(/recolher|expandir/i)[0];
-    fireEvent.click(toggleBtn);
-    // Após recolher, a mensagem de vazio não aparece mais
-    expect(screen.queryByText(/este aluno ainda não possui anotações/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/este aluno ainda não possui anotações/i)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /expandir sidebar lateralmente/i })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /recolher sidebar de ocorrências/i })).not.toBeInTheDocument();
+  });
+
+  it('bloqueia a rolagem do fundo ao expandir a sidebar', () => {
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
+    render(<StudentProfile {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
+
+    expect(scrollTo).not.toHaveBeenCalled();
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(screen.getByRole('button', { name: /fechar sidebar expandida/i })).toBeInTheDocument();
+    expect(screen.getByText('Fechar')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /fechar sidebar expandida/i }));
+    expect(document.body.style.overflow).toBe('');
+    scrollTo.mockRestore();
+  });
+
+  it('exibe a impressora à esquerda de Fechar na sidebar expandida', () => {
+    render(<StudentProfile {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
+
+    const printButton = screen.getByRole('button', { name: /imprimir anotações e sessões/i });
+    const closeButton = screen.getByRole('button', { name: /fechar sidebar expandida/i });
+    expect(printButton).toBeInTheDocument();
+    expect(printButton.compareDocumentPosition(closeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('mostra o nome e a navegação dentro da sidebar expandida', () => {
+    const next = { nome: 'Maria Oliveira' };
+    const setSelectedStudent = vi.fn();
+    render(<StudentProfile {...defaultProps} nextStudent={next} setSelectedStudent={setSelectedStudent} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
+
+    expect(screen.getByText('Perfil do estudante')).toBeInTheDocument();
+    expect(screen.getAllByText('João Silva').length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText('Próximo').closest('button'));
+    expect(setSelectedStudent).toHaveBeenCalledWith(next);
   });
 });
 
@@ -322,6 +373,52 @@ describe('StudentProfile — filtros de sessão', () => {
     );
     // "Tutoria" aparece como filtro ativo
     expect(screen.getAllByText('Tutoria').length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filtro de ocorrências por período
+// ─────────────────────────────────────────────────────────────────────────────
+describe('StudentProfile — período das ocorrências', () => {
+  it('filtra ocorrências por data inicial e final de forma inclusiva', () => {
+    const notes = [
+      makeNote({ id: 'before', displayDate: '09/04/2024', note: 'Antes do período.' }),
+      makeNote({ id: 'start', displayDate: '10/04/2024', note: 'No início do período.' }),
+      makeNote({ id: 'end', displayDate: '20/04/2024', note: 'No fim do período.' }),
+      makeNote({ id: 'after', displayDate: '21/04/2024', note: 'Depois do período.' }),
+    ];
+    const profile = makeProfile({ notes });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={notes} />);
+
+    fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-10' } });
+    fireEvent.change(screen.getByLabelText('Data final das ocorrências'), { target: { value: '2024-04-20' } });
+
+    expect(screen.getByText('No início do período.')).toBeInTheDocument();
+    expect(screen.getByText('No fim do período.')).toBeInTheDocument();
+    expect(screen.queryByText('Antes do período.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Depois do período.')).not.toBeInTheDocument();
+  });
+
+  it('limpa o período selecionado e restaura as ocorrências', () => {
+    const notes = [makeNote({ displayDate: '10/04/2024' }), makeNote({ id: 'later', displayDate: '20/04/2024', note: 'Registro posterior.' })];
+    const profile = makeProfile({ notes });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={notes} />);
+
+    fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-20' } });
+    expect(screen.queryByText('Aluno muito participativo na sessão de hoje.')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Limpar período'));
+
+    expect(screen.getByText('Aluno muito participativo na sessão de hoje.')).toBeInTheDocument();
+    expect(screen.getByText('Registro posterior.')).toBeInTheDocument();
+  });
+
+  it('informa quando o intervalo é inválido', () => {
+    render(<StudentProfile {...defaultProps} studentProfile={makeProfile({ notes: [makeNote()] })} />);
+
+    fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-20' } });
+    fireEvent.change(screen.getByLabelText('Data final das ocorrências'), { target: { value: '2024-04-10' } });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('data inicial deve ser anterior');
   });
 });
 
@@ -422,33 +519,30 @@ describe('StudentProfile — Evolutivo Numérico', () => {
 describe('StudentProfile — Análise Gráfica', () => {
   it('exibe a seção de gráficos diretamente sem sanfona', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/sem dados numéricos suficientes/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/sem notas para comparar nesta disciplina/i).length).toBe(2);
   });
 
-  it('renderiza RadarChart quando chartDataMapao tem dados', () => {
-    const chartData = [
-      { subject: 'Mat', fullSubject: 'Matemática', Aluno: 8, Turma: 7 },
-    ];
-    render(<StudentProfile {...defaultProps} chartDataMapao={chartData} />);
-    expect(screen.getByTestId('radar-chart')).toBeInTheDocument();
+  it('renderiza BarChart guiado para Conselho quando há histórico', () => {
+    const profile = makeProfile({ historicoConceitos: [makeBimestre('1º Bimestre')] });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
+    expect(screen.getAllByTestId('bar-chart').length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText('Disciplina analisada').length).toBeGreaterThan(0);
   });
 
-  it('renderiza RadarChart da Prova Paulista quando chartDataProva tem dados', () => {
-    const provaData = [
-      { subject: 'Mat', fullSubject: 'Matemática', Aluno: 8 },
-    ];
-    render(<StudentProfile {...defaultProps} chartDataProva={provaData} />);
-    expect(screen.getAllByTestId('radar-chart').length).toBeGreaterThan(0);
+  it('renderiza BarChart guiado para Prova Paulista quando há histórico', () => {
+    const profile = makeProfile({ historicoProvas: [{ bimestre: '1º Bimestre', notas: { Matemática: '0.8' } }] });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
+    expect(screen.getAllByTestId('bar-chart').length).toBeGreaterThan(0);
   });
 
-  it('exibe mensagem apropriada quando chartDataProva é vazio e gráfico é exibido', () => {
-    render(<StudentProfile {...defaultProps} chartDataProva={[]} />);
-    expect(screen.getByText(/nenhuma avaliação registrada/i)).toBeInTheDocument();
+  it('exibe estados vazios quando não há histórico para análise', () => {
+    render(<StudentProfile {...defaultProps} />);
+    expect(screen.getAllByText(/sem notas para comparar nesta disciplina/i).length).toBe(2);
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Export PDF e DOCX
+// Exportação disponível no cabeçalho
 // ─────────────────────────────────────────────────────────────────────────────
 describe('StudentProfile — exportação', () => {
   beforeEach(() => {
@@ -475,11 +569,6 @@ describe('StudentProfile — exportação', () => {
     expect(screen.getByText(/baixar pdf/i)).toBeInTheDocument();
   });
 
-  it('exibe botão "Baixar DOCX"', () => {
-    render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/baixar docx/i)).toBeInTheDocument();
-  });
-
   it('clica em "Baixar PDF" sem lançar exceção', async () => {
     render(<StudentProfile {...defaultProps} />);
     const pdfBtn = screen.getByText(/baixar pdf/i).closest('button');
@@ -490,16 +579,6 @@ describe('StudentProfile — exportação', () => {
     });
     // Botão existe e não crasha
     expect(pdfBtn).toBeInTheDocument();
-  });
-
-  it('clica em "Baixar DOCX" sem lançar exceção', async () => {
-    render(<StudentProfile {...defaultProps} />);
-    const docxBtn = screen.getByText(/baixar docx/i).closest('button');
-    await act(async () => {
-      fireEvent.click(docxBtn);
-      await new Promise(r => setTimeout(r, 50));
-    });
-    expect(docxBtn).toBeInTheDocument();
   });
 
   it('exporta PDF com notas e chartData preenchidos', async () => {
@@ -525,27 +604,6 @@ describe('StudentProfile — exportação', () => {
     expect(pdfBtn).toBeInTheDocument();
   });
 
-  it('exporta DOCX com notas e chartData preenchidos', async () => {
-    const profile = makeProfile({
-      nome: 'João Silva',
-      notes: [makeNote()],
-    });
-    render(
-      <StudentProfile
-        {...defaultProps}
-        studentProfile={profile}
-        filteredNotes={[makeNote()]}
-        chartDataMapao={[{ subject: 'Mat', Aluno: 8, Turma: 7, fullSubject: 'Matemática' }]}
-        chartDataProva={[{ subject: 'Mat', Desempenho: 8, fullSubject: 'Matemática' }]}
-      />
-    );
-    const docxBtn = screen.getByText(/baixar docx/i).closest('button');
-    await act(async () => {
-      fireEvent.click(docxBtn);
-      await new Promise(r => setTimeout(r, 100));
-    });
-    expect(docxBtn).toBeInTheDocument();
-  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -559,7 +617,7 @@ describe('StudentProfile — casos especiais', () => {
   it('renderiza aluno com ultimoBimNome "Sem Dados"', () => {
     const profile = makeProfile({ ultimoBimNome: 'Sem Dados' });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    expect(document.querySelector('.max-w-5xl')).toBeTruthy();
+    expect(document.querySelector('.w-full.max-w-none')).toBeTruthy();
   });
 
   it('renderiza com múltiplos bimestres de conceito', () => {
