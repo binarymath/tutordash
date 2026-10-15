@@ -95,11 +95,11 @@ const validateUrl = (url, type = 'sheet') => {
 
 const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onClose, onLoad, isLoading }) => {
   // Local state para editar as urls da aba atual antes de salvar
-  const [localConfig, setLocalConfig] = useState(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' });
+  const [localConfig, setLocalConfig] = useState(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
 
   // Quando o profile selecionado via props muda, atualiza o localConfig imediatamente
   useEffect(() => {
-    setLocalConfig(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' });
+    setLocalConfig(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
   }, [activeProfile, profiles]);
 
   const handleCreateProfile = () => {

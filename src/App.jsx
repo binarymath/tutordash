@@ -8,8 +8,10 @@ import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
 import { useProvas } from './hooks/useProvas';
 import { useConceitos } from './hooks/useConceitos';
+import { useDisciplinaSheet } from './hooks/useDisciplinaSheet';
 
 import ConfigModal    from './components/ConfigModal';
+import LinksModal     from './components/LinksModal';
 import Header         from './components/Header';
 import EmptyState     from './components/EmptyState';
 import Dashboard      from './components/Dashboard';
@@ -24,7 +26,7 @@ const App = () => {
 
   const [multiConfig, setMultiConfig] = useState(() => {
     const defaultProfileData = {
-      studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: ''
+      studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: []
     };
     const defaultData = {
       activeProfile: 'Principal',
@@ -93,7 +95,7 @@ const App = () => {
   };
 
   const activeProfile = multiConfig.activeProfile;
-  const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' };
+  const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] };
 
   // ── Estado de LGPD e Navegação ──────────────────────────────
   const [hasLgpdConsent, setHasLgpdConsent] = useState(() => {
@@ -105,6 +107,7 @@ const App = () => {
   });
 
   const [showSettings,          setShowSettings]          = useState(false);
+  const [showLinksModal,         setShowLinksModal]        = useState(false);
   const [filterMode,            setFilterMode]            = useState('tutor');
   const [selectedValue,         setSelectedValue]         = useState('Todos');
   const [searchTerm,            setSearchTerm]            = useState('');
@@ -136,15 +139,17 @@ const App = () => {
 
   // ── Dados (TanStack Query) ─────────────────────────────────
   // Apenas passa as URLs para os hooks se o usuário já tiver dado o consentimento da LGPD
-  const safeStudentsUrl = hasLgpdConsent ? config.studentsUrl : '';
-  const safeNotesUrl    = hasLgpdConsent ? config.notesUrl : '';
-  const safeProvaUrl    = hasLgpdConsent ? config.provaUrl : '';
-  const safeConceitoUrl = hasLgpdConsent ? config.conceitoUrl : '';
+  const safeStudentsUrl   = hasLgpdConsent ? config.studentsUrl : '';
+  const safeNotesUrl      = hasLgpdConsent ? config.notesUrl : '';
+  const safeProvaUrl      = hasLgpdConsent ? config.provaUrl : '';
+  const safeConceitoUrl   = hasLgpdConsent ? config.conceitoUrl : '';
+  const safeDisciplinaUrl = hasLgpdConsent ? (config.disciplinaUrl || '') : '';
 
   const { data: dataRaw = [], isLoading: isLoadingStudents, isFetching: isFetchingStudents, error: errorStudents } = useStudents(safeStudentsUrl);
   const { data: annotations = [], isLoading: isLoadingNotes, isFetching: isFetchingNotes, error: errorNotes } = useNotes(safeNotesUrl);
   const { data: provaData = [], isLoading: isLoadingProvas, isFetching: isFetchingProvas, error: errorProvas } = useProvas(safeProvaUrl);
   const { data: conceitoData = [], isLoading: isLoadingConceitos, isFetching: isFetchingConceitos, error: errorConceitos } = useConceitos(safeConceitoUrl);
+  const { data: disciplinaData = null, isLoading: isLoadingDisciplina, error: errorDisciplina } = useDisciplinaSheet(safeDisciplinaUrl);
 
   const data = useMemo(() => {
     // Redistribui alunos de turmas inválidas (405, 406) usando os dados do Mapão ou Prova Paulista
@@ -838,6 +843,17 @@ const App = () => {
         />
       )}
 
+      {showLinksModal && (
+        <LinksModal
+          isOpen={showLinksModal}
+          onClose={() => setShowLinksModal(false)}
+          config={config}
+          onSaveConfig={(updatedConfig) => {
+            saveProfile(activeProfile, updatedConfig);
+          }}
+        />
+      )}
+
       {showLowGradesModal && (
         <LowGradesReportModal
           allStudents={allStudents}
@@ -878,6 +894,7 @@ const App = () => {
         onRefresh={data.length > 0 ? () => loadAllData(true) : null}
         config={config}
         onOpenSettings={() => setShowSettings(true)}
+        onOpenLinksModal={() => setShowLinksModal(true)}
         showStickyName={showStickyName}
       />
 
@@ -898,6 +915,11 @@ const App = () => {
                 allStudents={allStudents}
                 conceitoData={conceitoData}
                 provaData={provaData}
+                disciplinaData={disciplinaData}
+                isLoadingDisciplina={isLoadingDisciplina}
+                disciplinaError={errorDisciplina}
+                hasDisciplinaUrl={!!config.disciplinaUrl}
+                onOpenLinksModal={() => setShowLinksModal(true)}
                 onSelectStudent={(nome) => {
                   setSelectedStudent(nome);
                   setSelectedTurma(null);

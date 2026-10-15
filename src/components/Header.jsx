@@ -4,13 +4,13 @@
 import React from 'react';
 import {
   LayoutDashboard, ChevronLeft, ChevronRight,
-  RefreshCw, ExternalLink, Settings
+  RefreshCw, ExternalLink, Settings, Plus
 } from 'lucide-react';
 
 const Header = ({
   selectedStudent, studentProfile, prevStudent, nextStudent,
   setSelectedStudent, isSyncing, onRefresh, config,
-  onOpenSettings, showStickyName
+  onOpenSettings, onOpenLinksModal, showStickyName
 }) => (
   <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
     <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 relative">
@@ -66,6 +66,14 @@ const Header = ({
               <RefreshCw className={`w-5 h-5 ${isSyncing ? 'animate-spin text-blue-600' : ''}`} />
             </button>
           )}
+          {/* Botão Adicionar ao lado esquerdo do botão Anotações */}
+          <button
+            onClick={onOpenLinksModal}
+            className="flex items-center gap-1.5 bg-gradient-to-b from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 text-slate-700 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold border border-slate-300 border-b-[3px] border-b-slate-400 shadow-xs hover:shadow active:border-b active:translate-y-[2px] transition-all cursor-pointer"
+            title="Adicionar links e planilhas importantes"
+          >
+            <Plus className="w-4 h-4 text-blue-600" /> Adicionar
+          </button>
           {config?.formLink && (
             <a
               href={config.formLink}

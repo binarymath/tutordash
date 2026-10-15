@@ -15,6 +15,7 @@ import {
 } from 'recharts';
 import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma } from '../utils/helpers';
 import SpeedometerGauge from './SpeedometerGauge';
+import DisciplinaTableSection from './DisciplinaTableSection';
 
 // Tooltip estilizado e claro para os gráficos Recharts
 const CustomTooltip = ({ active, payload, label }) => {
@@ -51,6 +52,11 @@ const ClassProfile = ({
   allStudents = [],
   conceitoData = [],
   provaData = [],
+  disciplinaData = null,
+  isLoadingDisciplina = false,
+  disciplinaError = null,
+  hasDisciplinaUrl = false,
+  onOpenLinksModal,
   onSelectStudent
 }) => {
   // ── 1. Estados e Configurações ──────────────────────────────────────
@@ -1291,6 +1297,17 @@ const ClassProfile = ({
           </span>
         </div>
       </section>
+
+      {/* ── SEÇÃO COMPLEMENTAR: PLANILHA DE DISCIPLINAS (POR TURMA E BIMESTRE) ── */}
+      <DisciplinaTableSection
+        selectedTurma={selectedTurma}
+        selectedDisc={selectedDisc}
+        disciplinaData={disciplinaData}
+        isLoading={isLoadingDisciplina}
+        error={disciplinaError}
+        onOpenLinksModal={onOpenLinksModal}
+        hasUrl={hasDisciplinaUrl}
+      />
 
     </div>
   );

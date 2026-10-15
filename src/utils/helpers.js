@@ -15,10 +15,10 @@ export const normalizeName = (name) => {
 export const formatBimestre = (text) => {
   if (!text) return '1º Bimestre';
   const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (t.includes('primeiro') || t.includes('1º') || t.includes('1o') || t.includes('1bim') || t.includes('1 bim') || t === '1' || t.startsWith('1-')) return '1º Bimestre';
-  if (t.includes('segundo')  || t.includes('2º') || t.includes('2o') || t.includes('2bim') || t.includes('2 bim') || t === '2' || t.startsWith('2-')) return '2º Bimestre';
-  if (t.includes('terceiro') || t.includes('3º') || t.includes('3o') || t.includes('3bim') || t.includes('3 bim') || t === '3' || t.startsWith('3-')) return '3º Bimestre';
-  if (t.includes('quarto')   || t.includes('4º') || t.includes('4o') || t.includes('4bim') || t.includes('4 bim') || t === '4' || t.startsWith('4-')) return '4º Bimestre';
+  if (t.includes('primeiro') || t.includes('1º') || t.includes('1o') || t.includes('1bim') || t.includes('1 bim') || t.includes('1b') || t === '1' || t.startsWith('1-')) return '1º Bimestre';
+  if (t.includes('segundo')  || t.includes('2º') || t.includes('2o') || t.includes('2bim') || t.includes('2 bim') || t.includes('2b') || t === '2' || t.startsWith('2-')) return '2º Bimestre';
+  if (t.includes('terceiro') || t.includes('3º') || t.includes('3o') || t.includes('3bim') || t.includes('3 bim') || t.includes('3b') || t === '3' || t.startsWith('3-')) return '3º Bimestre';
+  if (t.includes('quarto')   || t.includes('4º') || t.includes('4o') || t.includes('4bim') || t.includes('4 bim') || t.includes('4b') || t === '4' || t.startsWith('4-')) return '4º Bimestre';
   return text.trim();
 };
 
@@ -36,17 +36,17 @@ export const matchesBimestre = (bimName, selectedBim) => {
   if (!bimName) return false;
   const raw = String(bimName).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const target = String(selectedBim || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (target === '1' || target.includes('1º') || target.includes('1o') || target.includes('primeiro')) {
-    return raw.includes('1º') || raw.includes('1o') || raw.includes('1 bim') || raw.includes('1bim') || raw.includes('primeiro') || raw === '1' || raw.startsWith('1-');
+  if (target === '1' || target.includes('1º') || target.includes('1o') || target.includes('primeiro') || target.includes('1b')) {
+    return raw.includes('1º') || raw.includes('1o') || raw.includes('1 bim') || raw.includes('1bim') || raw.includes('1b') || raw.includes('primeiro') || raw === '1' || raw.startsWith('1-');
   }
-  if (target === '2' || target.includes('2º') || target.includes('2o') || target.includes('segundo')) {
-    return raw.includes('2º') || raw.includes('2o') || raw.includes('2 bim') || raw.includes('2bim') || raw.includes('segundo') || raw === '2' || raw.startsWith('2-');
+  if (target === '2' || target.includes('2º') || target.includes('2o') || target.includes('segundo') || target.includes('2b')) {
+    return raw.includes('2º') || raw.includes('2o') || raw.includes('2 bim') || raw.includes('2bim') || raw.includes('2b') || raw.includes('segundo') || raw === '2' || raw.startsWith('2-');
   }
-  if (target === '3' || target.includes('3º') || target.includes('3o') || target.includes('terceiro')) {
-    return raw.includes('3º') || raw.includes('3o') || raw.includes('3 bim') || raw.includes('3bim') || raw.includes('terceiro') || raw === '3' || raw.startsWith('3-');
+  if (target === '3' || target.includes('3º') || target.includes('3o') || target.includes('terceiro') || target.includes('3b')) {
+    return raw.includes('3º') || raw.includes('3o') || raw.includes('3 bim') || raw.includes('3bim') || raw.includes('3b') || raw.includes('terceiro') || raw === '3' || raw.startsWith('3-');
   }
-  if (target === '4' || target.includes('4º') || target.includes('4o') || target.includes('quarto')) {
-    return raw.includes('4º') || raw.includes('4o') || raw.includes('4 bim') || raw.includes('4bim') || raw.includes('quarto') || raw === '4' || raw.startsWith('4-');
+  if (target === '4' || target.includes('4º') || target.includes('4o') || target.includes('quarto') || target.includes('4b')) {
+    return raw.includes('4º') || raw.includes('4o') || raw.includes('4 bim') || raw.includes('4bim') || raw.includes('4b') || raw.includes('quarto') || raw === '4' || raw.startsWith('4-');
   }
   if (target === 'geral' || target.includes('media')) return true;
   return raw === target;

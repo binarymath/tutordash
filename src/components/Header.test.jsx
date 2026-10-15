@@ -68,6 +68,18 @@ describe('Header', () => {
     expect(screen.getByText(/anotações/i)).toBeInTheDocument();
   });
 
+  it('renderiza o botão Adicionar ao lado esquerdo de anotações', () => {
+    render(<Header {...defaultProps} />);
+    expect(screen.getByRole('button', { name: /adicionar/i })).toBeInTheDocument();
+  });
+
+  it('chama onOpenLinksModal ao clicar no botão Adicionar', () => {
+    const onOpenLinksModal = vi.fn();
+    render(<Header {...defaultProps} onOpenLinksModal={onOpenLinksModal} />);
+    fireEvent.click(screen.getByRole('button', { name: /adicionar/i }));
+    expect(onOpenLinksModal).toHaveBeenCalledTimes(1);
+  });
+
   it('não exibe navegação de aluno quando selectedStudent é null', () => {
     render(<Header {...defaultProps} selectedStudent={null} showStickyName={false} />);
     expect(screen.queryByTitle('Aluno Anterior')).not.toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { normalizeName, formatBimestre, formatTurma } from '../utils/helpers';
+import { normalizeName, formatBimestre, formatTurma, formatDisciplina } from '../utils/helpers';
 
 
 let xlsxModulePromise = null;
@@ -677,3 +677,130 @@ export const fetchConceitos = async (url) => {
   });
   return todosConceitos;
 };
+
+// ─────────────────────────────────────────────────────────────────────────────────────
+// Lê e estrutura a planilha de acompanhamento por disciplinas
+// Identifica Turma e Bimestre pelo nome da aba (ex: "6A-1B" -> Turma 6A, 1º Bimestre)
+// e filtra os dados onde a Coluna D (índice 3) é a Disciplina.
+// ─────────────────────────────────────────────────────────────────────────────────────
+export const fetchDisciplinaSheet = async (url) => {
+  if (!url) return null;
+
+  try {
+    const cleanUrl = url.trim();
+    const idMatch = cleanUrl.match(/\/d\/([^/\s]+)/);
+    let fetchUrl;
+    if (idMatch) {
+      const cleanId = idMatch[1].replace(/\s+/g, '');
+      fetchUrl = `https://docs.google.com/spreadsheets/d/${cleanId}/export?format=xlsx`;
+    } else {
+      fetchUrl = cleanUrl;
+    }
+
+    const proxyUrl = '/api/proxy?url=' + encodeURIComponent(fetchUrl);
+    const res = await fetch(proxyUrl);
+    if (!res.ok) throw new Error(`Proxy respondeu ${res.status} ao carregar planilha de disciplinas.`);
+    const arrayBuffer = await res.arrayBuffer();
+    const XLSX = await getXLSX();
+    const wb = XLSX.read(arrayBuffer, { type: 'array' });
+
+    const parsedRows = [];
+    const headersBySheet = {};
+
+    wb.SheetNames.forEach(sheetName => {
+      const snLower = sheetName.trim().toLowerCase();
+      if (snLower === 'tutoria' || snLower === 'tutores' || snLower === 'base') return;
+
+      // Extrai Turma e Bimestre pelo nome da aba (ex: "6A-1B", "7B-2Bim", "6A_1B")
+      // O bimestre é identificado pelo primeiro dígito (1-4) após o separador,
+      // tolerando erros de digitação como "6A-3C".
+      let turma = '';
+      let bimestre = '';
+      const sepMatch = sheetName.match(/^(.+?)[-_\s]+(.+)$/);
+      if (sepMatch) {
+        turma = formatTurma(sepMatch[1].trim());
+        const bimRaw = sepMatch[2].trim();
+        const digit = bimRaw.match(/[1-4]/);
+        bimestre = digit ? `${digit[0]}º Bimestre` : formatBimestre(bimRaw);
+      } else {
+        turma = formatTurma(sheetName);
+        bimestre = formatBimestre(sheetName);
+      }
+
+      const ws = wb.Sheets[sheetName];
+      const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      if (!jsonData || jsonData.length <= 1) return;
+
+      // Identifica a linha de cabeçalho
+      let headerIdx = 0;
+      if (
+        jsonData[0] &&
+        jsonData[0].filter(c => c !== '').length <= 1 &&
+        jsonData[1] &&
+        jsonData[1].filter(c => c !== '').length > 1
+      ) {
+        headerIdx = 1;
+      }
+
+      const rawHeaders = jsonData[headerIdx] || [];
+      const headers = rawHeaders.map((h, colIdx) => {
+        const val = String(h || '').trim();
+        if (val) return val;
+        if (colIdx === 3) return 'Disciplina';
+        return `Coluna ${String.fromCharCode(65 + (colIdx % 26))}`;
+      });
+
+      headersBySheet[sheetName] = headers;
+      const dataRows = jsonData.slice(headerIdx + 1);
+
+      dataRows.forEach((row, rIdx) => {
+        if (!row || !row.some(c => c !== undefined && c !== null && String(c).trim() !== '')) {
+          return;
+        }
+
+        // Coluna D é a disciplina (índice 3: A=0, B=1, C=2, D=3)
+        const disciplinaRaw = row[3] !== undefined && row[3] !== null ? String(row[3]).trim() : '';
+        if (!disciplinaRaw || isRefSpreadsheetError(disciplinaRaw)) return;
+
+        // Remove o código numérico do final (ex: "CIÊNCIAS - 8468" → "CIÊNCIAS")
+        // para unificar a mesma disciplina entre bimestres.
+        const disciplina = formatDisciplina(disciplinaRaw.replace(/\s*-\s*\d+\s*$/, '').trim());
+
+        const cells = headers.map((header, colIdx) => {
+          const raw = row[colIdx];
+          let value = raw !== undefined && raw !== null ? sanitizeCellText(raw) : '';
+          // Colunas de porcentagem com valor decimal (0.1875 → 18.8%)
+          if (header.includes('%') && typeof raw === 'number' && raw >= 0 && raw <= 1) {
+            value = `${(raw * 100).toFixed(1).replace('.', ',')}%`;
+          }
+          return { header, value };
+        });
+
+        parsedRows.push({
+          id: `${sheetName}_${rIdx}`,
+          sheetName,
+          turma: turma || 'Sem Turma',
+          bimestre: bimestre || '1º Bimestre',
+          disciplina,
+          disciplinaRaw,
+          cells,
+          rawRow: row
+        });
+      });
+    });
+
+    return {
+      rows: parsedRows,
+      headersBySheet,
+      turmas: Array.from(new Set(parsedRows.map(r => r.turma).filter(Boolean))),
+      disciplinas: Array.from(new Set(parsedRows.map(r => r.disciplina).filter(Boolean))),
+      bimestres: Array.from(new Set(parsedRows.map(r => r.bimestre).filter(Boolean))),
+    };
+  } catch (error) {
+    console.error('[fetchDisciplinaSheet] Falhou:', error.message);
+    throw new Error(
+      'Não foi possível carregar a planilha de disciplinas. Verifique se o link está correto e se o arquivo está público.'
+    );
+  }
+};
+
