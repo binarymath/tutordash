@@ -1,4 +1,4 @@
-import { normalizeName, formatBimestre, formatTurma, formatDisciplina } from '../utils/helpers';
+import { normalizeName, formatBimestre, formatTurma, formatDisciplina, expandSiglaDisciplina } from '../utils/helpers';
 
 
 let xlsxModulePromise = null;
@@ -417,7 +417,7 @@ export const fetchProvas = async (url) => {
     for (let col = SUBJECT_START; col < headers.length; col++) {
       const name = String(headers[col] || '').trim();
       if (!name) break; // cabeçalho vazio → fim real do bloco de matérias
-      ppSubjects.push({ index: col, name });
+      ppSubjects.push({ index: col, name: expandSiglaDisciplina(name) });
     }
 
     return dataRows
@@ -594,7 +594,7 @@ export const fetchConceitos = async (url) => {
             // A última coluna com dados é a coluna de frequência (não deve ser matéria)
             if (idx !== freqIdx && !isTf && !isExcluded && !isAttendanceIndex) {
               if (subjectName) {
-                subjects.push({ index: idx, name: subjectName });
+                subjects.push({ index: idx, name: expandSiglaDisciplina(subjectName) });
               }
             }
           }

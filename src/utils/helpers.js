@@ -215,9 +215,63 @@ export const fetchWithFallback = async (url) => {
   return res;
 };
 
+// Siglas usadas nos cabeçalhos da planilha da Prova Paulista → nome completo.
+// A chave é a sigla normalizada (sem acento, maiúscula, sem pontos/espaços).
+const DISCIPLINA_SIGLAS = {
+  CIE: 'Ciências',
+  CIEN: 'Ciências',
+  CIENC: 'Ciências',
+  GEO: 'Geografia',
+  GEOG: 'Geografia',
+  HIS: 'História',
+  HIST: 'História',
+  MAT: 'Matemática',
+  MATEM: 'Matemática',
+  LP: 'Língua Portuguesa',
+  POR: 'Língua Portuguesa',
+  PORT: 'Língua Portuguesa',
+  LPO: 'Língua Portuguesa',
+  ING: 'Língua Inglesa',
+  LI: 'Língua Inglesa',
+  LIN: 'Língua Inglesa',
+  ART: 'Arte',
+  ARTE: 'Arte',
+  EDF: 'Educação Física',
+  EF: 'Educação Física',
+  EDFIS: 'Educação Física',
+  BIO: 'Biologia',
+  BIOL: 'Biologia',
+  FIS: 'Física',
+  QUI: 'Química',
+  QUIM: 'Química',
+  FIL: 'Filosofia',
+  FILO: 'Filosofia',
+  SOC: 'Sociologia',
+  SOCIO: 'Sociologia',
+  TEC: 'Tecnologia',
+  RED: 'Redação',
+  PV: 'Projeto de Vida',
+};
+
+// Expande apenas siglas (CIE → Ciências). Qualquer outro nome é devolvido intacto.
+// Usado na leitura das planilhas para que TODO o sistema receba o nome completo.
+export const expandSiglaDisciplina = (nome) => {
+  if (nome === null || nome === undefined) return nome;
+  const original = String(nome).trim();
+  const sigla = original
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[\s.]+/g, '');
+  return DISCIPLINA_SIGLAS[sigla] || original;
+};
+
 export const formatDisciplina = (nome) => {
   if (!nome) return '';
   const n = String(nome).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+
+  const sigla = n.replace(/[\s.]+/g, '');
+  if (DISCIPLINA_SIGLAS[sigla]) return DISCIPLINA_SIGLAS[sigla];
   
   if (n.includes('ORIENTA') && n.includes('LINGU')) return 'OE: Língua Portuguesa';
   if (n.includes('ORIENTA') && n.includes('MATEM')) return 'OE: Matemática';

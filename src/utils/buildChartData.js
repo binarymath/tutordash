@@ -25,19 +25,42 @@ const normalizeStudentKey = (value) => String(value || '').trim().toLowerCase();
 const getRecordTurma = (record, allStudentsByName) =>
   record?.turmaPlanilha || allStudentsByName.get(normalizeStudentKey(record?.normalizedName))?.turma || record?.turma || null;
 
-const buildReferenceAverages = ({ records, disciplina, bimestre, studentProfile, allStudents, parseValue }) => {
+// Célula sem nota lançada: vazia, traço ou sigla de ausência (S/N, S/D, falta...).
+// Essas células NÃO podem entrar na média — antes eram convertidas em 0 pelo
+// parseGrade e puxavam as médias de Turma/Nível/Escola para baixo.
+const isBlankGrade = (raw) => {
+  if (raw === undefined || raw === null) return true;
+  const str = String(raw).trim();
+  if (!str || /^[-–—_.\s]+$/.test(str)) return true;
+  return /^(S\/N|S\/D|S\/C|NC|NA|N\/A|N\/C|DISP|DISPENSADO|AUSENTE|FALTA|SEM\s*NOTA)$/i.test(str);
+};
+
+const isInactiveRecord = (record) =>
+  Boolean(record?.situacao) && String(record.situacao).trim() !== 'Ativo';
+
+const buildReferenceAverages = ({ records, disciplina, bimestre, studentProfile, allStudents, parseValue, requirePositive = false, decimals = 1 }) => {
   const allStudentsByName = new Map((allStudents || []).map((student) => [normalizeStudentKey(student.normalizedName), student]));
   const targetTurma = studentProfile?.turma;
   const targetNivel = getSerieFromTurma(targetTurma);
   const totals = { turma: { sum: 0, count: 0 }, nivel: { sum: 0, count: 0 }, escola: { sum: 0, count: 0 } };
+  const seen = new Set();
 
   records
     .filter((record) => !bimestre || !record.bimestre || record.bimestre === bimestre)
     .forEach((record) => {
-      const turma = getRecordTurma(record, allStudentsByName);
-      const value = parseValue(record.notas?.[disciplina]);
+      if (isInactiveRecord(record)) return;
+      const raw = record.notas?.[disciplina];
+      if (isBlankGrade(raw)) return;
+      const value = parseValue(raw);
       if (value === null || value === undefined || Number.isNaN(value)) return;
+      if (requirePositive && value <= 0) return;
 
+      // Um aluno conta uma única vez por bimestre (evita duplicidade entre abas)
+      const dedupeKey = `${normalizeStudentKey(record.normalizedName)}__${record.bimestre || ''}`;
+      if (record.normalizedName && seen.has(dedupeKey)) return;
+      seen.add(dedupeKey);
+
+      const turma = getRecordTurma(record, allStudentsByName);
       totals.escola.sum += value;
       totals.escola.count += 1;
       if (turma === targetTurma) {
@@ -50,11 +73,11 @@ const buildReferenceAverages = ({ records, disciplina, bimestre, studentProfile,
       }
     });
 
-  const average = (item, decimals) => item.count > 0 ? Number((item.sum / item.count).toFixed(decimals)) : 0;
+  const average = (item) => item.count > 0 ? Number((item.sum / item.count).toFixed(decimals)) : 0;
   return {
-    Turma: average(totals.turma, 1),
-    Nivel: average(totals.nivel, 1),
-    Escola: average(totals.escola, 1),
+    Turma: average(totals.turma),
+    Nivel: average(totals.nivel),
+    Escola: average(totals.escola),
   };
 };
 
@@ -128,12 +151,11 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
     let count = 0;
 
     turmaAlunos.forEach((aluno) => {
-      if (aluno.notas?.[disciplina] !== undefined) {
-        const nota = parseGrade(aluno.notas[disciplina]);
-        if (nota > 0 || (aluno.notas[disciplina] && aluno.notas[disciplina] !== '-')) {
-          soma += nota;
-          count += 1;
-        }
+      if (isInactiveRecord(aluno) || isBlankGrade(aluno.notas?.[disciplina])) return;
+      const nota = parseGrade(aluno.notas[disciplina]);
+      if (nota > 0) {
+        soma += nota;
+        count += 1;
       }
     });
 
@@ -148,6 +170,8 @@ export const buildChartDataMapao = (studentProfile, conceitoData = [], provaData
       studentProfile,
       allStudents,
       parseValue: parseGrade,
+      requirePositive: true,
+      decimals: 1,
     });
 
     return {
@@ -259,6 +283,7 @@ export const buildChartDataProva = (studentProfile, conceitoData = [], provaData
         studentProfile,
         allStudents,
         parseValue: toScale10,
+        decimals: 2,
       });
 
       return {

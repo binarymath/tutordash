@@ -139,20 +139,21 @@ const formatOccurrenceDateTime = (value) => {
 };
 
 const buildAnalysisSummary = (data) => {
-  const values = (key) => data.map((item) => item[key]).filter((value) => typeof value === 'number');
+  // Compara apenas os bimestres em que o aluno tem nota, para que a diferença
+  // "vs turma/nível/escola" use exatamente o mesmo período nos dois lados.
+  const withAluno = data.filter((item) => typeof item.aluno === 'number');
+  if (withAluno.length === 0) return null;
   const average = (key) => {
-    const list = values(key);
+    const list = withAluno.map((item) => item[key]).filter((value) => typeof value === 'number');
     return list.length ? list.reduce((sum, value) => sum + value, 0) / list.length : null;
   };
-  const aluno = average('aluno');
-  if (aluno === null) return null;
   return {
-    aluno,
+    aluno: average('aluno'),
     turma: average('turma'),
     nivel: average('nivel'),
     escola: average('escola'),
-    first: values('aluno')[0],
-    last: values('aluno').at(-1),
+    first: withAluno[0].aluno,
+    last: withAluno.at(-1).aluno,
   };
 };
 
@@ -1001,18 +1002,27 @@ const StudentProfile = ({
     };
   }, [studentProfile]);
 
+  // Somente disciplinas com pelo menos uma nota lançada para o aluno
   const analysisOptionsCC = React.useMemo(
-    () => evolucaoDisciplinasCC.disciplinas.map((item) => ({ value: item.disciplina, label: item.label })),
+    () => evolucaoDisciplinasCC.disciplinas
+      .filter((item) => item.values.some((value) => value !== null))
+      .map((item) => ({ value: item.disciplina, label: item.label })),
     [evolucaoDisciplinasCC]
   );
 
   const analysisOptionsPP = React.useMemo(
-    () => evolucaoDisciplinasPP.disciplinas.map((item) => ({ value: item.disciplina, label: item.label })),
+    () => evolucaoDisciplinasPP.disciplinas
+      .filter((item) => item.values.some((value) => value !== null))
+      .map((item) => ({ value: item.disciplina, label: item.label })),
     [evolucaoDisciplinasPP]
   );
 
-  const activeAnalysisCC = selectedAnalysisCC || analysisOptionsCC[0]?.value || '';
-  const activeAnalysisPP = selectedAnalysisPP || analysisOptionsPP[0]?.value || '';
+  const activeAnalysisCC = analysisOptionsCC.some((o) => o.value === selectedAnalysisCC)
+    ? selectedAnalysisCC
+    : analysisOptionsCC[0]?.value || '';
+  const activeAnalysisPP = analysisOptionsPP.some((o) => o.value === selectedAnalysisPP)
+    ? selectedAnalysisPP
+    : analysisOptionsPP[0]?.value || '';
 
   const guidedAnalysisCC = React.useMemo(() => {
     if (!activeAnalysisCC) return { label: '', data: [], summary: null };

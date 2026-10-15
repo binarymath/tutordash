@@ -238,6 +238,27 @@ describe('formatDisciplina', () => {
   it('normaliza ORIENTA+LINGU para Língua Portuguesa', () => {
     expect(formatDisciplina('Orientação: Língua')).toBe('OE: Língua Portuguesa');
   });
+
+  it('expande siglas da Prova Paulista para o nome completo', () => {
+    expect(formatDisciplina('CIE')).toBe('Ciências');
+    expect(formatDisciplina('Cie')).toBe('Ciências');
+    expect(formatDisciplina('GEO')).toBe('Geografia');
+    expect(formatDisciplina('his')).toBe('História');
+    expect(formatDisciplina('MAT')).toBe('Matemática');
+    expect(formatDisciplina('LP')).toBe('Língua Portuguesa');
+    expect(formatDisciplina('ING')).toBe('Língua Inglesa');
+    expect(formatDisciplina('BIO')).toBe('Biologia');
+    expect(formatDisciplina('FIS')).toBe('Física');
+    expect(formatDisciplina('QUI')).toBe('Química');
+    expect(formatDisciplina('SOC')).toBe('Sociologia');
+    expect(formatDisciplina('FIL')).toBe('Filosofia');
+    expect(formatDisciplina(' Geo. ')).toBe('Geografia');
+  });
+
+  it('não altera nomes que apenas contêm uma sigla', () => {
+    expect(formatDisciplina('Geometria')).toBe('Geometria');
+    expect(formatDisciplina('Física Aplicada')).toBe('Física Aplicada');
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

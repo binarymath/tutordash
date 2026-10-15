@@ -331,6 +331,7 @@ const ClassProfile = ({
         const isMinhaSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === targetSerie;
         const isMinhaEscola = normNamesSchoolSet.has(reg.normalizedName) || Boolean(reg.turmaPlanilha);
         if (!isMinhaEscola) return;
+        if (reg.situacao && String(reg.situacao).trim() !== 'Ativo') return;
 
         Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
           const formatted = formatDisciplina(k);
