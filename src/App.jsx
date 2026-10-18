@@ -97,7 +97,6 @@ const App = () => {
   const activeProfile = multiConfig.activeProfile;
   const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] };
 
-  // ── Estado de LGPD e Navegação ──────────────────────────────
   const [hasLgpdConsent, setHasLgpdConsent] = useState(() => {
     try {
       return localStorage.getItem('tutordash_lgpd_consent') === 'true';
@@ -105,6 +104,18 @@ const App = () => {
       return false;
     }
   });
+
+  const handleRevokeConsent = () => {
+    try {
+      localStorage.removeItem('tutordash_lgpd_consent');
+      localStorage.removeItem('tutorDashConfig');
+    } catch (e) {
+      console.warn('Erro ao limpar dados locais', e);
+    }
+    setHasLgpdConsent(false);
+    setShowSettings(false);
+    window.location.reload();
+  };
 
   const [showSettings,          setShowSettings]          = useState(false);
   const [showLinksModal,         setShowLinksModal]        = useState(false);
@@ -840,6 +851,7 @@ const App = () => {
           onClose={() => setShowSettings(false)}
           onLoad={() => loadAllData(false)}
           isLoading={isLoading}
+          onRevokeConsent={handleRevokeConsent}
         />
       )}
 
@@ -896,6 +908,7 @@ const App = () => {
         onOpenSettings={() => setShowSettings(true)}
         onOpenLinksModal={() => setShowLinksModal(true)}
         showStickyName={showStickyName}
+        showActions={hasLgpdConsent && data.length > 0}
       />
 
       <main className={`w-full ${selectedTurma ? 'px-2 sm:px-4 lg:px-6 py-4' : 'px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6'}`}>

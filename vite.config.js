@@ -29,6 +29,21 @@ function localProxyPlugin() {
         try {
           const targetUrl = decodeURIComponent(urlParam);
 
+          // Proteção de Segurança e Privacidade (LGPD / SSRF):
+          const parsed = new URL(targetUrl);
+          const allowedHosts = [
+            'docs.google.com',
+            'sheets.googleapis.com',
+            'drive.google.com',
+            'googleusercontent.com'
+          ];
+          const isAllowed = allowedHosts.some(host => parsed.hostname === host || parsed.hostname.endsWith('.' + host));
+          if (!isAllowed) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Domínio de destino não autorizado para processamento.' }));
+            return;
+          }
+
           // Usa o fetch global do Node 18+ (disponível no Vite 4+)
           const upstream = await fetch(targetUrl, {
             redirect: 'follow',

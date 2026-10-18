@@ -19,6 +19,20 @@ export default async function handler(req, res) {
   try {
     const targetUrl = decodeURIComponent(url);
 
+    // Proteção de Segurança e Privacidade (LGPD / SSRF):
+    // Limita o proxy estritamente aos domínios do Google Workspace e serviços necessários
+    const parsed = new URL(targetUrl);
+    const allowedHosts = [
+      'docs.google.com',
+      'sheets.googleapis.com',
+      'drive.google.com',
+      'googleusercontent.com'
+    ];
+    const isAllowed = allowedHosts.some(host => parsed.hostname === host || parsed.hostname.endsWith('.' + host));
+    if (!isAllowed) {
+      return res.status(403).json({ error: 'Domínio de destino não autorizado para processamento.' });
+    }
+
     // redirect:'follow' é obrigatório — o Google Sheets redireciona antes de servir o CSV
     // credentials:'omit' garante que cookies/sessão do utilizador NÃO são enviados ao Google
     const response = await fetch(targetUrl, {

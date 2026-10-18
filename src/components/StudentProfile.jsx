@@ -1641,13 +1641,18 @@ const StudentProfile = ({
       const totalPages = pdf.internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         pdf.setPage(i);
-        pdf.setFontSize(9);
-        pdf.setTextColor(100);
+        pdf.setFontSize(8);
+        pdf.setTextColor(140);
+        pdf.text(
+          'Documento de uso pedagógico confidencial — Protegido pela LGPD (Lei nº 13.709/2018)',
+          10,
+          pdf.internal.pageSize.getHeight() - 6
+        );
         pdf.text(
           `Página ${i} de ${totalPages}`,
-          pdf.internal.pageSize.getWidth() / 2,
+          pdf.internal.pageSize.getWidth() - 10,
           pdf.internal.pageSize.getHeight() - 6,
-          { align: 'center' }
+          { align: 'right' }
         );
       }
 

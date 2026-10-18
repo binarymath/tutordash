@@ -80,6 +80,18 @@ describe('Header', () => {
     expect(onOpenLinksModal).toHaveBeenCalledTimes(1);
   });
 
+  it('não renderiza os botões Adicionar e Configurações quando hasLgpdConsent=false', () => {
+    render(<Header {...defaultProps} hasLgpdConsent={false} />);
+    expect(screen.queryByRole('button', { name: /adicionar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /configurações/i })).not.toBeInTheDocument();
+  });
+
+  it('não renderiza os botões Adicionar e Configurações quando showActions=false (tela inicial)', () => {
+    render(<Header {...defaultProps} hasLgpdConsent={true} showActions={false} />);
+    expect(screen.queryByRole('button', { name: /adicionar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /configurações/i })).not.toBeInTheDocument();
+  });
+
   it('não exibe navegação de aluno quando selectedStudent é null', () => {
     render(<Header {...defaultProps} selectedStudent={null} showStickyName={false} />);
     expect(screen.queryByTitle('Aluno Anterior')).not.toBeInTheDocument();

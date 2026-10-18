@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import PrivacyPolicyModal from './PrivacyPolicyModal';
 
 const LgpdBanner = ({ onAccept }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setIsVisible(true), 50);
@@ -23,23 +25,37 @@ const LgpdBanner = ({ onAccept }) => {
   };
 
   return (
-    <div 
-      className={`fixed bottom-0 left-0 right-0 z-[100] bg-white border-t border-slate-200 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)] transition-opacity duration-500 ease-in-out ${
-        isVisible && !isFadingOut ? 'opacity-100' : 'opacity-0'
-      }`}
-    >
-      <div className="w-full px-6 md:px-8 py-6 md:py-8 flex flex-col md:flex-row items-center gap-6">
-        <p className="flex-1 text-sm text-slate-600 font-medium leading-relaxed">
-          O TutorDash utiliza cookies e tecnologias de armazenamento local para salvar suas preferências de tutoria, filtros do painel e garantir o funcionamento seguro do sistema. Também processamos os dados de desempenho dos estudantes estritamente para a finalidade de gestão escolar e relatórios pedagógicos, em conformidade com a LGPD. Ao continuar e utilizar nossa plataforma, você está ciente e concorda com esses termos.
-        </p>
-        <button 
-          onClick={handleAccept}
-          className="shrink-0 w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-md"
-        >
-          Ciente e Aceito
-        </button>
+    <>
+      <div 
+        className={`fixed bottom-0 left-0 right-0 z-[100] bg-white border-t border-slate-200 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)] transition-opacity duration-500 ease-in-out ${
+          isVisible && !isFadingOut ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
+        <div className="w-full px-6 md:px-8 py-5 md:py-6 flex flex-col md:flex-row items-center gap-5">
+          <p className="flex-1 text-xs md:text-sm text-slate-600 font-medium leading-relaxed">
+            O TutorDash utiliza armazenamento local do seu navegador para guardar configurações de planilhas e garantir seu funcionamento pedagógico sem enviar dados pessoais a servidores próprios, em respeito à LGPD.{' '}
+            <button
+              onClick={() => setShowPolicyModal(true)}
+              className="text-blue-600 hover:text-blue-800 underline underline-offset-2 font-semibold transition-colors cursor-pointer"
+            >
+              Ver termos de uso e privacidade
+            </button>
+            .
+          </p>
+          <button 
+            onClick={handleAccept}
+            className="shrink-0 w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-7 py-3 rounded-2xl font-bold text-sm transition-all shadow-md active:scale-[0.98] cursor-pointer"
+          >
+            Ciente e Aceito
+          </button>
+        </div>
       </div>
-    </div>
+
+      <PrivacyPolicyModal
+        isOpen={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
+      />
+    </>
   );
 };
 

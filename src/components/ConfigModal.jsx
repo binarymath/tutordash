@@ -2,7 +2,8 @@
 // components/ConfigModal.jsx — Centro de Controle 360° do Sistema
 // ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from 'react';
-import { X, Settings, BookMarked, Loader2, Plus, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Settings, BookMarked, Loader2, Plus, CheckCircle2, AlertCircle, ShieldCheck, Trash2 } from 'lucide-react';
+import PrivacyPolicyModal from './PrivacyPolicyModal';
 
 // Função de validação inteligente de links em tempo real
 const validateUrl = (url, type = 'sheet') => {
@@ -93,7 +94,8 @@ const validateUrl = (url, type = 'sheet') => {
   };
 };
 
-const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onClose, onLoad, isLoading }) => {
+const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onClose, onLoad, isLoading, onRevokeConsent }) => {
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   // Local state para editar as urls da aba atual antes de salvar
   const [localConfig, setLocalConfig] = useState(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
 
@@ -531,23 +533,57 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onCl
         </div>
 
         {/* --- Console de Comando Inferior (Action Footer) --- */}
-        <div className="p-5 sm:px-8 sm:py-6 border-t border-slate-100 shrink-0 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3 text-xs text-slate-600">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
-            <span>
-              {`Perfil selecionado: ${activeProfile} • Sincronização pronta`}
-            </span>
+        <div className="p-5 sm:px-8 sm:py-5 border-t border-slate-100 shrink-0 bg-slate-50/70 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-5 text-sm text-slate-600 w-full sm:w-auto">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-600 shrink-0" />
+              <span className="font-semibold text-slate-800">
+                Perfil: {activeProfile}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-4 pt-1 sm:pt-0 sm:border-l sm:border-slate-200 sm:pl-5">
+              <button
+                type="button"
+                onClick={() => setShowPolicyModal(true)}
+                className="text-sm text-slate-600 hover:text-blue-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+              >
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                Privacidade & LGPD
+              </button>
+
+              {onRevokeConsent && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('Deseja realmente revogar o consentimento e limpar as configurações locais salvas neste navegador?')) {
+                      onRevokeConsent();
+                    }
+                  }}
+                  className="text-sm text-slate-500 hover:text-rose-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+                  title="Limpar preferências locais e revogar consentimento LGPD"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Limpar dados locais
+                </button>
+              )}
+            </div>
           </div>
 
           <button
             onClick={handleSave}
             disabled={isLoading || !localConfig.studentsUrl}
-            className="w-full sm:w-auto min-w-[240px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 active:scale-[0.99] disabled:bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:transform-none text-white py-3.5 px-8 rounded-2xl font-bold text-sm tracking-wide transition-all shadow-lg shadow-blue-600/20 hover:shadow-xl hover:shadow-blue-600/30 flex items-center justify-center gap-2.5"
+            className="w-full sm:w-auto min-w-[220px] bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 active:scale-[0.99] disabled:bg-none disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed disabled:transform-none text-white py-3 px-7 rounded-2xl font-bold text-sm tracking-wide transition-all shadow-md shadow-blue-600/20 hover:shadow-lg flex items-center justify-center gap-2.5 cursor-pointer"
           >
             {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Salvar e Sincronizar'}
           </button>
         </div>
       </div>
+
+      <PrivacyPolicyModal
+        isOpen={showPolicyModal}
+        onClose={() => setShowPolicyModal(false)}
+      />
     </div>
   );
 };
