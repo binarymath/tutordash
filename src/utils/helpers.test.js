@@ -14,6 +14,7 @@ import {
   getBimestreNum,
   matchesBimestre,
   resolveStudentActiveTurma,
+  isStudentActive,
 } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,8 +74,46 @@ describe('formatBimestre', () => {
     expect(formatBimestre('4º Bimestre')).toBe('4º Bimestre');
   });
 
+  it('reconhece abas do tipo Turma-Bimestre como 1A-1B, 1A-3B, 3E-1B, 3E-4B', () => {
+    expect(formatBimestre('1A-1B')).toBe('1º Bimestre');
+    expect(formatBimestre('1A-3B')).toBe('3º Bimestre');
+    expect(formatBimestre('3E-1B')).toBe('1º Bimestre');
+    expect(formatBimestre('3E-4B')).toBe('4º Bimestre');
+    expect(formatBimestre('7D - 2º Bi')).toBe('2º Bimestre');
+  });
+
   it('retorna o texto original para valor desconhecido', () => {
     expect(formatBimestre('Avaliação Final')).toBe('Avaliação Final');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getBimestreNum
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getBimestreNum', () => {
+  it('extrai corretamente números de bimestre isolados', () => {
+    expect(getBimestreNum('1º Bimestre')).toBe(1);
+    expect(getBimestreNum('2º Bimestre')).toBe(2);
+    expect(getBimestreNum('3º Bimestre')).toBe(3);
+    expect(getBimestreNum('4º Bimestre')).toBe(4);
+    expect(getBimestreNum('1B')).toBe(1);
+    expect(getBimestreNum('3B')).toBe(3);
+  });
+
+  it('distingue o número da turma do número do bimestre em padrões Turma-Bimestre', () => {
+    expect(getBimestreNum('1A-3B')).toBe(3);
+    expect(getBimestreNum('1A-2B')).toBe(2);
+    expect(getBimestreNum('1A-4B')).toBe(4);
+    expect(getBimestreNum('3E-1B')).toBe(1);
+    expect(getBimestreNum('3E-2B')).toBe(2);
+    expect(getBimestreNum('3E-4B')).toBe(4);
+    expect(getBimestreNum('3E-3B')).toBe(3);
+  });
+
+  it('retorna 0 para textos sem bimestre', () => {
+    expect(getBimestreNum('')).toBe(0);
+    expect(getBimestreNum(null)).toBe(0);
+    expect(getBimestreNum('Sem Bimestre')).toBe(0);
   });
 });
 
@@ -387,4 +426,118 @@ describe('resolveStudentActiveTurma', () => {
     expect(res.turmaAtiva).toBe('8B');
     expect(res.isTransferido).toBe(true);
   });
+
+  it('usa a turma válida mais recente quando a turma padrão é um código interno 405/406', () => {
+    const mockConceitos = [
+      {
+        normalizedName: 'aluno exemplo',
+        bimestre: '1º Bimestre',
+        turmaPlanilha: '1A',
+        situacao: 'Ativo'
+      },
+      {
+        normalizedName: 'aluno exemplo',
+        bimestre: '2º Bimestre',
+        turmaPlanilha: '4056C',
+        situacao: 'Ativo'
+      },
+      {
+        normalizedName: 'aluno exemplo',
+        bimestre: '3º Bimestre',
+        turmaPlanilha: '3C',
+        situacao: 'Ativo'
+      }
+    ];
+
+    const res = resolveStudentActiveTurma('Aluno Exemplo', '4050A', mockConceitos, []);
+
+    expect(res.turmaAtiva).toBe('3C');
+    expect(res.historicoTurmas).toEqual({ 1: '1A', 3: '3C' });
+    expect(res.isTransferido).toBe(true);
+  });
+
+  it('rejeita turma removida do Mapão SED (ex: 3E) vinda da Prova Paulista quando o Mapão está carregado', () => {
+    // Mapão possui turmas ativas 1A e 2B, mas 3E foi removida
+    const mockConceitos = [
+      { normalizedName: 'outro aluno', bimestre: '1º Bimestre', turmaPlanilha: '1A', situacao: 'Ativo' },
+      { normalizedName: 'segundo aluno', bimestre: '1º Bimestre', turmaPlanilha: '2B', situacao: 'Ativo' },
+    ];
+    // Prova Paulista ainda contém o registro antigo da turma 3E
+    const mockProvas = [
+      { normalizedName: 'aluno fantasma', bimestre: '2º Bimestre', turmaPlanilha: '3E' }
+    ];
+
+    const res = resolveStudentActiveTurma('Aluno Fantasma', '3E', mockConceitos, mockProvas);
+    // Não deve ressuscitar a turma 3E removida do Mapão
+    expect(res.turmaAtiva).toBe('Sem Turma');
+    expect(res.historicoTurmas).toEqual({});
+  });
+
+  it('permite Prova Paulista caso o Mapão SED não esteja configurado/carregado', () => {
+    const mockProvas = [
+      { normalizedName: 'aluno legitimo', bimestre: '2º Bimestre', turmaPlanilha: '3E' }
+    ];
+    const res = resolveStudentActiveTurma('Aluno Legitimo', '3E', [], mockProvas);
+    expect(res.turmaAtiva).toBe('3E');
+  });
+
+  it('prioriza o registro Ativo na nova turma quando há registro de Transferência da turma anterior no mesmo bimestre', () => {
+    const mockConceitos = [
+      { normalizedName: 'adryan gomes', bimestre: '3º Bimestre', turmaPlanilha: '1B', situacao: 'Transferência' },
+      { normalizedName: 'adryan gomes', bimestre: '3º Bimestre', turmaPlanilha: '2B', situacao: 'Ativo' },
+    ];
+    const res = resolveStudentActiveTurma('Adryan Gomes', '1B', mockConceitos, []);
+    expect(res.turmaAtiva).toBe('2B');
+    expect(res.isTransferido).toBe(true);
+    expect(res.historicoTurmas[3]).toBe('2B');
+  });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// isStudentActive
+// ─────────────────────────────────────────────────────────────────────────────
+describe('isStudentActive', () => {
+  it('retorna true para alunos Ativo, Matriculado ou Frequente', () => {
+    expect(isStudentActive('Ativo')).toBe(true);
+    expect(isStudentActive('ativo')).toBe(true);
+    expect(isStudentActive('Ativa')).toBe(true);
+    expect(isStudentActive('Matriculado')).toBe(true);
+    expect(isStudentActive('Frequente')).toBe(true);
+    expect(isStudentActive('')).toBe(true);
+    expect(isStudentActive(null)).toBe(true);
+  });
+
+  it('retorna false para Baixa - Transferência e variações de baixa', () => {
+    expect(isStudentActive('Baixa - Transferência')).toBe(false);
+    expect(isStudentActive('Baixa - Transferencia')).toBe(false);
+    expect(isStudentActive('Baixa - Não Comparecimento')).toBe(false);
+    expect(isStudentActive('Baixa - Cessou Frequência')).toBe(false);
+    expect(isStudentActive('Baixa - Falecimento')).toBe(false);
+    expect(isStudentActive('Baixa')).toBe(false);
+  });
+
+  it('retorna false para Transferência, Transferido, Abandono e Inativo', () => {
+    expect(isStudentActive('Transferência')).toBe(false);
+    expect(isStudentActive('Transferencia')).toBe(false);
+    expect(isStudentActive('Transferido')).toBe(false);
+    expect(isStudentActive('Transferida')).toBe(false);
+    expect(isStudentActive('Abandono')).toBe(false);
+    expect(isStudentActive('Cessou')).toBe(false);
+    expect(isStudentActive('Cancelado')).toBe(false);
+    expect(isStudentActive('Inativo')).toBe(false);
+    expect(isStudentActive('Inativo (Sem registro no Mapão)')).toBe(false);
+    expect(isStudentActive('Sem Matrícula')).toBe(false);
+  });
+
+  it('retorna false para Não Comparecimento e termos onde a palavra Ativo não está presente', () => {
+    expect(isStudentActive('Não Comparecimento')).toBe(false);
+    expect(isStudentActive('Nao comparecimento')).toBe(false);
+    expect(isStudentActive('NÃO COMPARECIMENTO')).toBe(false);
+    expect(isStudentActive('Comparecimento')).toBe(false);
+    expect(isStudentActive('Não compareceu')).toBe(false);
+    expect(isStudentActive('Remanejado')).toBe(false);
+    expect(isStudentActive('Pendente')).toBe(false);
+    expect(isStudentActive('Sem Registro')).toBe(false);
+  });
+});
+

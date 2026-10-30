@@ -94,7 +94,7 @@ const validateUrl = (url, type = 'sheet') => {
   };
 };
 
-const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onClose, onLoad, isLoading, onRevokeConsent }) => {
+const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, deleteProfile, onOpenLinksModal, onClose, onLoad, isLoading, onRevokeConsent }) => {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   // Local state para editar as urls da aba atual antes de salvar
   const [localConfig, setLocalConfig] = useState(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
@@ -104,10 +104,35 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onCl
     setLocalConfig(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
   }, [activeProfile, profiles]);
 
+  const handleTabChange = (nome) => {
+    if (nome === activeProfile) return;
+    if (saveProfile) {
+      saveProfile(activeProfile, localConfig);
+    }
+    changeProfile(nome);
+  };
+
   const handleCreateProfile = () => {
     const nome = prompt('Nome do novo perfil (Ex: Ensino Médio):');
     if (nome && nome.trim()) {
-      changeProfile(nome.trim());
+      const trimmed = nome.trim();
+      if (saveProfile) {
+        saveProfile(activeProfile, localConfig);
+      }
+      changeProfile(trimmed);
+    }
+  };
+
+  const handleDeleteProfile = (nome, e) => {
+    e.stopPropagation();
+    if (Object.keys(profiles).length <= 1) {
+      alert('É necessário manter pelo menos um período no sistema.');
+      return;
+    }
+    if (window.confirm(`Deseja excluir o período "${nome}" e todas as suas configurações isoladas?`)) {
+      if (deleteProfile) {
+        deleteProfile(nome);
+      }
     }
   };
 
@@ -178,25 +203,36 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onCl
           </div>
         </div>
 
-        {/* --- Dock de Perfis / Workspaces --- */}
+        {/* --- Dock de Perfis / Workspaces Isolados --- */}
         <div className="px-6 sm:px-8 py-3 bg-slate-50/70 border-b border-slate-100 flex items-center justify-between gap-4 shrink-0 overflow-x-auto">
           <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-slate-400 shrink-0">
-            <span>Ambientes:</span>
+            <span>Ambientes / Períodos:</span>
           </div>
 
           <div className="flex items-center bg-slate-200/60 p-1 rounded-2xl gap-1.5 overflow-x-auto border border-slate-300/40" style={{ scrollbarWidth: 'none' }}>
             {Object.keys(profiles).map(nome => (
-              <button
-                key={nome}
-                onClick={() => changeProfile(nome)}
-                className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-150 ${
-                  activeProfile === nome 
-                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200/70' 
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                }`}
-              >
-                {nome}
-              </button>
+              <div key={nome} className="flex items-center group relative">
+                <button
+                  key={nome}
+                  onClick={() => handleTabChange(nome)}
+                  className={`px-4 py-1.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-150 flex items-center gap-1.5 ${
+                    activeProfile === nome 
+                      ? 'bg-white text-blue-700 shadow-sm border border-slate-200/70 font-black' 
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  <span>{nome}</span>
+                  {Object.keys(profiles).length > 1 && (
+                    <span
+                      onClick={(e) => handleDeleteProfile(nome, e)}
+                      className="opacity-50 hover:opacity-100 p-0.5 hover:text-rose-600 hover:bg-rose-50 rounded transition-all ml-0.5 cursor-pointer"
+                      title={`Excluir período "${nome}"`}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </span>
+                  )}
+                </button>
+              </div>
             ))}
             <button
               onClick={handleCreateProfile}
@@ -527,6 +563,60 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, onCl
                   <span>{valForm.message}</span>
                 </p>
               )}
+            </div>
+
+            {/* 5. Links Adicionais & Planilha de Disciplinas do Período */}
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-b from-indigo-50/40 via-white to-white p-5 shadow-sm transition-all focus-within:border-indigo-400">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-2">
+                  <BookMarked className="w-4 h-4 text-indigo-600" />
+                  Links Adicionais & Disciplinas
+                </label>
+                <span className="text-[10px] font-black text-indigo-700 bg-indigo-100/80 border border-indigo-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  Isolado por Período
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Planilha de disciplinas e links rápidos salvos exclusivamente para o período selecionado.
+              </p>
+              <div className="space-y-3">
+                <div className="relative">
+                  <input
+                    type="text"
+                    className="w-full bg-white border border-indigo-200 rounded-xl py-2.5 pl-3.5 pr-10 text-xs sm:text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 font-medium transition-all shadow-xs"
+                    value={localConfig.disciplinaUrl || ''}
+                    onChange={e => setLocalConfig({ ...localConfig, disciplinaUrl: e.target.value })}
+                    placeholder="Link Planilha Disciplinas (Google Sheets)..."
+                  />
+                  {localConfig.disciplinaUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setLocalConfig({ ...localConfig, disciplinaUrl: '' })}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                      title="Limpar link de disciplinas"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-xs font-semibold text-slate-600">
+                    Atalhos Adicionais: <strong className="text-indigo-700">{(localConfig.customLinks || []).length}</strong> {(localConfig.customLinks || []).length === 1 ? 'link' : 'links'}
+                  </span>
+                  {onOpenLinksModal && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (saveProfile) saveProfile(activeProfile, localConfig);
+                        onOpenLinksModal();
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Gerenciar Links Adicionais
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
 
           </div>

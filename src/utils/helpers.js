@@ -12,44 +12,99 @@ export const normalizeName = (name) => {
     .replace(/\s+/g, ' ');
 };
 
-export const formatBimestre = (text) => {
-  if (!text) return '1º Bimestre';
-  const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (t.includes('primeiro') || t.includes('1º') || t.includes('1o') || t.includes('1bim') || t.includes('1 bim') || t.includes('1b') || t === '1' || t.startsWith('1-')) return '1º Bimestre';
-  if (t.includes('segundo')  || t.includes('2º') || t.includes('2o') || t.includes('2bim') || t.includes('2 bim') || t.includes('2b') || t === '2' || t.startsWith('2-')) return '2º Bimestre';
-  if (t.includes('terceiro') || t.includes('3º') || t.includes('3o') || t.includes('3bim') || t.includes('3 bim') || t.includes('3b') || t === '3' || t.startsWith('3-')) return '3º Bimestre';
-  if (t.includes('quarto')   || t.includes('4º') || t.includes('4o') || t.includes('4bim') || t.includes('4 bim') || t.includes('4b') || t === '4' || t.startsWith('4-')) return '4º Bimestre';
-  return text.trim();
-};
-
 export const getBimestreNum = (text) => {
   if (!text) return 0;
   const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (t.includes('1') || t.includes('primeiro')) return 1;
-  if (t.includes('2') || t.includes('segundo')) return 2;
-  if (t.includes('3') || t.includes('terceiro')) return 3;
-  if (t.includes('4') || t.includes('quarto')) return 4;
+
+  // 1. Se contiver separador (ex: "1A-3B", "3E - 2º Bimestre", "7B_4B"), analisa preferencialmente a parte do bimestre
+  const parts = t.split(/[-_/]+/);
+  if (parts.length > 1) {
+    for (let i = parts.length - 1; i >= 1; i--) {
+      const part = parts[i].trim();
+      const match = part.match(/([1-4])\s*(?:º|o|ª|b\b|bim|bime|bimestre)?/);
+      if (match) return parseInt(match[1], 10);
+    }
+  }
+
+  // 2. Busca padrões explícitos como "1º Bimestre", "1B", "1 bim", "primeiro"
+  if (t.match(/1\s*(?:º|o|ª|bim|b\b|bime|bimestre)/) || t.includes('primeiro')) return 1;
+  if (t.match(/2\s*(?:º|o|ª|bim|b\b|bime|bimestre)/) || t.includes('segundo')) return 2;
+  if (t.match(/3\s*(?:º|o|ª|bim|b\b|bime|bimestre)/) || t.includes('terceiro')) return 3;
+  if (t.match(/4\s*(?:º|o|ª|bim|b\b|bime|bimestre)/) || t.includes('quarto')) return 4;
+
+  // 3. Fallback para dígitos isolados
+  const digitMatch = t.match(/\b([1-4])\b/);
+  if (digitMatch) return parseInt(digitMatch[1], 10);
+
+  if (t.includes('1')) return 1;
+  if (t.includes('2')) return 2;
+  if (t.includes('3')) return 3;
+  if (t.includes('4')) return 4;
   return 0;
+};
+
+export const formatBimestre = (text) => {
+  if (!text) return '1º Bimestre';
+  const t = String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // Se for no formato Turma-Bimestre (ex: "1A-3B", "3E-1B"), extrai o bimestre da parte apropriada
+  const parts = t.split(/[-_/]+/);
+  let bimTarget = t;
+  if (parts.length > 1) {
+    const bimPart = parts.slice(1).reverse().find(p => /[1-4]/.test(p));
+    if (bimPart) bimTarget = bimPart;
+  }
+
+  const num = getBimestreNum(bimTarget);
+  if (num >= 1 && num <= 4) return `${num}º Bimestre`;
+
+  return text.trim();
 };
 
 export const matchesBimestre = (bimName, selectedBim) => {
   if (!bimName) return false;
   const raw = String(bimName).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const target = String(selectedBim || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (target === '1' || target.includes('1º') || target.includes('1o') || target.includes('primeiro') || target.includes('1b')) {
-    return raw.includes('1º') || raw.includes('1o') || raw.includes('1 bim') || raw.includes('1bim') || raw.includes('1b') || raw.includes('primeiro') || raw === '1' || raw.startsWith('1-');
-  }
-  if (target === '2' || target.includes('2º') || target.includes('2o') || target.includes('segundo') || target.includes('2b')) {
-    return raw.includes('2º') || raw.includes('2o') || raw.includes('2 bim') || raw.includes('2bim') || raw.includes('2b') || raw.includes('segundo') || raw === '2' || raw.startsWith('2-');
-  }
-  if (target === '3' || target.includes('3º') || target.includes('3o') || target.includes('terceiro') || target.includes('3b')) {
-    return raw.includes('3º') || raw.includes('3o') || raw.includes('3 bim') || raw.includes('3bim') || raw.includes('3b') || raw.includes('terceiro') || raw === '3' || raw.startsWith('3-');
-  }
-  if (target === '4' || target.includes('4º') || target.includes('4o') || target.includes('quarto') || target.includes('4b')) {
-    return raw.includes('4º') || raw.includes('4o') || raw.includes('4 bim') || raw.includes('4bim') || raw.includes('4b') || raw.includes('quarto') || raw === '4' || raw.startsWith('4-');
-  }
   if (target === 'geral' || target.includes('media')) return true;
+
+  const targetNum = getBimestreNum(target);
+  const rawNum = getBimestreNum(raw);
+  if (targetNum > 0 && rawNum > 0) {
+    return targetNum === rawNum;
+  }
+
   return raw === target;
+};
+
+export const isStudentActive = (situacao) => {
+  if (!situacao) return true;
+  const s = String(situacao).trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // Qualquer indicação de não comparecimento, baixa, transferência, abandono, cancelamento, etc. significa inativo
+  if (
+    s.includes('comparec') || // Cobre "nao comparecimento", "nao compareceu", etc.
+    s.includes('baixa') ||
+    s.includes('transferen') ||
+    s.includes('transferid') ||
+    s.includes('remanej') ||
+    s.includes('abandono') ||
+    s.includes('cessou') ||
+    s.includes('cessad') ||
+    s.includes('cancelad') ||
+    s.includes('desist') ||
+    s.includes('falec') ||
+    s.includes('inativ') ||
+    s.includes('sem matricula') ||
+    s.includes('sem registro')
+  ) {
+    return false;
+  }
+
+  // Regra expressa do Mapão SED:
+  // O aluno só é considerado ativo se na frente do nome constar expressamente a palavra "Ativo" / "Ativa"
+  // (ou termos afins de matrícula regular como "Matriculado" / "Frequente")
+  const hasAtivo = /\b(ativo|ativa)\b/i.test(s) || s.includes('matriculad') || s.includes('frequente');
+  return hasAtivo;
 };
 
 export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', conceitoData = [], provaData = []) => {
@@ -63,19 +118,46 @@ export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', con
     return s !== '' && !s.startsWith('405') && !s.startsWith('406') && s !== 'Sem Turma' && s !== 'Desconhecida';
   };
 
+  const validMapaoTurmas = new Set();
+  (conceitoData || []).forEach(c => {
+    const t = formatTurma(c.turmaPlanilha);
+    if (isValidTurma(t)) validMapaoTurmas.add(t);
+  });
+  const hasMapao = validMapaoTurmas.size > 0;
+
   // Coleta registros do Mapão
   (conceitoData || []).forEach(c => {
     if (c.normalizedName === norm && isValidTurma(c.turmaPlanilha)) {
       const bNum = getBimestreNum(c.bimestre);
       if (bNum > 0) {
-        // Prioriza registro ativo ou mais recente do mesmo bimestre
         const current = historicoTurmas[bNum];
-        if (!current || (c.situacao === 'Ativo' && current.situacao !== 'Ativo')) {
+        if (!current) {
           historicoTurmas[bNum] = {
             turma: formatTurma(c.turmaPlanilha),
             situacao: c.situacao || 'Ativo',
             origem: 'mapao'
           };
+        } else {
+          const curActive = isStudentActive(current.situacao);
+          const newActive = isStudentActive(c.situacao);
+          // O registro Ativo prevalece sobre registro de Transferência/Baixa de turma anterior no mesmo bimestre
+          if (!curActive && newActive) {
+            historicoTurmas[bNum] = {
+              turma: formatTurma(c.turmaPlanilha),
+              situacao: c.situacao || 'Ativo',
+              origem: 'mapao'
+            };
+          } else if (curActive === newActive) {
+            const curHasGrades = current.notas && Object.keys(current.notas).length > 0;
+            const newHasGrades = c.notas && Object.keys(c.notas).length > 0;
+            if (!curHasGrades && newHasGrades) {
+              historicoTurmas[bNum] = {
+                turma: formatTurma(c.turmaPlanilha),
+                situacao: c.situacao || 'Ativo',
+                origem: 'mapao'
+              };
+            }
+          }
         }
       }
     }
@@ -84,10 +166,15 @@ export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', con
   // Coleta registros da Prova Paulista como fallback para bimestres sem Mapão
   (provaData || []).forEach(p => {
     if (p.normalizedName === norm && isValidTurma(p.turmaPlanilha)) {
+      const pTurma = formatTurma(p.turmaPlanilha);
+      // Se há turmas no Mapão SED carregadas, só aceita a turma da Prova Paulista se ela existir no Mapão SED
+      if (hasMapao && !validMapaoTurmas.has(pTurma)) {
+        return;
+      }
       const bNum = getBimestreNum(p.bimestre);
       if (bNum > 0 && !historicoTurmas[bNum]) {
         historicoTurmas[bNum] = {
-          turma: formatTurma(p.turmaPlanilha),
+          turma: pTurma,
           situacao: 'Ativo',
           origem: 'prova'
         };
@@ -97,13 +184,21 @@ export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', con
 
   // Identifica a turma do bimestre mais recente
   let highestBim = 0;
-  let turmaAtiva = def;
+  let turmaAtiva = '';
   [4, 3, 2, 1].forEach(b => {
     if (highestBim === 0 && historicoTurmas[b]?.turma) {
       highestBim = b;
       turmaAtiva = historicoTurmas[b].turma;
     }
   });
+
+  if (!turmaAtiva) {
+    if (hasMapao && def && !validMapaoTurmas.has(def)) {
+      turmaAtiva = 'Sem Turma';
+    } else {
+      turmaAtiva = def || 'Sem Turma';
+    }
+  }
 
   // Mapeia histórico simples { 1: "7D", 2: "7D", 3: "7A" }
   const turmasPorBimestre = {};

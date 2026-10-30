@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
-import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma } from '../utils/helpers';
+import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma, isStudentActive } from '../utils/helpers';
 import SpeedometerGauge from './SpeedometerGauge';
 import DisciplinaTableSection from './DisciplinaTableSection';
 
@@ -87,9 +87,9 @@ const ClassProfile = ({
 
   const serieLabel = useMemo(() => getSerieFromTurma(selectedTurma), [selectedTurma]);
 
-  // Lista ordenada de todas as turmas para navegação anterior/próximo
+  // Lista ordenada de todas as turmas para navegação anterior/próximo (apenas com alunos ativos)
   const allTurmasSorted = useMemo(() => {
-    const s = new Set(allStudents.map(st => st.turma).filter(Boolean));
+    const s = new Set(allStudents.filter(st => isStudentActive(st.situacao)).map(st => st.turma).filter(Boolean));
     return Array.from(s).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
   }, [allStudents]);
 
@@ -102,9 +102,9 @@ const ClassProfile = ({
     };
   }, [allTurmasSorted, selectedTurma]);
 
-  // Alunos desta turma
+  // Alunos desta turma (apenas ativos para manter total e lista em sincronia)
   const studentsInTurma = useMemo(() => {
-    return allStudents.filter(s => s.turma === selectedTurma);
+    return allStudents.filter(s => s.turma === selectedTurma && isStudentActive(s.situacao));
   }, [allStudents, selectedTurma]);
 
   // Inicializa e sincroniza globalSlice e individualSlices com o total da turma
@@ -251,7 +251,7 @@ const ClassProfile = ({
     });
 
     allStudents.forEach(s => {
-      if (s.situacao !== 'Ativo' || !s.turma) return;
+      if (!isStudentActive(s.situacao) || !s.turma) return;
       const nPP = parseFloat(String(s.provaPaulista || '').replace(',', '.'));
       if (!isNaN(nPP) && nPP >= 0 && turmaScoresPP.has(s.turma)) {
         const item = turmaScoresPP.get(s.turma);
@@ -331,7 +331,7 @@ const ClassProfile = ({
         const isMinhaSerie = normNamesSerieSet.has(reg.normalizedName) || getSerieFromTurma(reg.turmaPlanilha) === targetSerie;
         const isMinhaEscola = normNamesSchoolSet.has(reg.normalizedName) || Boolean(reg.turmaPlanilha);
         if (!isMinhaEscola) return;
-        if (reg.situacao && String(reg.situacao).trim() !== 'Ativo') return;
+        if (reg.situacao && !isStudentActive(reg.situacao)) return;
 
         Object.entries(reg.notas || {}).forEach(([k, valRaw]) => {
           const formatted = formatDisciplina(k);
@@ -369,7 +369,7 @@ const ClassProfile = ({
   // ── 4. Classificação dos Alunos da Turma ───────────────────────────
   const rankingAnalysis = useMemo(() => {
     const allStudentsEvaluated = allStudents
-      .filter(s => s.situacao === 'Ativo')
+      .filter(s => isStudentActive(s.situacao))
       .map(s => ({
         student: s,
         score: getStudentGrade(s, activeAvaliacao, selectedDisc, null)
@@ -399,7 +399,7 @@ const ClassProfile = ({
 
     // Alunos da turma ordenados por nota decrescente
     const turmaEvaluated = studentsInTurma
-      .filter(s => s.situacao === 'Ativo')
+      .filter(s => isStudentActive(s.situacao))
       .map(s => {
         const scoreGeral = getStudentGrade(s, activeAvaliacao, selectedDisc, null);
         const bimGrades = {};

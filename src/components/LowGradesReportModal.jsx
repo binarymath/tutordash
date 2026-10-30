@@ -9,7 +9,7 @@ import {
   BookOpen, Calendar, Filter, ArrowUpDown, AlertTriangle, Users, 
   ChevronRight, Sparkles 
 } from 'lucide-react';
-import { parseGrade, formatDisciplina, formatBimestre, checkIsMissing, isNonSubjectHeader } from '../utils/helpers';
+import { parseGrade, formatDisciplina, formatBimestre, checkIsMissing, isNonSubjectHeader, isStudentActive } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 
 const LowGradesReportModal = ({
@@ -48,7 +48,7 @@ const LowGradesReportModal = ({
     const turmaSet = new Set();
 
     allStudents.forEach(s => {
-      if (s.situacao && String(s.situacao).trim() !== 'Ativo') return;
+      if (!isStudentActive(s.situacao)) return;
       const tClean = String(s.turma || '').trim();
       if (tClean) turmaSet.add(tClean);
       const hist = s.historicoConceitos || [];
@@ -124,7 +124,7 @@ const LowGradesReportModal = ({
     };
 
     allStudents.forEach(s => {
-      if (s.situacao && String(s.situacao).trim() !== 'Ativo') return;
+      if (!isStudentActive(s.situacao)) return;
       const turmaAluno = String(s.turma || '').trim().toLowerCase();
       if (targetTurmaClean !== 'todas' && turmaAluno !== targetTurmaClean) return;
       if (targetSearchClean && !String(s.nome || '').toLowerCase().includes(targetSearchClean)) return;
@@ -148,7 +148,7 @@ const LowGradesReportModal = ({
         if (selectedPeriod === 'Média Geral') {
           let soma = 0, count = 0;
           hist.forEach(b => {
-            if (b.situacao && String(b.situacao).trim() !== 'Ativo') return;
+            if (b.situacao && !isStudentActive(b.situacao)) return;
             const raw = b.notas?.[rawDisc];
             if (!checkIsMissing(raw)) {
               const val = parseGrade(raw);
@@ -191,7 +191,7 @@ const LowGradesReportModal = ({
           }
         } else {
           const bimObj = hist.find(b => formatBimestre(b.bimestre) === selectedPeriod || b.bimestre === selectedPeriod);
-          if (bimObj && bimObj.situacao && String(bimObj.situacao).trim() !== 'Ativo') return;
+          if (bimObj && bimObj.situacao && !isStudentActive(bimObj.situacao)) return;
 
           const rawVal = bimObj?.notas?.[rawDisc];
           const isMissing = checkIsMissing(rawVal);

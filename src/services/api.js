@@ -175,26 +175,57 @@ const excelSerialToDate = (value) => {
 
 
 
-export const parsePlanilhaTutoriaMedio = (csvArray) => {
+export const parsePlanilhaTutoriaMedio = (csvArray, colIndices = {}) => {
   const grupos = new Map();
   let lastTurma = '';
 
-  csvArray.slice(1).forEach((row) => {
-    const turmaSanitized = sanitizeCellText(row?.[0]);
+  let headerRowIdx = 0;
+  for (let r = 0; r < Math.min(csvArray.length, 6); r++) {
+    const rowHeaders = (csvArray[r] || []).map(normalizeHeaderToken);
+    if (
+      rowHeaders.some(h => h.includes('TURMA') || h.includes('SERIE') || h.includes('CLASSE')) &&
+      rowHeaders.some(h => h.includes('TUTORADO') || h.includes('ALUNO') || h.includes('ESTUDANTE') || h === 'NOME' || h.includes('NOMEDOALUNO'))
+    ) {
+      headerRowIdx = r;
+      break;
+    }
+  }
+
+  const header = (csvArray[headerRowIdx] || []).map(normalizeHeaderToken);
+  let turmaCol = colIndices.turmaCol ?? header.findIndex(h => h.includes('TURMA') || h.includes('SERIE') || h.includes('CLASSE'));
+  let tutorCol = colIndices.tutorCol ?? header.findIndex(h => h.includes('TUTOR') || h.includes('PROFESSOR') || h.includes('DOCENTE'));
+  let alunoCol = colIndices.alunoCol ?? header.findIndex(h => h.includes('TUTORADO') || h.includes('ALUNO') || h.includes('ESTUDANTE') || h === 'NOME' || h.includes('NOMEDOALUNO'));
+
+  if (turmaCol === -1) turmaCol = 0;
+  if (tutorCol === -1) tutorCol = 1;
+  if (alunoCol === -1) alunoCol = 2;
+
+  csvArray.slice(headerRowIdx + 1).forEach((row) => {
+    const turmaSanitized = sanitizeCellText(row?.[turmaCol]);
     const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
-    const tutorRaw = sanitizeCellText(row?.[1]);
-    const tutorado = sanitizeCellText(row?.[2]);
+    const tutorRaw = sanitizeCellText(row?.[tutorCol]);
+    let tutorado = sanitizeCellText(row?.[alunoCol]);
+
+    // Se a coluna de aluno apontou para número e a próxima coluna tem o nome
+    if (/^\d+$/.test(tutorado) && row?.[alunoCol + 1]) {
+      const nextVal = sanitizeCellText(row[alunoCol + 1]);
+      if (nextVal && !/^\d+$/.test(nextVal)) {
+        tutorado = nextVal;
+      }
+    }
 
     if (!tutorado) return;
+    const normTut = tutorado.toUpperCase();
+    if (normTut === 'ALUNO' || normTut === 'ALUNOS' || normTut.includes('NOME DO ALUNO') || normTut === 'TUTORADO') return;
 
     const turma = turmaRaw || lastTurma || 'Sem Turma';
     const tutor = tutorRaw || 'Sem Tutor';
 
     if (turmaRaw) lastTurma = turmaRaw;
 
-    const key = `${turma}__${tutor}`;
+    const key = `${formatTurma(turma)}__${tutor}`;
     if (!grupos.has(key)) {
-      grupos.set(key, { turma, tutor, tutorados: [] });
+      grupos.set(key, { turma: formatTurma(turma), tutor, tutorados: [] });
     }
 
     const grupo = grupos.get(key);
@@ -232,69 +263,90 @@ export const fetchStudents = async (url) => {
     const XLSX = await getXLSX();
     const wb = XLSX.read(arrayBuffer, { type: 'array' });
 
-    let targetSheetName = wb.SheetNames[0];
-    for (const sheetName of wb.SheetNames) {
-      const sn = sheetName.toLowerCase().trim();
-      if (sn === 'tutoria' || sn === 'tutores' || sn === 'base') {
-        targetSheetName = sheetName;
-        break;
-      }
+    const baseNames = ['tutoria', 'tutores', 'base'];
+    const exactBaseSheet = wb.SheetNames.find(sn => baseNames.includes(sn.toLowerCase().trim()));
+    const sheetsToProcess = exactBaseSheet ? [exactBaseSheet] : wb.SheetNames;
+
+    const allGruposMap = new Map(); // key: "turma__tutor"
+
+    for (const sheetName of sheetsToProcess) {
       const ws = wb.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-      const header = jsonData[0] || [];
-      const normalizedHeader = header.map(normalizeHeaderToken);
-      
-      const tTurmaIdx = header.findIndex(h => h && String(h).toLowerCase().includes('turma'));
-      const tTutorIdx = header.findIndex(h => h && ['tutor', 'professor'].some(kw => String(h).toLowerCase().includes(kw)));
-      
-      if (
-        (normalizedHeader.includes('TURMA') && normalizedHeader.includes('TUTOR') && normalizedHeader.includes('TUTORADO')) ||
-        (tTurmaIdx !== -1 && tTutorIdx !== -1 && jsonData.length > 1)
-      ) {
-        targetSheetName = sheetName;
-        break;
+      const alunosArray = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      if (!alunosArray || alunosArray.length <= 1) continue;
+
+      let headerIdx = 0;
+      for (let r = 0; r < Math.min(alunosArray.length, 5); r++) {
+        const rowTokens = (alunosArray[r] || []).map(normalizeHeaderToken);
+        if (
+          rowTokens.some(h => h.includes('TURMA') || h.includes('SERIE') || h.includes('CLASSE')) ||
+          rowTokens.some(h => h.includes('TUTOR') || h.includes('PROFESSOR')) ||
+          rowTokens.some(h => h.includes('ALUNO') || h.includes('TUTORADO') || h === 'NOME')
+        ) {
+          headerIdx = r;
+          break;
+        }
       }
+
+      const header = alunosArray[headerIdx] || [];
+      const normalizedHeader = header.map(normalizeHeaderToken);
+      const hasStudentCol = normalizedHeader.some(h => 
+        h.includes('TUTORADO') || h.includes('ALUNO') || h.includes('ESTUDANTE') || h === 'NOME' || h.includes('NOMEDOALUNO')
+      );
+      const hasTurmaCol = normalizedHeader.some(h => h.includes('TURMA') || h.includes('SERIE') || h.includes('CLASSE'));
+      const isFormatoMedio =
+        (normalizedHeader.includes('TURMA') && normalizedHeader.includes('TUTOR') && normalizedHeader.includes('TUTORADO')) ||
+        (hasTurmaCol && hasStudentCol);
+
+      const parsedSheetGrupos = isFormatoMedio
+        ? parsePlanilhaTutoriaMedio(alunosArray.slice(headerIdx))
+        : (() => {
+            const tTurmaIdx = header.findIndex(h => h && String(h).toLowerCase().includes('turma'));
+            const tTutorIdx = header.findIndex(h => h && ['tutor', 'professor'].some(kw => String(h).toLowerCase().includes(kw)));
+            
+            const colTurma = tTurmaIdx !== -1 ? tTurmaIdx : 1;
+            const colTutor = tTutorIdx !== -1 ? tTutorIdx : 16;
+            
+            return alunosArray.slice(headerIdx + 1).map((row, idx) => {
+              const startName = colTurma + 1;
+              const endName = colTutor;
+              const tutoradosRaw = row.slice(startName, endName) || [];
+              const tutorados = tutoradosRaw
+                .map(sanitizeCellText)
+                .filter(t => t !== "" && !['ALUNO', 'NOME', 'SITUAÇÃO'].includes(t.toUpperCase()));
+              
+              const turmaSanitized = sanitizeCellText(row[colTurma]);
+              const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : formatTurma(sheetName);
+              const tutorRaw = sanitizeCellText(row[colTutor]);
+              
+              return {
+                id: idx,
+                turma: turmaRaw || 'Sem Turma',
+                tutorados,
+                tutor: tutorRaw || 'Não Atribuído'
+              };
+            }).filter(item => item.tutorados.length > 0);
+          })();
+
+      parsedSheetGrupos.forEach(g => {
+        const key = `${formatTurma(g.turma)}__${g.tutor}`;
+        if (!allGruposMap.has(key)) {
+          allGruposMap.set(key, { turma: formatTurma(g.turma), tutor: g.tutor, tutorados: [] });
+        }
+        const existing = allGruposMap.get(key);
+        g.tutorados.forEach(nome => {
+          if (!existing.tutorados.includes(nome)) {
+            existing.tutorados.push(nome);
+          }
+        });
+      });
     }
 
-    const ws = wb.Sheets[targetSheetName];
-    const alunosArray = XLSX.utils.sheet_to_json(ws, { header: 1 });
-
-    const header = alunosArray?.[0] || [];
-    const normalizedHeader = header.map(normalizeHeaderToken);
-    const isFormatoMedio =
-      normalizedHeader.includes('TURMA') &&
-      normalizedHeader.includes('TUTOR') &&
-      normalizedHeader.includes('TUTORADO');
-
-    const formattedAlunos = isFormatoMedio
-      ? parsePlanilhaTutoriaMedio(alunosArray)
-      : (() => {
-          const tTurmaIdx = header.findIndex(h => h && String(h).toLowerCase().includes('turma'));
-          const tTutorIdx = header.findIndex(h => h && ['tutor', 'professor'].some(kw => String(h).toLowerCase().includes(kw)));
-          
-          const colTurma = tTurmaIdx !== -1 ? tTurmaIdx : 1;
-          const colTutor = tTutorIdx !== -1 ? tTutorIdx : 16;
-          
-          return alunosArray.slice(1).map((row, idx) => {
-            const startName = colTurma + 1;
-            const endName = colTutor;
-            const tutoradosRaw = row.slice(startName, endName) || [];
-            const tutorados = tutoradosRaw
-              .map(sanitizeCellText)
-              .filter(t => t !== "");
-            
-            const turmaSanitized = sanitizeCellText(row[colTurma]);
-            const turmaRaw = turmaSanitized ? formatTurma(turmaSanitized) : '';
-            const tutorRaw = sanitizeCellText(row[colTutor]);
-            
-            return {
-              id: idx,
-              turma: turmaRaw || 'Sem Turma',
-              tutorados,
-              tutor: tutorRaw || 'Não Atribuído'
-            };
-          }).filter(item => item.tutorados.length > 0);
-        })();
+    const formattedAlunos = Array.from(allGruposMap.values()).map((g, idx) => ({
+      id: idx,
+      turma: g.turma,
+      tutor: g.tutor,
+      tutorados: g.tutorados
+    }));
 
     if (formattedAlunos.length === 0) throw new Error("Nenhum dado válido de tutoria encontrado.");
     return formattedAlunos;
@@ -496,33 +548,77 @@ export const fetchConceitos = async (url) => {
     
     const ws       = wb.Sheets[nomeDaGuia];
     const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 });
-    let turmaPlanilha = nomeDaGuia;
-    let bimestreRaw   = nomeDaGuia;
-    let headerRowIdx  = -1;
+    let turmaPlanilha = '';
+    let bimestreRaw   = '';
 
-    for (let i = 0; i < jsonData.length; i++) {
+    // Suporte ao padrão Turma-Bimestre (ex: "1A-1B", "3E-3B", "7A_2B", "1A - 1º Bi", "3E - 3º Bimestre")
+    const bimMatch = nomeDaGuia.match(/^(.+?)[-_\s]+([1-4]\s*(?:º|o|ª|b\b|bim|bime|bimestre).*)$/i);
+    if (bimMatch) {
+      turmaPlanilha = formatTurma(bimMatch[1].trim());
+      bimestreRaw = formatBimestre(bimMatch[2].trim());
+    } else {
+      turmaPlanilha = formatTurma(nomeDaGuia);
+      bimestreRaw = formatBimestre(nomeDaGuia);
+    }
+
+    let headerRowIdx  = -1;
+    let alunoColIdx   = -1;
+
+    for (let i = 0; i < Math.min(jsonData.length, 35); i++) {
         const row = jsonData[i] || [];
-        if (row[0] === 'Turma:')          turmaPlanilha = row[1];
-        if (row[0] === 'Tipo Fechamento:') bimestreRaw   = row[1];
-        if (row[0] === 'ALUNO') { headerRowIdx = i; break; }
+        
+        for (let c = 0; c < row.length; c++) {
+          const val = String(row[c] || '').trim();
+          const norm = val.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+          if (norm === 'TURMA' || norm === 'TURMA:' || norm.startsWith('TURMA:')) {
+            const nextVal = row[c + 1] ? String(row[c + 1]).trim() : val.replace(/^TURMA\s*:?\s*/i, '').trim();
+            if (nextVal) {
+              const formatted = formatTurma(nextVal);
+              if (formatted && formatted !== 'Desconhecida') {
+                turmaPlanilha = formatted;
+              }
+            }
+          }
+
+          if (norm.startsWith('TIPO FECHAM') || norm.startsWith('TIPO DE FECHAM') || norm.includes('FECHAMENTO')) {
+            const nextVal = row[c + 1] ? String(row[c + 1]).trim() : val;
+            if (nextVal) {
+              bimestreRaw = formatBimestre(nextVal);
+            }
+          }
+
+          if (norm === 'ALUNO' || norm === 'ALUNOS' || norm === 'NOME' || norm === 'ESTUDANTE' || norm === 'TUTORADO' || norm.includes('NOME DO ALUNO') || norm.includes('NOMEDOALUNO')) {
+            headerRowIdx = i;
+            alunoColIdx = c;
+            break;
+          }
+        }
+        if (headerRowIdx !== -1) break;
     }
 
     // Aplica a formatação à turma
     turmaPlanilha = turmaPlanilha && turmaPlanilha !== 'Desconhecida' ? formatTurma(String(turmaPlanilha)) : 'Desconhecida';
 
     if (headerRowIdx !== -1) {
+        if (alunoColIdx === -1) alunoColIdx = 0;
         let headers  = jsonData[headerRowIdx];
         
         const nextRow = jsonData[headerRowIdx + 1] || [];
-        if (!nextRow[0] || String(nextRow[0]).trim() === '') {
-        const maxLen = Math.max(headers.length, nextRow.length);
-        headers = Array.from({ length: maxLen }).map((_, i) => {
-            const h = headers[i];
-            const subH = nextRow[i];
-            if (h && subH) return `${h}\n${subH}`;
-            return h || subH || '';
-        });
-        headerRowIdx++;
+        const isNextRowAStudent = nextRow[alunoColIdx] && 
+          typeof nextRow[alunoColIdx] === 'string' && 
+          String(nextRow[alunoColIdx]).trim().length > 3 &&
+          !['DISCIPLINA', 'COMPONENTE', 'CH', 'AULAS'].some(w => String(nextRow[alunoColIdx]).toUpperCase().includes(w));
+
+        if (!isNextRowAStudent && (!nextRow[0] || String(nextRow[0]).trim() === '' || (!nextRow[alunoColIdx] || String(nextRow[alunoColIdx]).trim() === ''))) {
+          const maxLen = Math.max(headers.length, nextRow.length);
+          headers = Array.from({ length: maxLen }).map((_, i) => {
+              const h = headers[i];
+              const subH = nextRow[i];
+              if (h && subH) return `${h}\n${subH}`;
+              return h || subH || '';
+          });
+          headerRowIdx++;
         }
 
         const rowsAfterHeader = jsonData.slice(headerRowIdx + 1);
@@ -573,7 +669,13 @@ export const fetchConceitos = async (url) => {
               tfIdx = idx;
             }
 
-            if (situacaoIdx === -1 && (compact === 'SITUACAO' || compact.includes('SITUACAO'))) {
+            const isSituacaoH = compact === 'SITUACAO' || 
+                               compact.includes('SITUACAO') || 
+                               compact === 'CONDICAO' || 
+                               compact.includes('CONDICAO') ||
+                               compact === 'STATUS' || 
+                               compact.includes('STATUS');
+            if (situacaoIdx === -1 && isSituacaoH && idx !== alunoColIdx) {
               situacaoIdx = idx;
             }
 
@@ -612,22 +714,88 @@ export const fetchConceitos = async (url) => {
           });
         }
 
-        if (situacaoIdx === -1) situacaoIdx = 1;
+        // Se situacaoIdx não foi localizada pelo cabeçalho, procura na frente do nome nas primeiras linhas de dados
+        if (situacaoIdx === -1) {
+          for (let r = 0; r < Math.min(rowsAfterHeader.length, 15); r++) {
+            const rData = rowsAfterHeader[r];
+            if (!rData) continue;
+            for (let c = 0; c < Math.min(rData.length, 8); c++) {
+              if (c === alunoColIdx || c === tfIdx) continue;
+              const val = String(rData[c] || '').trim();
+              if (/^(ativo|ativa|n[aã]o\s*comparec.*|baixa.*|transfer.*|remanej.*|abandono|cessou.*|cancelad.*)$/i.test(val)) {
+                situacaoIdx = c;
+                break;
+              }
+            }
+            if (situacaoIdx !== -1) break;
+          }
+        }
 
+        const validSubjects = subjects.filter(sub => sub.index !== alunoColIdx && sub.index !== situacaoIdx && sub.index !== tfIdx && sub.index !== freqIdx);
         const dadosDaGuia = [];
 
         for (const row of rowsAfterHeader) {
-          const alunoNome = row[0];
-          const nomeNormalizado = String(alunoNome || '').trim().toUpperCase();
+          if (!row || !row.length) continue;
 
-          if (!nomeNormalizado || nomeNormalizado.includes('LEGENDA') || nomeNormalizado === 'SITUAÇÃO' || nomeNormalizado.startsWith('C -')) {
-              break; 
+          let alunoNome = '';
+          let actualAlunoCol = alunoColIdx;
+          const candidate = row[alunoColIdx];
+          if (candidate !== undefined && candidate !== null) {
+            const strVal = String(candidate).trim();
+            if (!/^\d+$/.test(strVal) && strVal.length >= 2 && !/^\d{6,}/.test(strVal)) {
+              alunoNome = strVal;
+            }
           }
 
-          if (nomeNormalizado.includes('AULAS DADAS')) continue;
+          // Se a coluna alunoColIdx era um número (Nº chamada) ou RA ou vazia, busca a coluna com o nome do aluno
+          if (!alunoNome) {
+            for (let c = 0; c < Math.min(row.length, 6); c++) {
+              if (c === situacaoIdx || c === tfIdx) continue;
+              const cellVal = String(row[c] || '').trim();
+              if (
+                cellVal.length >= 3 &&
+                /[a-zA-ZÀ-ÿ]{2,}/.test(cellVal) &&
+                !/^\d+/.test(cellVal) &&
+                !/^(aluno|alunos|nome|ra|numero|nº|situacao|total|legenda|ch|faltas|freq|frequencia)$/i.test(cellVal)
+              ) {
+                alunoNome = cellVal;
+                actualAlunoCol = c;
+                break;
+              }
+            }
+          }
+
+          const nomeNormalizado = String(alunoNome || '').trim().toUpperCase();
+
+          if (!nomeNormalizado) continue;
+
+          // Se for cabeçalho repetido ou indicador de aulas/situação, pula a linha sem abortar a leitura da turma
+          if (
+            nomeNormalizado === 'ALUNO' || 
+            nomeNormalizado === 'ALUNOS' || 
+            nomeNormalizado === 'SITUAÇÃO' || 
+            nomeNormalizado.includes('NOME DO ALUNO') ||
+            nomeNormalizado.includes('AULAS DADAS') ||
+            nomeNormalizado.includes('CARGA HORARIA') ||
+            nomeNormalizado.startsWith('C -') ||
+            nomeNormalizado.startsWith('NC -')
+          ) {
+            continue; 
+          }
+
+          // Apenas encerra se for de fato o rodapé da folha
+          if (
+            nomeNormalizado.startsWith('LEGENDA') || 
+            nomeNormalizado.startsWith('TOTAL GERAL') || 
+            nomeNormalizado.startsWith('TOTAL DE ALUNOS') ||
+            nomeNormalizado.startsWith('DIRETOR DE ESCOLA') ||
+            nomeNormalizado.startsWith('COORDENADOR')
+          ) {
+            break; 
+          }
 
           let notas = {};
-          subjects.forEach(sub => {
+          validSubjects.forEach(sub => {
               notas[sub.name] = row[sub.index] ? String(row[sub.index]).trim() : '-';
           });
 
@@ -653,8 +821,42 @@ export const fetchConceitos = async (url) => {
             }
           }
               
-          const situacaoRaw = row[situacaoIdx];
-          const situacao = situacaoRaw && String(situacaoRaw).trim() !== '' ? String(situacaoRaw).trim() : 'Ativo';
+          let situacao = '';
+          if (situacaoIdx !== -1 && situacaoIdx !== actualAlunoCol) {
+            const situacaoRaw = row[situacaoIdx];
+            if (situacaoRaw !== undefined && situacaoRaw !== null && String(situacaoRaw).trim() !== '') {
+              situacao = String(situacaoRaw).trim();
+            }
+          }
+
+          // Se não encontrou por situacaoIdx, verifica a célula imediatamente à frente do nome do aluno (actualAlunoCol + 1)
+          if (!situacao && actualAlunoCol >= 0 && actualAlunoCol + 1 < row.length) {
+            const nextCellVal = String(row[actualAlunoCol + 1] || '').trim();
+            if (
+              nextCellVal &&
+              !/^\d+([.,]\d+)?$/.test(nextCellVal) &&
+              !/^[MBRI]$/i.test(nextCellVal) &&
+              nextCellVal !== '-'
+            ) {
+              situacao = nextCellVal;
+            }
+          }
+
+          // Fallback: varre colunas adjacentes ao nome do aluno por termos conhecidos de status
+          if (!situacao) {
+            for (let c = 0; c < Math.min(row.length, 8); c++) {
+              if (c === actualAlunoCol || c === tfIdx) continue;
+              const cellVal = String(row[c] || '').trim();
+              if (/^(ativo|ativa|n[aã]o\s*comparec.*|baixa.*|transfer.*|remanej.*|abandono|cessou.*|cancelad.*|desist.*|inativ.*)$/i.test(cellVal)) {
+                situacao = cellVal;
+                break;
+              }
+            }
+          }
+
+          if (!situacao) {
+            situacao = 'Ativo';
+          }
 
           dadosDaGuia.push({
               nomeOriginal: String(alunoNome).trim(),
