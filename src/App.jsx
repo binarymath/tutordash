@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AlertCircle, X } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { normalizeName, parseGrade, formatDisciplina, toScale10, getSerieFromTurma, formatTurma, resolveStudentActiveTurma } from './utils/helpers';
+import { normalizeName, parseGrade, formatDisciplina, toScale10, getSerieFromTurma, formatTurma, resolveStudentActiveTurma, isStudentActive, getBimestreNum } from './utils/helpers';
 import { buildChartDataMapao, buildChartDataProva } from './utils/buildChartData';
 import { useStudents } from './hooks/useStudents';
 import { useNotes } from './hooks/useNotes';
@@ -70,32 +70,93 @@ const App = () => {
   const changeProfile = (nome) => {
     if (nome === multiConfig.activeProfile) return;
     
-    // Prevenção de "Stale State": Limpa imediatamente o cache das queries
-    // Isso forçará o estado "Carregando" puro até que novos dados cheguem
-    queryClient.removeQueries();
+    // Prevenção de contaminação entre sistemas: cancela requisições e limpa o cache
+    queryClient.cancelQueries();
+    queryClient.clear();
+
+    // Isolamento completo de estado entre períodos
+    setSelectedStudent(null);
+    setSelectedTurma(null);
+    setSearchTerm('');
+    setSelectedValue('Todos');
+    setFilterMode('tutor');
+    setSelectedSessionFilters([]);
+    setLowGradesInitialPeriod('Média Geral');
+    setLowGradesInitialTurma('Todas');
+    setTraceabilityTurma('Todas');
+    setManualError(null);
 
     setMultiConfig(prev => {
       const profiles = { ...prev.profiles };
       if (!profiles[nome]) {
-        // Se para algum motivo pedir perfil novo aqui
-        profiles[nome] = { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '' };
+        profiles[nome] = {
+          studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: []
+        };
       }
       return { ...prev, activeProfile: nome, profiles };
     });
   };
 
-  const saveProfile = (nome, configUrls) => {
-    setMultiConfig(prev => ({
-      ...prev,
-      profiles: {
-        ...prev.profiles,
-        [nome]: configUrls
+  const deleteProfile = (nome) => {
+    setMultiConfig(prev => {
+      const keys = Object.keys(prev.profiles).filter(k => k !== nome);
+      if (keys.length === 0) return prev;
+
+      const newProfiles = { ...prev.profiles };
+      delete newProfiles[nome];
+
+      const newActive = prev.activeProfile === nome ? keys[0] : prev.activeProfile;
+
+      if (prev.activeProfile === nome) {
+        queryClient.cancelQueries();
+        queryClient.clear();
+        setSelectedStudent(null);
+        setSelectedTurma(null);
+        setSearchTerm('');
+        setSelectedValue('Todos');
+        setFilterMode('tutor');
+        setSelectedSessionFilters([]);
+        setManualError(null);
       }
-    }));
+
+      return {
+        ...prev,
+        activeProfile: newActive,
+        profiles: newProfiles
+      };
+    });
   };
 
-  const activeProfile = multiConfig.activeProfile;
-  const config = multiConfig.profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] };
+  const saveProfile = (nome, configUrls) => {
+    setMultiConfig(prev => {
+      const defaultProfile = {
+        studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: []
+      };
+      const existing = prev.profiles[nome] || defaultProfile;
+      return {
+        ...prev,
+        profiles: {
+          ...prev.profiles,
+          [nome]: {
+            ...existing,
+            ...configUrls,
+            customLinks: Array.isArray(configUrls?.customLinks)
+              ? configUrls.customLinks
+              : (existing.customLinks || [])
+          }
+        }
+      };
+    });
+  };
+
+  const activeProfile = multiConfig.activeProfile || Object.keys(multiConfig.profiles)[0] || 'Principal';
+  const defaultProfileData = {
+    studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: []
+  };
+  const config = {
+    ...defaultProfileData,
+    ...(multiConfig.profiles[activeProfile] || {})
+  };
 
   const [hasLgpdConsent, setHasLgpdConsent] = useState(() => {
     try {
@@ -163,138 +224,191 @@ const App = () => {
   const { data: disciplinaData = null, isLoading: isLoadingDisciplina, error: errorDisciplina } = useDisciplinaSheet(safeDisciplinaUrl);
 
   const data = useMemo(() => {
-    // Redistribui alunos de turmas inválidas (405, 406) usando os dados do Mapão ou Prova Paulista
-    const resolvedDataRaw = [];
-    const orphanStudentsToReassign = [];
-
-    dataRaw.forEach(item => {
-      const t = String(item.turma || '').trim();
-      if (t.startsWith('405') || t.startsWith('406')) {
-        item.tutorados.forEach(nome => {
-           orphanStudentsToReassign.push({ nome, tutor: item.tutor });
-        });
-      } else {
-        resolvedDataRaw.push(item);
-      }
-    });
-
-    // Detecta alunos transferidos/remanejados para uma nova turma em bimestres mais recentes
-    const transferredStudents = [];
-    const updatedResolvedData = resolvedDataRaw.map(group => {
-      const remainingTutorados = [];
-      group.tutorados.forEach(nome => {
-        const { turmaAtiva, isTransferido } = resolveStudentActiveTurma(
-          nome,
-          group.turma,
-          conceitoData,
-          provaData
-        );
-        if (isTransferido && turmaAtiva && formatTurma(turmaAtiva) !== formatTurma(group.turma)) {
-          transferredStudents.push({
-            nomeOriginal: nome,
-            turma: turmaAtiva,
-            tutor: group.tutor || 'Sem Tutor'
-          });
-        } else {
-          remainingTutorados.push(nome);
+    // Coleta o conjunto de turmas válidas presentes no Mapão SED (se o Mapão estiver carregado)
+    const validMapaoTurmas = new Set();
+    if (conceitoData && conceitoData.length > 0) {
+      conceitoData.forEach(c => {
+        const t = formatTurma(c.turmaPlanilha);
+        if (t && t !== 'Sem Turma' && !t.startsWith('405') && !t.startsWith('406')) {
+          validMapaoTurmas.add(t);
         }
       });
-      return { ...group, tutorados: remainingTutorados };
-    }).filter(group => group.tutorados.length > 0);
-
-    // 1. Set de nomes que já possuem tutor atribuído e estão em turmas válidas
-    const tutoredSet = new Set();
-    updatedResolvedData.forEach(item =>
-      item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)))
-    );
-    transferredStudents.forEach(t => tutoredSet.add(normalizeName(t.nomeOriginal)));
-
-    // 2. Mapa de órfãos E alunos realocados: normalizedName → { nomeOriginal, turma, tutor }
-    const orphanMap = new Map();
-
-    // 2a. Varredura do Mapão (conceitos bimestrais)
-    conceitoData.forEach(c => {
-      const t = String(c.turmaPlanilha || '').trim();
-      if (!t.startsWith('405') && !t.startsWith('406')) {
-         if (!tutoredSet.has(c.normalizedName) && !orphanMap.has(c.normalizedName)) {
-           orphanMap.set(c.normalizedName, {
-             nomeOriginal: c.nomeOriginal || c.normalizedName,
-             turma: c.turmaPlanilha || 'Sem Turma',
-             tutor: 'Sem Tutor'
-           });
-         }
-      }
-    });
-
-    // 2b. Varredura da Prova Paulista (somente alunos ainda não mapeados)
-    provaData.forEach(p => {
-      const t = String(p.turmaPlanilha || '').trim();
-      if (!t.startsWith('405') && !t.startsWith('406')) {
-         if (!tutoredSet.has(p.normalizedName) && !orphanMap.has(p.normalizedName)) {
-           orphanMap.set(p.normalizedName, {
-             nomeOriginal: p.nomeOriginal || p.normalizedName,
-             turma: p.turmaPlanilha || 'Sem Turma',
-             tutor: 'Sem Tutor'
-           });
-         }
-      }
-    });
-
-    // 2c. Tenta encaixar os alunos das turmas 405/406 nas turmas corretas
-    orphanStudentsToReassign.forEach(aluno => {
-      const norm = normalizeName(aluno.nome);
-      if (!tutoredSet.has(norm)) {
-         if (orphanMap.has(norm)) {
-            // Achou a turma dele no Mapão/Prova; apenas restaura o tutor original
-            orphanMap.get(norm).tutor = aluno.tutor;
-         } else {
-            // Não achou em lugar nenhum, põe em Sem Turma com o tutor dele
-            orphanMap.set(norm, {
-               nomeOriginal: aluno.nome,
-               turma: 'Sem Turma',
-               tutor: aluno.tutor
-            });
-         }
-         tutoredSet.add(norm); // Marca como resolvido
-      }
-    });
-
-    // 3. Agrupa órfãos e alunos transferidos por turma + tutor
-    const byTurmaTutor = new Map(); // key: "turma|tutor"
-    for (const { nomeOriginal, turma, tutor } of orphanMap.values()) {
-      const key = `${turma}|${tutor}`;
-      if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
-      byTurmaTutor.get(key).tutorados.push(nomeOriginal);
     }
+    const hasMapao = validMapaoTurmas.size > 0;
 
-    for (const { nomeOriginal, turma, tutor } of transferredStudents) {
-      const existingGroup = updatedResolvedData.find(g => formatTurma(g.turma) === formatTurma(turma) && g.tutor === tutor);
-      if (existingGroup) {
-        if (!existingGroup.tutorados.includes(nomeOriginal)) {
-          existingGroup.tutorados.push(nomeOriginal);
+    // Fallback caso o Mapão SED não esteja carregado
+    if (!hasMapao) {
+      const resolvedDataRaw = [];
+      const orphanStudentsToReassign = [];
+
+      dataRaw.forEach(item => {
+        const rawT = String(item.turma || '').trim();
+        const cleanT = formatTurma(rawT) || rawT;
+        if (rawT.startsWith('405') || rawT.startsWith('406')) {
+          item.tutorados.forEach(nome => {
+             orphanStudentsToReassign.push({ nome, tutor: item.tutor });
+          });
+        } else {
+          resolvedDataRaw.push(item);
         }
-      } else {
+      });
+
+      const transferredStudents = [];
+      const updatedResolvedData = resolvedDataRaw.map(group => {
+        const remainingTutorados = [];
+        group.tutorados.forEach(nome => {
+          const { turmaAtiva, isTransferido } = resolveStudentActiveTurma(
+            nome,
+            group.turma,
+            conceitoData,
+            provaData
+          );
+          if (isTransferido && turmaAtiva && formatTurma(turmaAtiva) !== formatTurma(group.turma)) {
+            transferredStudents.push({
+              nomeOriginal: nome,
+              turma: turmaAtiva,
+              tutor: group.tutor || 'Sem Tutor'
+            });
+          } else {
+            remainingTutorados.push(nome);
+          }
+        });
+        return { ...group, tutorados: remainingTutorados };
+      }).filter(group => group.tutorados.length > 0);
+
+      const tutoredSet = new Set();
+      updatedResolvedData.forEach(item =>
+        item.tutorados.forEach(nome => tutoredSet.add(normalizeName(nome)))
+      );
+      transferredStudents.forEach(t => tutoredSet.add(normalizeName(t.nomeOriginal)));
+
+      const orphanMap = new Map();
+      const addOrphanFromRecord = (record) => {
+        const norm = normalizeName(record.normalizedName || record.nomeOriginal);
+        if (!norm || tutoredSet.has(norm) || orphanMap.has(norm)) return;
+        const { turmaAtiva } = resolveStudentActiveTurma(norm, record.turmaPlanilha, conceitoData, provaData);
+        const turma = formatTurma(turmaAtiva || record.turmaPlanilha) || 'Sem Turma';
+        orphanMap.set(norm, {
+          nomeOriginal: record.nomeOriginal || record.normalizedName,
+          turma,
+          tutor: 'Sem Tutor'
+        });
+      };
+
+      provaData.forEach(addOrphanFromRecord);
+
+      orphanStudentsToReassign.forEach(aluno => {
+        const norm = normalizeName(aluno.nome);
+        if (!tutoredSet.has(norm)) {
+          const { turmaAtiva } = resolveStudentActiveTurma(norm, '', conceitoData, provaData);
+          orphanMap.set(norm, {
+            nomeOriginal: aluno.nome,
+            turma: formatTurma(turmaAtiva) || 'Sem Turma',
+            tutor: aluno.tutor
+          });
+          tutoredSet.add(norm);
+        }
+      });
+
+      const byTurmaTutor = new Map();
+      for (const { nomeOriginal, turma, tutor } of orphanMap.values()) {
+        const key = `${turma}|${tutor}`;
+        if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
+        byTurmaTutor.get(key).tutorados.push(nomeOriginal);
+      }
+      for (const { nomeOriginal, turma, tutor } of transferredStudents) {
         const key = `${turma}|${tutor}`;
         if (!byTurmaTutor.has(key)) byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
         if (!byTurmaTutor.get(key).tutorados.includes(nomeOriginal)) {
           byTurmaTutor.get(key).tutorados.push(nomeOriginal);
         }
       }
+
+      const additionalGroups = [];
+      let groupIdx = 0;
+      for (const group of byTurmaTutor.values()) {
+        additionalGroups.push({
+          id: `reassigned-${groupIdx++}`,
+          turma: group.turma,
+          tutor: group.tutor,
+          tutorados: group.tutorados,
+        });
+      }
+
+      return [...updatedResolvedData, ...additionalGroups];
     }
 
-    // 4. Gera os novos grupos
-    const additionalGroups = [];
-    let groupIdx = 0;
-    for (const group of byTurmaTutor.values()) {
-      additionalGroups.push({
-        id: `reassigned-${groupIdx++}`,
+    // ────────────────────────────────────────────────────────────────────────
+    // Quando o Mapão SED está presente:
+    // O ÚLTIMO REGISTRO DO MAPÃO SED É A FONTE OFICIAL DE ALUNOS MATRICULADOS E TURMAS.
+    // Todos os alunos presentes no último registro de cada turma no Mapão aparecem
+    // na respectiva turma, mesmo que não possuam notas nos bimestres anteriores.
+    // ────────────────────────────────────────────────────────────────────────
+
+    // 1. Mapeia os tutores definidos na planilha de tutoria (dataRaw) e turmas padrão
+    const tutorByStudent = new Map();
+    const rawTurmaByStudent = new Map();
+    const allStudentsMap = new Map(); // norm -> nomeOriginal
+
+    dataRaw.forEach(group => {
+      const tutorName = group.tutor || 'Sem Tutor';
+      const rawT = String(group.turma || '').trim();
+      const cleanT = formatTurma(rawT) || rawT;
+      (group.tutorados || []).forEach(nome => {
+        const norm = normalizeName(nome);
+        if (norm) {
+          if (!allStudentsMap.has(norm)) allStudentsMap.set(norm, nome);
+          if (!tutorByStudent.has(norm)) tutorByStudent.set(norm, tutorName);
+          if (!rawTurmaByStudent.has(norm)) rawTurmaByStudent.set(norm, cleanT);
+        }
+      });
+    });
+
+    conceitoData.forEach(c => {
+      const norm = normalizeName(c.normalizedName || c.nomeOriginal);
+      if (norm && !allStudentsMap.has(norm)) {
+        allStudentsMap.set(norm, c.nomeOriginal || c.normalizedName);
+      }
+    });
+
+    // 2. Para cada aluno, resolve sua ÚNICA turma ativa mais recente
+    // e o aloca exclusivamente nela, sem duplicar entre turmas
+    const byTurmaTutor = new Map();
+
+    allStudentsMap.forEach((nomeOriginal, norm) => {
+      const defaultT = rawTurmaByStudent.get(norm) || '';
+      const { turmaAtiva } = resolveStudentActiveTurma(norm, defaultT, conceitoData, provaData);
+      const cleanTurma = formatTurma(turmaAtiva) || turmaAtiva || 'Sem Turma';
+
+      if (!cleanTurma || cleanTurma === 'Sem Turma' || cleanTurma.startsWith('405') || cleanTurma.startsWith('406')) {
+        return;
+      }
+      if (hasMapao && !validMapaoTurmas.has(cleanTurma)) {
+        return;
+      }
+
+      const tutor = tutorByStudent.get(norm) || 'Sem Tutor';
+      const key = `${cleanTurma}|${tutor}`;
+      if (!byTurmaTutor.has(key)) {
+        byTurmaTutor.set(key, { turma: cleanTurma, tutor, tutorados: [] });
+      }
+      if (!byTurmaTutor.get(key).tutorados.includes(nomeOriginal)) {
+        byTurmaTutor.get(key).tutorados.push(nomeOriginal);
+      }
+    });
+
+    let idCounter = 1;
+    const finalData = [];
+    byTurmaTutor.forEach(group => {
+      finalData.push({
+        id: `group-${idCounter++}`,
         turma: group.turma,
         tutor: group.tutor,
-        tutorados: group.tutorados,
+        tutorados: group.tutorados
       });
-    }
+    });
 
-    return [...updatedResolvedData, ...additionalGroups];
+    return finalData;
   }, [dataRaw, conceitoData, provaData]);
 
   const isLoading = hasLgpdConsent && (isLoadingStudents || isLoadingNotes || isLoadingProvas || isLoadingConceitos);
@@ -330,32 +444,54 @@ const App = () => {
     data.forEach(item => {
       item.tutorados.forEach(nomeOriginal => {
         const normName       = normalizeName(nomeOriginal);
-        const uniqueKey      = `${normName}__${item.turma}`;
-        if (seenStudentKeys.has(uniqueKey)) return;
-        seenStudentKeys.add(uniqueKey);
+        if (!normName || seenStudentKeys.has(normName)) return;
+        seenStudentKeys.add(normName);
 
         const studentNotes   = annotations.filter(n => n.normalizedName === normName);
         let provasDoAlunoRaw = provaData.filter(p => p.normalizedName === normName);
         const provasMap = new Map();
         provasDoAlunoRaw.forEach(p => {
-          if (p.bimestre) provasMap.set(p.bimestre, p);
+          if (p.bimestre) {
+            const bNum = getBimestreNum(p.bimestre);
+            if (bNum > 0 && !provasMap.has(bNum)) {
+              provasMap.set(bNum, p);
+            }
+          }
         });
         let historicoProvas = Array.from(provasMap.values());
-        historicoProvas.sort((a, b) => (a.bimestre || '').localeCompare(b.bimestre || ''));
+        historicoProvas.sort((a, b) => getBimestreNum(a.bimestre) - getBimestreNum(b.bimestre));
         const provaInfo = historicoProvas.length > 0 ? historicoProvas[historicoProvas.length - 1] : null;
 
         let conceitosDoAlunoRaw = conceitoData.filter(c => c.normalizedName === normName);
         
         const conceitosMap = new Map();
         conceitosDoAlunoRaw.forEach(c => {
-          const current = conceitosMap.get(c.bimestre);
-          if (!current || (c.situacao === 'Ativo' && current.situacao !== 'Ativo')) {
-            conceitosMap.set(c.bimestre, c);
+          const bNum = getBimestreNum(c.bimestre);
+          const current = conceitosMap.get(bNum);
+          if (!current) {
+            conceitosMap.set(bNum, c);
+          } else {
+            const curMatchesTurma = formatTurma(current.turmaPlanilha) === formatTurma(item.turma);
+            const newMatchesTurma = formatTurma(c.turmaPlanilha) === formatTurma(item.turma);
+            const curHasGrades = current.notas && Object.keys(current.notas).length > 0;
+            const newHasGrades = c.notas && Object.keys(c.notas).length > 0;
+            const curActive = isStudentActive(current.situacao);
+            const newActive = isStudentActive(c.situacao);
+            // Registro correspondente à turma atual do grupo prevalece; Ativo prevalece sobre Inativo/Transferido
+            if (!curMatchesTurma && newMatchesTurma) {
+              conceitosMap.set(bNum, c);
+            } else if (curMatchesTurma === newMatchesTurma) {
+              if (!curActive && newActive) {
+                conceitosMap.set(bNum, c);
+              } else if (curActive === newActive && !curHasGrades && newHasGrades) {
+                conceitosMap.set(bNum, c);
+              }
+            }
           }
         });
         
         let conceitosDoAluno = Array.from(conceitosMap.values());
-        conceitosDoAluno.sort((a, b) => a.bimestre.localeCompare(b.bimestre));
+        conceitosDoAluno.sort((a, b) => getBimestreNum(a.bimestre) - getBimestreNum(b.bimestre));
 
         const { turmaAtiva, turmaOriginal, isTransferido, historicoTurmas } = resolveStudentActiveTurma(
           nomeOriginal,
@@ -453,21 +589,24 @@ const App = () => {
           const frequenciaMedia = frequenciaGeralNum;
 
           // ── Status: prioridade para o bimestre mais recente ──────────────────
-          // No mesmo bimestre, se houver "Ativo" entre os status, prevalece "Ativo"
+          const hasMapaoLoaded = conceitoData && conceitoData.length > 0;
           const ultimoBimNome = ultimoBimestre ? ultimoBimestre.bimestre : null;
           const situacoesUltimoBim = ultimoBimNome
             ? conceitosDoAluno
                 .filter(c => c.bimestre === ultimoBimNome)
                 .map(c => c.situacao || 'Ativo')
-            : (ultimoBimestre?.situacao ? [ultimoBimestre.situacao] : ['Ativo']);
+            : (ultimoBimestre?.situacao ? [ultimoBimestre.situacao] : (hasMapaoLoaded ? ['Inativo (Sem registro no Mapão)'] : ['Ativo']));
 
-          const situacaoAtual = situacoesUltimoBim.includes('Ativo')
-            ? 'Ativo'
-            : situacoesUltimoBim[0] || 'Ativo';
+          // O status oficial no último bimestre define a situação atual do aluno
+          const situacaoBaixa = situacoesUltimoBim.find(s => !isStudentActive(s));
+          const situacaoAtual = situacaoBaixa || (situacoesUltimoBim.includes('Ativo') ? 'Ativo' : (situacoesUltimoBim[0] || (hasMapaoLoaded ? 'Inativo (Sem registro no Mapão)' : 'Ativo')));
 
           // Histórico: status únicos de todos os bimestres
           const todasSituacoes = Array.from(
-            new Set(conceitosDoAluno.map(c => c.situacao || 'Ativo'))
+            new Set(conceitosDoAluno.length > 0
+              ? conceitosDoAluno.map(c => c.situacao || 'Ativo')
+              : (hasMapaoLoaded ? ['Inativo (Sem registro no Mapão)'] : ['Ativo'])
+            )
           ).sort((a, b) => {
             if (a === 'Ativo') return -1;
             if (b === 'Ativo') return 1;
@@ -476,7 +615,7 @@ const App = () => {
 
           list.push({
             nome: nomeOriginal, normalizedName: normName,
-            turma: turmaAtiva || item.turma,
+            turma: (hasMapaoLoaded ? item.turma : turmaAtiva) || item.turma,
             turmaOriginal: turmaOriginal || item.turma,
             transferido: isTransferido,
             historicoTurmas,
@@ -527,13 +666,28 @@ const App = () => {
   );
 
   const optionsList = useMemo(() => {
+    let baseData = data;
+    if (showOnlyActive) {
+      baseData = data.map(group => {
+        const activeTutorados = group.tutorados.filter(nome => {
+          const norm = normalizeName(nome);
+          const studentInfo = allStudents.find(s => s.normalizedName === norm);
+          if (!studentInfo) return false;
+          return isStudentActive(studentInfo.situacao);
+        });
+        return { ...group, tutorados: activeTutorados };
+      }).filter(group => group.tutorados.length > 0);
+    }
+
     if (filterMode === 'serie') {
-      const uniqueValues = [...new Set(data.map(item => getSerieFromTurma(item.turma)))];
+      const uniqueValues = [...new Set(baseData.map(item => getSerieFromTurma(item.turma)))];
       const sorted = uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
       return ['Todos', ...sorted];
     }
     const field        = filterMode === 'tutor' ? 'tutor' : 'turma';
-    const uniqueValues = [...new Set(data.map(item => item[field]))];
+    const uniqueValues = filterMode === 'turma'
+      ? [...new Set(baseData.map(item => formatTurma(item.turma)).filter(Boolean))]
+      : [...new Set(baseData.map(item => item[field]))];
     const sorted = uniqueValues.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true }));
     
     if (field === 'tutor' && sorted.includes('Sem Tutor')) {
@@ -541,16 +695,24 @@ const App = () => {
     }
     
     return ['Todos', ...sorted];
-  }, [data, filterMode]);
+  }, [data, allStudents, filterMode, showOnlyActive]);
+
+  // Se a turma selecionada não existir mais nas opções disponíveis (ex: turma removida do Mapão), reseta para 'Todos'
+  useEffect(() => {
+    if (selectedValue !== 'Todos' && optionsList && optionsList.length > 0 && !optionsList.includes(selectedValue)) {
+      setSelectedValue('Todos');
+    }
+  }, [optionsList, selectedValue]);
 
   const filteredData = useMemo(() => {
     let filteredGroups = data;
     if (selectedValue !== 'Todos') {
       if (filterMode === 'serie') {
         filteredGroups = data.filter(item => getSerieFromTurma(item.turma) === selectedValue);
+      } else if (filterMode === 'turma') {
+        filteredGroups = data.filter(item => formatTurma(item.turma) === formatTurma(selectedValue));
       } else {
-        const field = filterMode === 'tutor' ? 'tutor' : 'turma';
-        filteredGroups = data.filter(item => item[field] === selectedValue);
+        filteredGroups = data.filter(item => item.tutor === selectedValue);
       }
     }
     
@@ -559,7 +721,8 @@ const App = () => {
         const filteredTutorados = group.tutorados.filter(nome => {
           const norm = normalizeName(nome);
           const studentInfo = allStudents.find(s => s.normalizedName === norm);
-          return studentInfo && studentInfo.situacao === 'Ativo';
+          if (!studentInfo) return false;
+          return isStudentActive(studentInfo.situacao);
         });
         return { ...group, tutorados: filteredTutorados };
       }).filter(group => group.tutorados.length > 0);
@@ -570,9 +733,9 @@ const App = () => {
 
   const filteredStudents = useMemo(() => {
     const names = new Set();
-    filteredData.forEach(item => item.tutorados.forEach(nome => names.add(nome)));
+    filteredData.forEach(item => item.tutorados.forEach(nome => names.add(normalizeName(nome))));
     return allStudents
-      .filter(student => names.has(student.nome))
+      .filter(student => names.has(student.normalizedName) || names.has(normalizeName(student.nome)))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [filteredData, allStudents]);
 
@@ -792,6 +955,8 @@ const App = () => {
     return allStudents.filter(s => names.has(s.nome));
   }, [filteredData, allStudents]);
 
+
+
   // Título contextual do ranking
   const filterLabel = useMemo(() => {
     if (selectedValue === 'Todos') return 'Ranking Geral';
@@ -848,6 +1013,8 @@ const App = () => {
           profiles={multiConfig.profiles}
           changeProfile={changeProfile}
           saveProfile={saveProfile}
+          deleteProfile={deleteProfile}
+          onOpenLinksModal={() => setShowLinksModal(true)}
           onClose={() => setShowSettings(false)}
           onLoad={() => loadAllData(false)}
           isLoading={isLoading}
@@ -860,6 +1027,9 @@ const App = () => {
           isOpen={showLinksModal}
           onClose={() => setShowLinksModal(false)}
           config={config}
+          activeProfile={activeProfile}
+          profiles={multiConfig.profiles}
+          onChangeProfile={changeProfile}
           onSaveConfig={(updatedConfig) => {
             saveProfile(activeProfile, updatedConfig);
           }}
@@ -905,10 +1075,14 @@ const App = () => {
         isSyncing={isSyncing}
         onRefresh={data.length > 0 ? () => loadAllData(true) : null}
         config={config}
+        activeProfile={activeProfile}
+        profiles={multiConfig.profiles}
+        onChangeProfile={changeProfile}
         onOpenSettings={() => setShowSettings(true)}
         onOpenLinksModal={() => setShowLinksModal(true)}
         showStickyName={showStickyName}
         showActions={hasLgpdConsent && data.length > 0}
+        hasLgpdConsent={hasLgpdConsent}
       />
 
       <main className={`w-full ${selectedTurma ? 'px-2 sm:px-4 lg:px-6 py-4' : 'px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 py-6'}`}>

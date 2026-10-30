@@ -458,4 +458,127 @@ describe('fetchConceitos', () => {
     const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/SUB/edit');
     expect(result).toBeInstanceOf(Array);
   });
+
+  it('processa abas com nome no padrão Turma-Bimestre (ex: 3E-1B e 3E-3B) e coluna Nº na col 0', async () => {
+    mockFetch();
+    const sheetData = [
+      ['Nº', 'ALUNO', 'Matemática', 'Português', 'TF', 'Frequência'],
+      ['1', 'Aluno Um', '8,0', '7,5', '0', '100%'],
+      ['2', 'Aluno Dois', '6,5', '5,0', '2', '95%'],
+      ['3', 'Aluno Tres', '9,0', '8,5', '1', '98%'],
+    ];
+    XLSX.read.mockReturnValue({ SheetNames: ['3E-3B'], Sheets: { '3E-3B': {} } });
+    XLSX.utils.sheet_to_json.mockReturnValue(sheetData);
+
+    const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/MAPAO/edit');
+    expect(result).toHaveLength(3);
+    expect(result[0].turmaPlanilha).toBe('3E');
+    expect(result[0].bimestre).toBe('3º Bimestre');
+    expect(result[0].nomeOriginal).toBe('Aluno Um');
+    expect(result[0].situacao).toBe('Ativo');
+    expect(result[1].nomeOriginal).toBe('Aluno Dois');
+    expect(result[2].nomeOriginal).toBe('Aluno Tres');
+  });
+
+  it('não aborta a leitura se houver linha vazia intermediária e não mascara situacao com nota', async () => {
+    mockFetch();
+    const sheetData = [
+      ['ALUNO', 'Matemática', 'Português'],
+      ['Carlos Silva', '7,0', '6,0'],
+      ['', '', ''], // linha vazia
+      ['Mariana Souza', '8,5', '9,0'],
+    ];
+    XLSX.read.mockReturnValue({ SheetNames: ['1A-1B'], Sheets: { '1A-1B': {} } });
+    XLSX.utils.sheet_to_json.mockReturnValue(sheetData);
+
+    const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/BLANK/edit');
+    expect(result).toHaveLength(2);
+    expect(result[0].nomeOriginal).toBe('Carlos Silva');
+    expect(result[0].situacao).toBe('Ativo');
+    expect(result[1].nomeOriginal).toBe('Mariana Souza');
+    expect(result[1].situacao).toBe('Ativo');
+  });
+
+  it('não aborta a leitura se houver linha intermediária com C - ou quebra de página', async () => {
+    mockFetch();
+    const sheetData = [
+      ['Nº', 'ALUNO', 'RA', 'Matemática'],
+      ['1', 'Aluno Um', '12345678-1', '8,0'],
+      ['2', 'Aluno Dois', '12345678-2', '7,0'],
+      ['3', 'Aluno Tres', '12345678-3', '9,0'],
+      ['4', 'Aluno Quatro', '12345678-4', '6,0'],
+      ['5', 'C - Cessou Frequência', '', ''],
+      ['6', 'Aluno Seis', '12345678-6', '8,5'],
+      ['7', 'Aluno Sete', '12345678-7', '7,5'],
+    ];
+    XLSX.read.mockReturnValue({ SheetNames: ['3E-3B'], Sheets: { '3E-3B': {} } });
+    XLSX.utils.sheet_to_json.mockReturnValue(sheetData);
+
+    const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/CLASS_WITH_C/edit');
+    expect(result).toHaveLength(6);
+    expect(result.map(r => r.nomeOriginal)).toEqual([
+      'Aluno Um', 'Aluno Dois', 'Aluno Tres', 'Aluno Quatro', 'Aluno Seis', 'Aluno Sete'
+    ]);
+  });
+
+  it('extrai corretamente Não Comparecimento ou Ativo na coluna à frente do nome do aluno', async () => {
+    mockFetch();
+    const sheetData = [
+      ['Nº', 'ALUNO', 'SITUAÇÃO', 'Matemática', 'TF', 'Frequência'],
+      ['1', 'Aluno Um', 'Ativo', '8,0', '0', '100%'],
+      ['2', 'Aluno Ausente', 'Não Comparecimento', '-', '10', '0%'],
+      ['3', 'Aluno Transferido', 'Baixa - Transferência', '-', '5', '50%'],
+    ];
+    XLSX.read.mockReturnValue({ SheetNames: ['3E-3B'], Sheets: { '3E-3B': {} } });
+    XLSX.utils.sheet_to_json.mockReturnValue(sheetData);
+
+    const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/MAPAO_SITUACOES/edit');
+    expect(result).toHaveLength(3);
+    expect(result[0].nomeOriginal).toBe('Aluno Um');
+    expect(result[0].situacao).toBe('Ativo');
+    expect(result[1].nomeOriginal).toBe('Aluno Ausente');
+    expect(result[1].situacao).toBe('Não Comparecimento');
+    expect(result[2].nomeOriginal).toBe('Aluno Transferido');
+    expect(result[2].situacao).toBe('Baixa - Transferência');
+    // Garante que SITUAÇÃO não virou disciplina
+    expect(result[0].notas['SITUAÇÃO']).toBeUndefined();
+    expect(result[1].notas['SITUAÇÃO']).toBeUndefined();
+  });
+
+  it('extrai corretamente a turma e notas quando o cabeçalho possui Turma: 3ª SERIE E INTEGRAL e Tipo Fechamer', async () => {
+    mockFetch();
+    const sheetData = [
+      ['Registro e Controle do Rendimento Escolar'],
+      ['Ano Letivo:', '', '', '', '2026'],
+      ['Diretoria:', 'Sorocaba'],
+      ['Escola:', 'Marco Antonio Mencacci Professor'],
+      ['Tipo de Ensino', '101 - NOVO ENSINO MÉDIO'],
+      ['Turma:', '3ª SERIE E INTEGRAL 7H T2 ANUAL'],
+      ['Tipo Fechamer', 'Conselho Terceiro Bimestre'],
+      ['Total de Aulas', '', '', '', '632'],
+      ['Total de Aulas', '278 (Soma de todas as eletivas)'],
+      [''],
+      ['ALUNO', 'SITUAÇÃO', 'APROFUNDAMENTO DE FILOSOFIA 9921', '', '', 'APROFUNDAMENTO DE GEOGRAFIA 9920'],
+      ['', '', 'M', 'F', 'AC', 'M', 'F'],
+      ['ANA JULYA DINIZ SANTOS', 'Ativo', '5', '0', '0', '5', '0'],
+      ['CARLA ELOISA SILVA', 'Ativo', '9', '0', '0', '10', '0'],
+      ['MURILO OSMAR', 'Não Comparecimento', '-', '0', '0', '-', '0'],
+    ];
+    XLSX.read.mockReturnValue({ SheetNames: ['3ª SERIE E'], Sheets: { '3ª SERIE E': {} } });
+    XLSX.utils.sheet_to_json.mockReturnValue(sheetData);
+
+    const result = await fetchConceitos('https://docs.google.com/spreadsheets/d/SED_EXACT_LAYOUT/edit');
+    expect(result).toHaveLength(3);
+    expect(result[0].turmaPlanilha).toBe('3E');
+    expect(result[0].bimestre).toBe('3º Bimestre');
+    expect(result[0].nomeOriginal).toBe('ANA JULYA DINIZ SANTOS');
+    expect(result[0].situacao).toBe('Ativo');
+    expect(result[1].turmaPlanilha).toBe('3E');
+    expect(result[1].bimestre).toBe('3º Bimestre');
+    expect(result[1].nomeOriginal).toBe('CARLA ELOISA SILVA');
+    expect(result[1].situacao).toBe('Ativo');
+    expect(result[2].turmaPlanilha).toBe('3E');
+    expect(result[2].nomeOriginal).toBe('MURILO OSMAR');
+    expect(result[2].situacao).toBe('Não Comparecimento');
+  });
 });

@@ -8,7 +8,7 @@ import {
   Check, ArrowUpDown, School,
   FileSpreadsheet, Eye
 } from 'lucide-react';
-import { parseGrade, formatDisciplina, formatBimestre, formatTurma, matchesBimestre, getBimestreNum } from '../utils/helpers';
+import { parseGrade, formatDisciplina, formatBimestre, formatTurma, matchesBimestre, getBimestreNum, isStudentActive } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 
 // Verificação robusta de célula sem nota
@@ -63,7 +63,7 @@ const LaunchTraceabilityModal = ({
   // ── Motor de Auditoria e Rastreabilidade ──────────────────────────────────
   const auditData = useMemo(() => {
     // 1. Filtrar estritamente alunos ativos
-    const activeStudents = allStudents.filter(s => !s.situacao || String(s.situacao).trim() === 'Ativo');
+    const activeStudents = allStudents.filter(s => isStudentActive(s.situacao));
 
     // 2. Mapear todas as turmas cadastradas com alunos ativos
     const bimNum = getBimestreNum(selectedBimestre);

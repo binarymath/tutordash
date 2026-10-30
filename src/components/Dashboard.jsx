@@ -10,7 +10,7 @@ import {
   TrendingUp, TrendingDown, Minus, Calendar, CheckCircle2,
   Clock, Compass, Info, ChevronDown, ClipboardList
 } from 'lucide-react';
-import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing } from '../utils/helpers';
+import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing, isStudentActive } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
 
@@ -544,13 +544,14 @@ const Dashboard = ({
         grade = s.mediaGeralVal;
       }
 
+      if (s.turma) turmasNoPeriodo.add(s.turma);
+
       if (grade !== null) {
         totalAvaliados++;
         if (!isNaN(grade) && grade > 0) {
           ccSoma += grade;
           ccQtd++;
         }
-        if (s.turma) turmasNoPeriodo.add(s.turma);
         if (grade >= 7.0) consolidados++;
         else if (grade >= 5.0) emApoio++;
       } else {
@@ -603,7 +604,7 @@ const Dashboard = ({
     let ccMediaCalc = '-';
     if (ccQtd > 0) {
       ccMediaCalc = (ccSoma / ccQtd).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    } else if (stats.performanceStats?.ccAvg && stats.performanceStats.ccAvg !== 'S/D') {
+    } else if (total > 0 && stats.performanceStats?.ccAvg && stats.performanceStats.ccAvg !== 'S/D') {
       ccMediaCalc = stats.performanceStats.ccAvg;
     }
 
@@ -625,7 +626,7 @@ const Dashboard = ({
     let cardCCBadge = selectedBimestre === 'geral' ? 'Geral' : `${selectedBimestre}º Bi`;
     let cardCCSubtitle = 'Média consolidada do Conselho';
     let card3Badge = null;
-    let card3Subtitle = 'Média diagnóstica geral da escola';
+    let card3Subtitle = total === 0 ? 'Sem avaliações disponíveis' : 'Média diagnóstica geral da escola';
     let card4Badge = 'Conselho';
     let card4Subtitle = 'Médias consolidadas abaixo de 5,0';
 
@@ -637,7 +638,7 @@ const Dashboard = ({
       cardCCBadge = '1º Bi';
       cardCCSubtitle = ccQtd > 0 ? 'Média Conselho (1º Bi)' : 'Notas do 1º Bimestre';
       card3Badge = '1º Bi';
-      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (1º Bi)' : 'Média diagnóstica (1º Bi)';
+      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (1º Bi)' : (total === 0 ? 'Sem avaliações disponíveis' : 'Média diagnóstica (1º Bi)');
       card4Badge = '1º Bi';
       card4Subtitle = emRisco > 0 ? `${emRisco} aluno${emRisco > 1 ? 's' : ''} < 5,0 no 1º Bi` : 'Nenhum aluno < 5,0 no 1º Bi';
     } else if (selectedBimestre === '2') {
@@ -648,7 +649,7 @@ const Dashboard = ({
       cardCCBadge = '2º Bi';
       cardCCSubtitle = ccQtd > 0 ? 'Média Conselho (2º Bi)' : 'Notas do 2º Bimestre';
       card3Badge = '2º Bi';
-      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (2º Bi)' : 'Média diagnóstica (2º Bi)';
+      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (2º Bi)' : (total === 0 ? 'Sem avaliações disponíveis' : 'Média diagnóstica (2º Bi)');
       card4Badge = '2º Bi';
       card4Subtitle = emRisco > 0 ? `${emRisco} aluno${emRisco > 1 ? 's' : ''} < 5,0 no 2º Bi` : 'Nenhum aluno < 5,0 no 2º Bi';
     } else if (selectedBimestre === '3') {
@@ -661,7 +662,7 @@ const Dashboard = ({
       cardCCBadge = '3º Bi';
       cardCCSubtitle = ccQtd > 0 ? 'Média Conselho (3º Bi)' : 'Notas em lançamento';
       card3Badge = '3º Bi';
-      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (3º Bi)' : 'Média diagnóstica do grupo';
+      card3Subtitle = ppQtd > 0 ? 'Média Prova Paulista (3º Bi)' : (total === 0 ? 'Sem avaliações disponíveis' : 'Média diagnóstica do grupo');
       card4Badge = '3º Bi (Parcial)';
       card4Subtitle = (totalAvaliados > 0 || emRisco > 0)
         ? (emRisco > 0 
@@ -848,7 +849,7 @@ const Dashboard = ({
                     </span>
                   )}
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ml-auto border ${
-                    s.situacao === 'Ativo'
+                    isStudentActive(s.situacao)
                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                       : 'bg-rose-50 text-rose-700 border-rose-200'
                   }`}>
@@ -904,7 +905,7 @@ const Dashboard = ({
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-200/70">
                       <Users className="w-3.5 h-3.5 text-slate-500" />
-                      {selectedBimestre === 'geral' ? pedagogicalStats.total : (pedagogicalStats.totalAvaliados || pedagogicalStats.total)} alunos
+                      {pedagogicalStats.total} alunos
                     </span>
 
                     {onOpenTraceability && (
@@ -1022,6 +1023,8 @@ const Dashboard = ({
 
           </div>
 
+
+
           {/* ── 3.2 Cartões de Resumo (Dados Centralizados e Harmoniosos) ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             
@@ -1082,7 +1085,9 @@ const Dashboard = ({
                 )}
               </div>
               <div className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight my-0.5">
-                {pedagogicalStats.ccMedia !== '-' ? pedagogicalStats.ccMedia : (stats.performanceStats?.ccAvg || '-')}
+                {pedagogicalStats.total > 0 && pedagogicalStats.ccMedia !== '-' 
+                  ? pedagogicalStats.ccMedia 
+                  : (pedagogicalStats.total > 0 && stats.performanceStats?.ccAvg && stats.performanceStats.ccAvg !== 'S/D' ? stats.performanceStats.ccAvg : '-')}
               </div>
               <p className="text-[11px] text-slate-500 font-medium text-center">
                 {pedagogicalStats.cardCCSubtitle}
@@ -1101,7 +1106,9 @@ const Dashboard = ({
                 )}
               </div>
               <div className="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight my-0.5">
-                {pedagogicalStats.ppMedia !== '-' ? pedagogicalStats.ppMedia : (stats.performanceStats?.ppAvg || '4,83')}
+                {pedagogicalStats.total > 0 && pedagogicalStats.ppMedia !== '-' 
+                  ? pedagogicalStats.ppMedia 
+                  : (pedagogicalStats.total > 0 && stats.performanceStats?.ppAvg && stats.performanceStats.ppAvg !== 'S/D' ? stats.performanceStats.ppAvg : '-')}
               </div>
               <p className="text-[11px] text-slate-500 font-medium text-center">
                 {pedagogicalStats.card3Subtitle}

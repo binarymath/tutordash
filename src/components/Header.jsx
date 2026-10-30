@@ -10,6 +10,7 @@ import {
 const Header = ({
   selectedStudent, studentProfile, prevStudent, nextStudent,
   setSelectedStudent, isSyncing, onRefresh, config,
+  activeProfile, profiles, onChangeProfile,
   onOpenSettings, onOpenLinksModal, showStickyName,
   hasLgpdConsent = true,
   showActions = true
@@ -18,7 +19,7 @@ const Header = ({
     <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 relative">
       <div className="h-16 flex items-center justify-between">
 
-        {/* Logo e Marca */}
+        {/* Logo e Marca + Seletor de Períodos Isolados */}
         <div className="flex items-center gap-3">
           <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-2xl shadow-md shadow-blue-600/20 flex items-center justify-center">
             <LayoutDashboard className="text-white w-5 h-5" />
@@ -29,6 +30,29 @@ const Header = ({
               Gestão Escolar
             </span>
           </div>
+
+          {/* Seletor de Períodos / Ambientes Isolados (quando há mais de um período) */}
+          {hasLgpdConsent && profiles && Object.keys(profiles).length > 1 && (
+            <div className="flex items-center bg-slate-100 p-1 rounded-2xl gap-1 border border-slate-200/80 shadow-2xs ml-1 sm:ml-2">
+              {Object.keys(profiles).map(nome => {
+                const isActive = activeProfile === nome;
+                return (
+                  <button
+                    key={nome}
+                    onClick={() => onChangeProfile && onChangeProfile(nome)}
+                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+                      isActive
+                        ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90 font-black'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                    }`}
+                    title={`Alternar para o período ${nome}`}
+                  >
+                    {nome}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Navegação flutuante centrada (visível ao rolar ficha de aluno) */}
@@ -70,6 +94,25 @@ const Header = ({
           )}
           {hasLgpdConsent && showActions && (
             <>
+              {/* Links adicionais rápidos para este período */}
+              {config?.customLinks && config.customLinks.length > 0 && (
+                <div className="hidden xl:flex items-center gap-1.5">
+                  {config.customLinks.slice(0, 2).map(link => (
+                    <a
+                      key={link.id}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 text-slate-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-slate-200 shadow-2xs transition-all max-w-[130px] truncate"
+                      title={`${link.title} (${link.url})`}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                      <span className="truncate">{link.title}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
               {/* Botão Adicionar ao lado esquerdo do botão Anotações */}
               <button
                 onClick={onOpenLinksModal}

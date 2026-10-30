@@ -8,7 +8,10 @@ const LinksModal = ({
   isOpen,
   onClose,
   config = {},
-  onSaveConfig
+  onSaveConfig,
+  activeProfile,
+  profiles,
+  onChangeProfile
 }) => {
   const [disciplinaUrl, setDisciplinaUrl] = useState(config.disciplinaUrl || '');
   const [customLinks, setCustomLinks] = useState(config.customLinks || []);
@@ -88,11 +91,18 @@ const LinksModal = ({
               <Plus className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-800 tracking-tight flex items-center gap-2">
-                Adicionar Links & Planilhas
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-slate-800 tracking-tight">
+                  Adicionar Links & Planilhas
+                </h2>
+                {activeProfile && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-50 text-blue-700 border border-blue-200">
+                    Período: {activeProfile}
+                  </span>
+                )}
+              </div>
               <p className="text-xs font-semibold text-slate-500 mt-0.5">
-                Gerencie a planilha de disciplinas e seus atalhos rápidos importantes
+                Gerencie a planilha de disciplinas e atalhos isolados para este período
               </p>
             </div>
           </div>
@@ -104,6 +114,40 @@ const LinksModal = ({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Dock de seleção de período (se houver mais de um) */}
+        {profiles && Object.keys(profiles).length > 1 && (
+          <div className="px-5 sm:px-7 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 overflow-x-auto">
+            <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 shrink-0">
+              Período selecionado:
+            </span>
+            <div className="flex items-center bg-slate-200/60 p-1 rounded-xl gap-1 overflow-x-auto">
+              {Object.keys(profiles).map(nome => (
+                <button
+                  key={nome}
+                  type="button"
+                  onClick={() => {
+                    if (onSaveConfig) {
+                      onSaveConfig({
+                        ...config,
+                        disciplinaUrl: disciplinaUrl.trim(),
+                        customLinks
+                      });
+                    }
+                    if (onChangeProfile) onChangeProfile(nome);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                    activeProfile === nome
+                      ? 'bg-white text-blue-700 shadow-xs border border-slate-200 font-black'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                  }`}
+                >
+                  {nome}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Conteúdo com rolagem */}
         <div className="p-5 sm:p-7 overflow-y-auto space-y-6 flex-1">
