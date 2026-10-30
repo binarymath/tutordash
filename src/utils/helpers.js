@@ -183,14 +183,24 @@ export const resolveStudentActiveTurma = (normalizedName, defaultTurma = '', con
   });
 
   // Identifica a turma do bimestre mais recente
-  let highestBim = 0;
+  // 1. Prioriza o bimestre mais recente em que o aluno esteja expressamente ATIVO
+  let highestActiveBim = 0;
   let turmaAtiva = '';
   [4, 3, 2, 1].forEach(b => {
-    if (highestBim === 0 && historicoTurmas[b]?.turma) {
-      highestBim = b;
+    if (highestActiveBim === 0 && historicoTurmas[b]?.turma && isStudentActive(historicoTurmas[b].situacao)) {
+      highestActiveBim = b;
       turmaAtiva = historicoTurmas[b].turma;
     }
   });
+
+  // 2. Se não houver nenhum registro ativo, usa o bimestre mais recente registrado como fallback
+  if (!turmaAtiva) {
+    [4, 3, 2, 1].forEach(b => {
+      if (!turmaAtiva && historicoTurmas[b]?.turma) {
+        turmaAtiva = historicoTurmas[b].turma;
+      }
+    });
+  }
 
   if (!turmaAtiva) {
     if (hasMapao && def && !validMapaoTurmas.has(def)) {

@@ -541,3 +541,38 @@ describe('isStudentActive', () => {
   });
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// resolveStudentActiveTurma
+// ─────────────────────────────────────────────────────────────────────────────
+describe('resolveStudentActiveTurma', () => {
+  it('aloca o aluno na turma mais recente onde ele está ativo quando transferido', () => {
+    const conceitoData = [
+      { normalizedName: 'joao silva', turmaPlanilha: '2A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { normalizedName: 'joao silva', turmaPlanilha: '2A', bimestre: '2º Bimestre', situacao: 'Baixa - Transferência' },
+      { normalizedName: 'joao silva', turmaPlanilha: '2B', bimestre: '2º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const res = resolveStudentActiveTurma('joao silva', '2A', conceitoData, []);
+    expect(res.turmaAtiva).toBe('2B');
+    expect(res.isTransferido).toBe(true);
+    expect(res.historicoTurmas[1]).toBe('2A');
+    expect(res.historicoTurmas[2]).toBe('2B');
+  });
+
+  it('mantém a turma mais recente com registro se nenhuma estiver explicitamente ativa', () => {
+    const conceitoData = [
+      { normalizedName: 'maria souza', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Baixa' },
+      { normalizedName: 'maria souza', turmaPlanilha: '1C', bimestre: '2º Bimestre', situacao: 'Baixa - Transferência' },
+    ];
+
+    const res = resolveStudentActiveTurma('maria souza', '1A', conceitoData, []);
+    expect(res.turmaAtiva).toBe('1C');
+  });
+
+  it('retorna turma padrão se não houver registros no Mapão', () => {
+    const res = resolveStudentActiveTurma('aluno novo', '3D', [], []);
+    expect(res.turmaAtiva).toBe('3D');
+    expect(res.isTransferido).toBe(false);
+  });
+});
+

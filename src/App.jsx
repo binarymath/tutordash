@@ -345,126 +345,52 @@ const App = () => {
     // na respectiva turma, mesmo que não possuam notas nos bimestres anteriores.
     // ────────────────────────────────────────────────────────────────────────
 
-    // 1. Identifica o último bimestre registrado para cada turma válida no Mapão SED
-    const latestBimPerTurma = new Map();
-    conceitoData.forEach(c => {
-      const t = formatTurma(c.turmaPlanilha);
-      if (!t || !validMapaoTurmas.has(t)) return;
-      const bNum = getBimestreNum(c.bimestre);
-      const cur = latestBimPerTurma.get(t) || 0;
-      if (bNum > cur) {
-        latestBimPerTurma.set(t, bNum);
-      }
-    });
-
-    // 2. Extrai os alunos do último registro DE CADA TURMA no Mapão SED
-    // Para cada turma, garante que todos os alunos do último bimestre apareçam na respectiva turma
-    // turma -> Map(norm -> { nomeOriginal, turma, situacao, bNum })
-    const studentsByTurma = new Map();
-    const allMapaoStudents = new Set();
-
-    conceitoData.forEach(c => {
-      const t = formatTurma(c.turmaPlanilha);
-      if (!t || !validMapaoTurmas.has(t)) return;
-      const latestBim = latestBimPerTurma.get(t) || 0;
-      const bNum = getBimestreNum(c.bimestre);
-
-      // Considera apenas o registro do último bimestre registrado para esta turma
-      if (latestBim > 0 && bNum !== latestBim) return;
-
-      const norm = normalizeName(c.normalizedName || c.nomeOriginal);
-      if (!norm) return;
-
-      allMapaoStudents.add(norm);
-
-      if (!studentsByTurma.has(t)) {
-        studentsByTurma.set(t, new Map());
-      }
-      const turmaMap = studentsByTurma.get(t);
-      const current = turmaMap.get(norm);
-      if (!current) {
-        turmaMap.set(norm, {
-          nomeOriginal: c.nomeOriginal || c.normalizedName,
-          turma: t,
-          situacao: c.situacao || 'Ativo',
-          bNum
-        });
-      } else {
-        const curActive = isStudentActive(current.situacao);
-        const newActive = isStudentActive(c.situacao);
-        if (!curActive && newActive) {
-          turmaMap.set(norm, {
-            nomeOriginal: c.nomeOriginal || current.nomeOriginal,
-            turma: t,
-            situacao: c.situacao || 'Ativo',
-            bNum
-          });
-        }
-      }
-    });
-
-    // 3. Mapeia os tutores definidos na planilha de tutoria (dataRaw)
+    // 1. Mapeia os tutores definidos na planilha de tutoria (dataRaw) e turmas padrão
     const tutorByStudent = new Map();
+    const rawTurmaByStudent = new Map();
+    const allStudentsMap = new Map(); // norm -> nomeOriginal
+
     dataRaw.forEach(group => {
       const tutorName = group.tutor || 'Sem Tutor';
-      (group.tutorados || []).forEach(nome => {
-        const norm = normalizeName(nome);
-        if (norm && !tutorByStudent.has(norm)) {
-          tutorByStudent.set(norm, tutorName);
-        }
-      });
-    });
-
-    // 4. Fallback: alunos de dataRaw que não constam no Mapão SED
-    const missingDataRawStudents = [];
-    dataRaw.forEach(group => {
       const rawT = String(group.turma || '').trim();
       const cleanT = formatTurma(rawT) || rawT;
-      if (cleanT.startsWith('405') || cleanT.startsWith('406')) return;
-
       (group.tutorados || []).forEach(nome => {
         const norm = normalizeName(nome);
-        if (!norm || allMapaoStudents.has(norm)) return;
-
-        let turmaFinal = cleanT;
-        if (hasMapao && !validMapaoTurmas.has(cleanT)) {
-          const { turmaAtiva } = resolveStudentActiveTurma(norm, cleanT, conceitoData, provaData);
-          const cleanAtiva = formatTurma(turmaAtiva) || turmaAtiva;
-          if (cleanAtiva && validMapaoTurmas.has(cleanAtiva)) {
-            turmaFinal = cleanAtiva;
-          } else {
-            return;
-          }
+        if (norm) {
+          if (!allStudentsMap.has(norm)) allStudentsMap.set(norm, nome);
+          if (!tutorByStudent.has(norm)) tutorByStudent.set(norm, tutorName);
+          if (!rawTurmaByStudent.has(norm)) rawTurmaByStudent.set(norm, cleanT);
         }
-
-        missingDataRawStudents.push({
-          nomeOriginal: nome,
-          turma: turmaFinal,
-          tutor: group.tutor || 'Sem Tutor'
-        });
       });
     });
 
-    // 5. Agrupa por turma e tutor
+    conceitoData.forEach(c => {
+      const norm = normalizeName(c.normalizedName || c.nomeOriginal);
+      if (norm && !allStudentsMap.has(norm)) {
+        allStudentsMap.set(norm, c.nomeOriginal || c.normalizedName);
+      }
+    });
+
+    // 2. Para cada aluno, resolve sua ÚNICA turma ativa mais recente
+    // e o aloca exclusivamente nela, sem duplicar entre turmas
     const byTurmaTutor = new Map();
 
-    studentsByTurma.forEach((turmaMap, turma) => {
-      turmaMap.forEach(({ nomeOriginal }, norm) => {
-        const tutor = tutorByStudent.get(norm) || 'Sem Tutor';
-        const key = `${turma}|${tutor}`;
-        if (!byTurmaTutor.has(key)) {
-          byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
-        }
-        if (!byTurmaTutor.get(key).tutorados.includes(nomeOriginal)) {
-          byTurmaTutor.get(key).tutorados.push(nomeOriginal);
-        }
-      });
-    });
+    allStudentsMap.forEach((nomeOriginal, norm) => {
+      const defaultT = rawTurmaByStudent.get(norm) || '';
+      const { turmaAtiva } = resolveStudentActiveTurma(norm, defaultT, conceitoData, provaData);
+      const cleanTurma = formatTurma(turmaAtiva) || turmaAtiva || 'Sem Turma';
 
-    missingDataRawStudents.forEach(({ nomeOriginal, turma, tutor }) => {
-      const key = `${turma}|${tutor}`;
+      if (!cleanTurma || cleanTurma === 'Sem Turma' || cleanTurma.startsWith('405') || cleanTurma.startsWith('406')) {
+        return;
+      }
+      if (hasMapao && !validMapaoTurmas.has(cleanTurma)) {
+        return;
+      }
+
+      const tutor = tutorByStudent.get(norm) || 'Sem Tutor';
+      const key = `${cleanTurma}|${tutor}`;
       if (!byTurmaTutor.has(key)) {
-        byTurmaTutor.set(key, { turma, tutor, tutorados: [] });
+        byTurmaTutor.set(key, { turma: cleanTurma, tutor, tutorados: [] });
       }
       if (!byTurmaTutor.get(key).tutorados.includes(nomeOriginal)) {
         byTurmaTutor.get(key).tutorados.push(nomeOriginal);
@@ -518,9 +444,8 @@ const App = () => {
     data.forEach(item => {
       item.tutorados.forEach(nomeOriginal => {
         const normName       = normalizeName(nomeOriginal);
-        const uniqueKey      = `${normName}__${item.turma}`;
-        if (seenStudentKeys.has(uniqueKey)) return;
-        seenStudentKeys.add(uniqueKey);
+        if (!normName || seenStudentKeys.has(normName)) return;
+        seenStudentKeys.add(normName);
 
         const studentNotes   = annotations.filter(n => n.normalizedName === normName);
         let provasDoAlunoRaw = provaData.filter(p => p.normalizedName === normName);
