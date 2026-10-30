@@ -267,4 +267,31 @@ describe('ConfigModal — troca de perfil ativo', () => {
     );
     expect(screen.getByPlaceholderText(/link \(qualquer ficheiro sheets\)/i).value).toBe('https://b.com');
   });
+
+  it('salva o perfil atual antes de mudar para outra tab', () => {
+    const saveProfile = vi.fn();
+    const changeProfile = vi.fn();
+    const multiProfiles = {
+      Principal: { studentsUrl: 'https://a.com', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] },
+      Secundário: { studentsUrl: 'https://b.com', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] },
+    };
+    render(
+      <ConfigModal
+        {...defaultProps}
+        profiles={multiProfiles}
+        activeProfile="Principal"
+        saveProfile={saveProfile}
+        changeProfile={changeProfile}
+      />
+    );
+
+    fireEvent.click(screen.getByText('Secundário'));
+    expect(saveProfile).toHaveBeenCalledWith('Principal', expect.any(Object));
+    expect(changeProfile).toHaveBeenCalledWith('Secundário');
+  });
+
+  it('exibe o campo de Planilha de Disciplinas isolado do período', () => {
+    render(<ConfigModal {...defaultProps} />);
+    expect(screen.getByPlaceholderText(/link planilha disciplinas/i)).toBeInTheDocument();
+  });
 });

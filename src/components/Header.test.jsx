@@ -171,4 +171,44 @@ describe('Header', () => {
     fireEvent.click(screen.getByTitle('Aluno Anterior'));
     expect(setSelectedStudent).toHaveBeenCalledWith(prev);
   });
+
+  it('exibe seletor de períodos quando há múltiplos períodos e permite alternar', () => {
+    const onChangeProfile = vi.fn();
+    const profiles = {
+      Principal: { studentsUrl: '' },
+      'Ensino Médio': { studentsUrl: '' }
+    };
+    render(
+      <Header
+        {...defaultProps}
+        activeProfile="Principal"
+        profiles={profiles}
+        onChangeProfile={onChangeProfile}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Principal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ensino Médio' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ensino Médio' }));
+    expect(onChangeProfile).toHaveBeenCalledWith('Ensino Médio');
+  });
+
+  it('renderiza links adicionais rápidos do período ativo', () => {
+    const configWithLinks = {
+      customLinks: [
+        { id: '1', title: 'Drive da Turma', url: 'https://drive.google.com/xyz' }
+      ]
+    };
+    render(
+      <Header
+        {...defaultProps}
+        config={configWithLinks}
+        showActions={true}
+      />
+    );
+
+    const link = screen.getByText('Drive da Turma');
+    expect(link).toBeInTheDocument();
+  });
 });
