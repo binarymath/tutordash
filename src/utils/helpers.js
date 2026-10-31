@@ -94,16 +94,15 @@ export const isStudentActive = (situacao) => {
     s.includes('desist') ||
     s.includes('falec') ||
     s.includes('inativ') ||
-    s.includes('sem matricula') ||
-    s.includes('sem registro')
+    s.includes('sem matricula')
   ) {
     return false;
   }
 
   // Regra expressa do Mapão SED:
   // O aluno só é considerado ativo se na frente do nome constar expressamente a palavra "Ativo" / "Ativa"
-  // (ou termos afins de matrícula regular como "Matriculado" / "Frequente")
-  const hasAtivo = /\b(ativo|ativa)\b/i.test(s) || s.includes('matriculad') || s.includes('frequente');
+  // (ou termos afins de matrícula regular como "Matriculado" / "Frequente" / "Recem")
+  const hasAtivo = /\b(ativo|ativa)\b/i.test(s) || s.includes('matriculad') || s.includes('frequente') || s.includes('recem');
   return hasAtivo;
 };
 
@@ -751,7 +750,7 @@ export const getMapaoCoverageDetails = (conceitoData = [], tutoradosCount = 0, s
   const mapaoCount = mapaoStudentsList.length;
   const dashboardNorms = new Set((debugContext.sortedData || []).map(s => normalizeName(s.normalizedName || s.nome)));
   const missing = mapaoStudentsList.filter(m => !dashboardNorms.has(normalizeName(m.nomeOriginal)));
-  const isMatching = debugContext.sortedData ? (missing.length === 0 && mapaoCount === tutoradosCount) : (mapaoCount === tutoradosCount);
+  const isMatching = debugContext.sortedData ? (missing.length === 0) : (mapaoCount === tutoradosCount);
 
   const diagnostico = missing.map(m => {
     const normM = normalizeName(m.nomeOriginal);
@@ -807,14 +806,20 @@ export const getMapaoCoverageDetails = (conceitoData = [], tutoradosCount = 0, s
   };
 };
 
-export const validateMapaoCoverage = (conceitoData = [], tutoradosCount = 0, showOnlyActive = true, targetTurma = 'Todos', debugContext = {}) => {
+export const validateMapaoCoverage = (conceitoData = [], tutoradosCount = 0, showOnlyActive = true, targetTurma = 'Todos', debugContext = {}, { verbose = false } = {}) => {
   const details = getMapaoCoverageDetails(conceitoData, tutoradosCount, showOnlyActive, targetTurma, debugContext);
   if (!details) {
     return { isMatching: false, mapaoCount: 0, tutoradosCount, message: 'Mapão não carregado' };
   }
 
+  // Quando todos os alunos estão inclusos (operação normal), mantém o console limpo
   if (details.isMatching) {
-    console.log(`Ok, Todos os alunos do mapão da turma ${details.turma} estão inclusos`);
+    if (verbose) {
+      const extra = (details.tutoradosCount > details.mapaoCount && details.mapaoCount > 0)
+        ? ` (+ ${details.tutoradosCount - details.mapaoCount} recém-matriculado(s) na tutoria)`
+        : '';
+      console.log(`Ok, Todos os alunos do mapão da turma ${details.turma} estão inclusos${extra}`);
+    }
   } else {
     console.warn(
       `Atenção (Turma: ${details.turma}): Nem todos os alunos do mapão estão inclusos (Mapão: ${details.mapaoCount} vs Tutorados: ${details.tutoradosCount})`

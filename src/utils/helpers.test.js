@@ -506,6 +506,8 @@ describe('isStudentActive', () => {
     expect(isStudentActive('Ativa')).toBe(true);
     expect(isStudentActive('Matriculado')).toBe(true);
     expect(isStudentActive('Frequente')).toBe(true);
+    expect(isStudentActive('Ativo (Recém-Matriculado)')).toBe(true);
+    expect(isStudentActive('Recém-Matriculado')).toBe(true);
     expect(isStudentActive('')).toBe(true);
     expect(isStudentActive(null)).toBe(true);
   });
@@ -630,7 +632,7 @@ describe('validateMapaoCoverage', () => {
     warnSpy.mockRestore();
   });
 
-  it('emite a frase com a turma quando as contagens batem em Todos', () => {
+  it('mantém o console limpo quando as contagens batem em Todos', () => {
     const conceitoData = [
       { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
       { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
@@ -642,26 +644,27 @@ describe('validateMapaoCoverage', () => {
     expect(res.isMatching).toBe(true);
     expect(res.mapaoCount).toBe(2);
     expect(res.tutoradosCount).toBe(2);
-    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+    // Console limpo por padrão em caso de sucesso
+    expect(logSpy).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 
-  it('emite a frase especificando a turma selecionada (ex: 1A) quando as contagens batem', () => {
+  it('emite a frase com a turma quando verbose: true e as contagens batem', () => {
     const conceitoData = [
       { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
       { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
       { nomeOriginal: 'Caio', turmaPlanilha: '1B', bimestre: '1º Bimestre', situacao: 'Ativo' },
     ];
 
-    // Para a turma 1A: 2 alunos ativos
-    const res = validateMapaoCoverage(conceitoData, 2, true, '1A');
+    // Para a turma 1A com verbose: true
+    const res = validateMapaoCoverage(conceitoData, 2, true, '1A', {}, { verbose: true });
     expect(res.isMatching).toBe(true);
     expect(res.mapaoCount).toBe(2);
     expect(res.tutoradosCount).toBe(2);
     expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma 1A estão inclusos');
   });
 
-  it('emite a frase quando showOnlyActive é false e as contagens totais batem', () => {
+  it('mantém o console limpo quando showOnlyActive é false e as contagens batem', () => {
     const conceitoData = [
       { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
       { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
@@ -673,7 +676,7 @@ describe('validateMapaoCoverage', () => {
     expect(res.isMatching).toBe(true);
     expect(res.mapaoCount).toBe(3);
     expect(res.tutoradosCount).toBe(3);
-    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+    expect(logSpy).not.toHaveBeenCalled();
   });
 
   it('emite console.warn quando as contagens divergem', () => {
