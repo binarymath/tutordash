@@ -153,5 +153,89 @@ describe('LowGradesReportModal revisado', () => {
     const selectTurma = screen.getAllByRole('combobox')[2];
     expect(selectTurma.value).toBe('101');
   });
+
+  it('permite filtrar por tutor no seletor e atualiza a listagem de alunos', () => {
+    const multiTutorStudents = [
+      {
+        nome: 'Aluno do Prof Carlos',
+        turma: '3D',
+        tutor: 'Prof. Carlos',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '3.0' } }
+        ]
+      },
+      {
+        nome: 'Aluno da Profa Maria',
+        turma: '3D',
+        tutor: 'Profa. Maria',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '2.5' } }
+        ]
+      }
+    ];
+
+    const onClose = vi.fn();
+    render(
+      <LowGradesReportModal
+        allStudents={multiTutorStudents}
+        initialPeriod="1º Bimestre"
+        onClose={onClose}
+      />
+    );
+
+    // Inicialmente ambos estão visíveis (Tutor: Todos)
+    expect(screen.getByText('Aluno do Prof Carlos')).toBeInTheDocument();
+    expect(screen.getByText('Aluno da Profa Maria')).toBeInTheDocument();
+
+    // Selecionar o combobox de tutor (índice 3)
+    const selectTutor = screen.getByRole('combobox', { name: /filtrar por tutor/i });
+    expect(selectTutor).toBeInTheDocument();
+    fireEvent.change(selectTutor, { target: { value: 'Prof. Carlos' } });
+
+    // Apenas aluno do Prof Carlos deve permanecer
+    expect(screen.getByText('Aluno do Prof Carlos')).toBeInTheDocument();
+    expect(screen.queryByText('Aluno da Profa Maria')).not.toBeInTheDocument();
+  });
+
+  it('inicializa com o tutor passado em initialTutor', () => {
+    const multiTutorStudents = [
+      {
+        nome: 'Aluno do Prof Carlos',
+        turma: '3D',
+        tutor: 'Prof. Carlos',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '3.0' } }
+        ]
+      },
+      {
+        nome: 'Aluno da Profa Maria',
+        turma: '3D',
+        tutor: 'Profa. Maria',
+        situacao: 'Ativo',
+        historicoConceitos: [
+          { bimestre: '1º Bimestre', notas: { 'MATEMÁTICA': '2.5' } }
+        ]
+      }
+    ];
+
+    const onClose = vi.fn();
+    render(
+      <LowGradesReportModal
+        allStudents={multiTutorStudents}
+        initialPeriod="1º Bimestre"
+        initialTutor="Profa. Maria"
+        onClose={onClose}
+      />
+    );
+
+    expect(screen.getByText('Aluno da Profa Maria')).toBeInTheDocument();
+    expect(screen.queryByText('Aluno do Prof Carlos')).not.toBeInTheDocument();
+
+    const selectTutor = screen.getByRole('combobox', { name: /filtrar por tutor/i });
+    expect(selectTutor.value).toBe('Profa. Maria');
+  });
 });
 

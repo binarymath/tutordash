@@ -192,6 +192,7 @@ const App = () => {
   const [showLowGradesModal,    setShowLowGradesModal]    = useState(false);
   const [lowGradesInitialPeriod, setLowGradesInitialPeriod] = useState('Média Geral');
   const [lowGradesInitialTurma,  setLowGradesInitialTurma]  = useState('Todas');
+  const [lowGradesInitialTutor,  setLowGradesInitialTutor]  = useState('Todos');
   const [showTraceabilityModal, setShowTraceabilityModal] = useState(false);
   const [traceabilityPeriod,    setTraceabilityPeriod]    = useState('3');
   const [traceabilityTurma,     setTraceabilityTurma]     = useState('Todas');
@@ -595,21 +596,21 @@ const App = () => {
             ? conceitosDoAluno
                 .filter(c => c.bimestre === ultimoBimNome)
                 .map(c => c.situacao || 'Ativo')
-            : (ultimoBimestre?.situacao ? [ultimoBimestre.situacao] : (hasMapaoLoaded ? ['Inativo (Sem registro no Mapão)'] : ['Ativo']));
+            : (ultimoBimestre?.situacao ? [ultimoBimestre.situacao] : (hasMapaoLoaded ? ['Ativo (Recém-Matriculado)'] : ['Ativo']));
 
           // O status oficial no último bimestre define a situação atual do aluno
           const situacaoBaixa = situacoesUltimoBim.find(s => !isStudentActive(s));
-          const situacaoAtual = situacaoBaixa || (situacoesUltimoBim.includes('Ativo') ? 'Ativo' : (situacoesUltimoBim[0] || (hasMapaoLoaded ? 'Inativo (Sem registro no Mapão)' : 'Ativo')));
+          const situacaoAtual = situacaoBaixa || (situacoesUltimoBim.includes('Ativo') ? 'Ativo' : (situacoesUltimoBim[0] || (hasMapaoLoaded ? 'Ativo (Recém-Matriculado)' : 'Ativo')));
 
           // Histórico: status únicos de todos os bimestres
           const todasSituacoes = Array.from(
             new Set(conceitosDoAluno.length > 0
               ? conceitosDoAluno.map(c => c.situacao || 'Ativo')
-              : (hasMapaoLoaded ? ['Inativo (Sem registro no Mapão)'] : ['Ativo'])
+              : (hasMapaoLoaded ? ['Ativo (Recém-Matriculado)'] : ['Ativo'])
             )
           ).sort((a, b) => {
-            if (a === 'Ativo') return -1;
-            if (b === 'Ativo') return 1;
+            if (a.includes('Ativo')) return -1;
+            if (b.includes('Ativo')) return 1;
             return a.localeCompare(b, 'pt-BR');
           });
 
@@ -1041,6 +1042,7 @@ const App = () => {
           allStudents={allStudents}
           initialPeriod={lowGradesInitialPeriod}
           initialTurma={lowGradesInitialTurma}
+          initialTutor={lowGradesInitialTutor}
           onClose={() => setShowLowGradesModal(false)}
           onSelectStudent={(nome) => {
             setSelectedStudent(nome);
@@ -1134,7 +1136,7 @@ const App = () => {
                 setShowOnlyActive={setShowOnlyActive}
                 rankingStudents={rankingStudents}
                 filterLabel={filterLabel}
-                onOpenLowGradesReport={(bim, turma) => {
+                onOpenLowGradesReport={(bim, turma, tutor) => {
                   if (bim === '1') setLowGradesInitialPeriod('1º Bimestre');
                   else if (bim === '2') setLowGradesInitialPeriod('2º Bimestre');
                   else if (bim === '3') setLowGradesInitialPeriod('3º Bimestre');
@@ -1147,6 +1149,15 @@ const App = () => {
                     }
                   }
                   setLowGradesInitialTurma(targetTurma || 'Todas');
+
+                  let targetTutor = tutor;
+                  if (!targetTutor || targetTutor === 'Todos') {
+                    if (filterMode === 'tutor' && selectedValue && selectedValue !== 'Todos') {
+                      targetTutor = selectedValue;
+                    }
+                  }
+                  setLowGradesInitialTutor(targetTutor || 'Todos');
+
                   setShowLowGradesModal(true);
                 }}
                 onOpenTraceability={(bim, turma) => {
