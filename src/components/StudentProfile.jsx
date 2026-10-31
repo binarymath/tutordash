@@ -2255,7 +2255,7 @@ const StudentProfile = ({
       </div>
 
       {/* Cabeçalho do aluno */}
-      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+      <div className="bg-white p-8 rounded-3xl border border-slate-300 shadow-md">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
           <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
@@ -2283,7 +2283,7 @@ const StudentProfile = ({
       </div>
 
       {/* ── ACCORDION DE ANOTAÇÕES ── */}
-      <section className="w-full bg-white rounded-3xl border-[3px] border-slate-400 shadow-sm overflow-hidden transition-all hover:border-slate-500" data-chart>
+      <section className="w-full bg-white rounded-3xl border border-slate-300 shadow-md overflow-hidden transition-all hover:border-slate-400 hover:shadow-lg" data-chart>
         <div className="w-full flex items-center justify-between p-5 md:p-6 bg-white hover:bg-slate-50/70 transition-colors">
           <button
             type="button"
@@ -2310,7 +2310,7 @@ const StudentProfile = ({
               </div>
             </div>
 
-            <div className="flex items-center justify-center w-9 h-9 rounded-xl border-2 border-slate-400 bg-slate-50 text-slate-700 shrink-0 ml-4 group-hover:bg-slate-100 group-hover:border-slate-500 transition-colors">
+            <div className="flex items-center justify-center w-9 h-9 rounded-xl border border-slate-300 bg-slate-50 text-slate-700 shrink-0 ml-4 group-hover:bg-slate-100 group-hover:border-slate-400 transition-colors">
               {isNotesOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
             </div>
           </button>
@@ -2325,7 +2325,7 @@ const StudentProfile = ({
                 event.stopPropagation();
                 printChart(event.currentTarget.closest('[data-chart]'), 'Anotações');
               }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 border-slate-400 bg-white text-slate-600 transition-colors hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-600 transition-colors hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
             >
               <Printer className="h-4 w-4" />
             </button>
@@ -2333,7 +2333,7 @@ const StudentProfile = ({
         </div>
 
         {isNotesOpen && (
-          <div id="student-notes-accordion" className="border-t-[3px] border-slate-300 p-5 md:p-6 space-y-6">
+          <div id="student-notes-accordion" className="border-t border-slate-300 p-5 md:p-6 space-y-6">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
               {studentProfile.notes?.length > 0 && (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 flex-1">
@@ -2456,7 +2456,7 @@ const StudentProfile = ({
       {/* ── SEÇÃO HERO: RESUMO DO PERÍODO SELECIONADO ── */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Card Média Conselho */}
-        <div className="bg-white p-5 rounded-3xl text-slate-900 border-[3px] border-slate-400 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-500">
+        <div className="bg-white p-5 rounded-3xl text-slate-900 border border-slate-300 shadow-md relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-400 hover:shadow-lg">
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           <div>
             <div className="flex items-center justify-between text-blue-700 font-black text-[11px] uppercase tracking-widest">
@@ -2472,7 +2472,7 @@ const StudentProfile = ({
         </div>
 
         {/* Card Prova Paulista */}
-        <div className="bg-white p-5 rounded-3xl text-slate-900 border-[3px] border-slate-400 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-500">
+        <div className="bg-white p-5 rounded-3xl text-slate-900 border border-slate-300 shadow-md relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-400 hover:shadow-lg">
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
           <div>
             <div className="flex items-center justify-between text-sky-700 font-black text-[11px] uppercase tracking-widest opacity-90">
@@ -2496,7 +2496,7 @@ const StudentProfile = ({
         </div>
 
         {/* Card Frequência Total */}
-        <div className="bg-white p-5 rounded-3xl text-slate-900 border-[3px] border-slate-400 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-500">
+        <div className="bg-white p-5 rounded-3xl text-slate-900 border border-slate-300 shadow-md relative overflow-hidden flex flex-col justify-between transition-all hover:border-slate-400 hover:shadow-lg">
           <div className="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
           <div>
             <div className="flex items-center justify-between text-blue-700 font-black text-[11px] uppercase tracking-widest">
@@ -2521,13 +2521,13 @@ const StudentProfile = ({
         {selectedChartBimestre === 'evolucao' ? (
           /* MODO EVOLUÇÃO COMPARATIVA */
           <div className="space-y-8 animate-fadeIn">
-            <div className="bg-slate-50 border border-slate-200 p-8 rounded-3xl shadow-sm">
+            <div className="bg-slate-50 border border-slate-300 p-8 rounded-3xl shadow-md">
               <h3 className="text-base font-black text-slate-800 uppercase tracking-widest flex items-center gap-2 mb-6">
                 📈 Trajetória Multi-Bimestral de Desempenho
               </h3>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Evolução Conselho */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+                <div className="bg-white p-6 rounded-3xl border border-slate-300 shadow-md relative" data-chart>
                   <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={() => setMaximizedChart({ type: 'evolucaoCC', title: 'Evolução Média Geral — Conselho' })}
@@ -2567,7 +2567,7 @@ const StudentProfile = ({
                 </div>
 
                 {/* Evolução PP */}
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm relative" data-chart>
+                <div className="bg-white p-6 rounded-3xl border border-slate-300 shadow-md relative" data-chart>
                   <div className="absolute top-4 right-4 flex items-center gap-1">
                     <button
                       onClick={() => setMaximizedChart({ type: 'evolucaoPP', title: 'Evolução Média Geral — Prova Paulista' })}
@@ -2648,7 +2648,7 @@ const StudentProfile = ({
             </div>
 
             {/* Tabela única de Conselho por disciplina e bimestre */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-8 rounded-3xl border border-slate-300 shadow-md">
               <h4 className="text-xs font-black text-blue-600 uppercase mb-5 tracking-widest">
                 📋 Conselho — Evolução por Disciplina e Média Geral
               </h4>
@@ -2735,7 +2735,7 @@ const StudentProfile = ({
             </div>
 
             {/* Tabela única de Prova Paulista por disciplina e bimestre */}
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+            <div className="bg-white p-8 rounded-3xl border border-slate-300 shadow-md">
               <h4 className="text-xs font-black text-sky-600 uppercase mb-5 tracking-widest">
                 🎯 Prova Paulista — Evolução por Disciplina e Média Geral
               </h4>
@@ -2808,7 +2808,7 @@ const StudentProfile = ({
           <div className="space-y-10 animate-fadeIn">
             {/* ── PILAR CONSELHO BIMESTRAL ── */}
             {chartDataMapao.length > 0 && (
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+              <div className="bg-white rounded-3xl border border-slate-300 shadow-md p-8">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-8">
                   <div className="flex items-center gap-3">
                     <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl">
@@ -2824,7 +2824,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Mapão */}
-                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                  <div className="w-full bg-slate-50/80 p-6 md:p-8 rounded-3xl border border-slate-300 flex flex-col items-center relative min-h-[380px] shadow-md" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarCC', title: `Radar de Equilíbrio — Conselho (${bimestreRadarLabel})` })}
@@ -2858,7 +2858,7 @@ const StudentProfile = ({
                   </div>
 
                   {/* Barras Mapão */}
-                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-100 shadow-sm" data-chart>
+                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-300 shadow-md" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'barrasCC', title: `Comparativo de Notas — Conselho (${bimestreRadarLabel})` })}
@@ -2943,7 +2943,7 @@ const StudentProfile = ({
 
             {/* ── PILAR PROVA PAULISTA ── */}
             {chartDataProva.length > 0 && (
-              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8">
+              <div className="bg-white rounded-3xl border border-slate-300 shadow-md p-8">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-5 mb-8">
                   <div className="flex items-center gap-3">
                     <div className="p-3.5 bg-sky-50 text-sky-600 rounded-2xl">
@@ -2959,7 +2959,7 @@ const StudentProfile = ({
 
                 <div className="space-y-8">
                   {/* Radar Prova Paulista */}
-                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-sky-100 flex flex-col items-center relative min-h-[380px]" data-chart>
+                  <div className="w-full bg-sky-50/50 p-6 md:p-8 rounded-3xl border border-slate-300 flex flex-col items-center relative min-h-[380px] shadow-md" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'radarPP', title: `Desempenho por Área — Prova Paulista (${bimestreRadarLabel})` })}
@@ -2993,7 +2993,7 @@ const StudentProfile = ({
                   </div>
 
                   {/* Barras Prova Paulista */}
-                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-100 shadow-sm" data-chart>
+                  <div className="w-full bg-white p-6 md:p-8 rounded-3xl relative min-h-[400px] border border-slate-300 shadow-md" data-chart>
                     <div className="absolute top-4 right-4 flex items-center gap-1">
                       <button
                         onClick={() => setMaximizedChart({ type: 'barrasPP', title: `Comparativo de Notas — Prova Paulista (${bimestreRadarLabel})` })}

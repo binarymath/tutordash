@@ -656,7 +656,7 @@ const ClassProfile = ({
       <section ref={ato1Ref} className="space-y-6">
         
         {/* Banner Claro e Luminoso da Turma */}
-        <div className="bg-gradient-to-r from-white via-sky-50/60 to-indigo-50/40 rounded-3xl p-8 md:p-10 border border-slate-200/90 shadow-sm relative overflow-hidden">
+        <div className="bg-gradient-to-r from-white via-sky-50/60 to-indigo-50/40 rounded-3xl p-8 md:p-10 border border-slate-300 shadow-md relative overflow-hidden">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 relative z-10">
             <div>
               <div className="flex items-center gap-2">
@@ -674,25 +674,25 @@ const ClassProfile = ({
 
             {/* Cards Oficiais de Ranking e Médias */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 w-full lg:w-auto">
-              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs text-center min-w-[110px]">
+              <div className="bg-white p-4 rounded-2xl border border-slate-300 shadow-md text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Alunos Ativos</p>
                 <p className="text-2xl font-black text-slate-800 mt-1">{officialClassMetrics.total}</p>
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">matrículas</p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-sky-100 shadow-2xs text-center min-w-[110px]">
+              <div className="bg-white p-4 rounded-2xl border border-slate-300 shadow-md text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Prova Paulista</p>
                 <p className="text-2xl font-black text-sky-700 mt-1">{officialClassMetrics.mediaOficialPP}</p>
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">Nível: {officialClassMetrics.mediaNivelPP}</p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-purple-100 shadow-2xs text-center min-w-[110px]">
+              <div className="bg-white p-4 rounded-2xl border border-slate-300 shadow-md text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Conselho (CC)</p>
                 <p className="text-2xl font-black text-purple-700 mt-1">{officialClassMetrics.mediaOficialCC}</p>
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">Nível: {officialClassMetrics.mediaNivelCC}</p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-amber-100 shadow-2xs text-center min-w-[110px]">
+              <div className="bg-white p-4 rounded-2xl border border-slate-300 shadow-md text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Posição no Nível</p>
                 <p className="text-2xl font-black text-amber-700 mt-1">
                   {officialClassMetrics.rankPPSerie}º <span className="text-xs font-bold text-slate-400">/ {officialClassMetrics.totalPPSerie}</span>
@@ -700,7 +700,7 @@ const ClassProfile = ({
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">entre as turmas de {serieLabel}</p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-sky-100 shadow-2xs text-center min-w-[110px]">
+              <div className="bg-white p-4 rounded-2xl border border-slate-300 shadow-md text-center min-w-[110px]">
                 <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Posição na Escola</p>
                 <p className="text-2xl font-black text-sky-700 mt-1">
                   {officialClassMetrics.rankPP}º <span className="text-xs font-bold text-slate-400">/ {officialClassMetrics.totalPP}</span>
@@ -712,7 +712,7 @@ const ClassProfile = ({
         </div>
 
         {/* Gráfico de Colunas Oficiais Bimestre a Bimestre */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
+        <div className="bg-white rounded-3xl border border-slate-300 shadow-md p-6 md:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
               <div className="flex items-center gap-2">
@@ -838,7 +838,7 @@ const ClassProfile = ({
           ATO 2: TODOS OS VELOCÍMETROS DOS BIMESTRES LADO A LADO
           (COM SLICE GERAL OU INDIVIDUAL POR BIMESTRE)
       ───────────────────────────────────────────────────────────── */}
-      <section ref={ato2Ref} className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
+      <section ref={ato2Ref} className="bg-white rounded-3xl border border-slate-300 shadow-md p-6 md:p-8 space-y-6">
         
         {/* Cabeçalho de Controle de Velocímetros & Slices */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-slate-100">
@@ -882,7 +882,7 @@ const ClassProfile = ({
             </div>
 
             {/* Meta Única Definida pelo Professor */}
-            <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/70 to-cyan-50/70 p-1.5 rounded-2xl border border-slate-200/90 shadow-2xs text-xs">
+            <div className="flex items-center gap-2 bg-gradient-to-r from-amber-50/70 to-cyan-50/70 p-1.5 rounded-2xl border border-slate-300 shadow-md text-xs">
               <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider px-2">
                 Meta Única da Turma:
               </span>
@@ -918,7 +918,7 @@ const ClassProfile = ({
 
         {/* SE MODO SLICE GERAL: PAINEL DE CONTROLE MESTRE SINCRONIZADO */}
         {sliceMode === 'geral' && (
-          <div className="bg-gradient-to-r from-slate-50 via-sky-50/40 to-indigo-50/30 p-5 rounded-3xl border border-slate-200/90 space-y-4">
+          <div className="bg-gradient-to-r from-slate-50 via-sky-50/40 to-indigo-50/30 p-5 rounded-3xl border border-slate-300 shadow-md space-y-4">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest block">
@@ -1012,7 +1012,7 @@ const ClassProfile = ({
 
         {/* SE MODO SLICE INDIVIDUAL: BARRA DE STATUS & SINCRONIZAÇÃO RÁPIDA */}
         {sliceMode === 'individual' && (
-          <div className="bg-gradient-to-r from-slate-50 via-indigo-50/30 to-sky-50/30 p-4 rounded-3xl border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="bg-gradient-to-r from-slate-50 via-indigo-50/30 to-sky-50/30 p-4 rounded-3xl border border-slate-300 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-black text-indigo-700 uppercase tracking-widest bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 rounded-lg">
@@ -1133,7 +1133,7 @@ const ClassProfile = ({
       {/* ─────────────────────────────────────────────────────────────
           ATO 3: O RAIO-X INDIVIDUAL DOS ALUNOS & COLOCAÇÕES
       ───────────────────────────────────────────────────────────── */}
-      <section ref={ato3Ref} className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 md:p-8 space-y-6">
+      <section ref={ato3Ref} className="bg-white rounded-3xl border border-slate-300 shadow-md p-6 md:p-8 space-y-6">
         
         {/* Cabeçalho da Lista com Busca e Explicação */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">

@@ -78,14 +78,14 @@ const SpeedometerGauge = ({
   const ticks = [0, 2, 4, 6, 8, 10];
 
   return (
-    <div className={`w-full rounded-3xl p-4 sm:p-5 border shadow-sm relative overflow-hidden flex flex-col justify-between transition-all ${className} ${
+    <div className={`w-full rounded-3xl p-4 sm:p-5 border shadow-md relative overflow-hidden flex flex-col justify-between transition-all ${className} ${
       isDark
         ? isHighlight
           ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border-indigo-500/50 shadow-indigo-500/10 text-white'
           : 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border-slate-700/80 text-white'
         : isHighlight
-          ? 'bg-gradient-to-br from-white via-sky-50/40 to-indigo-50/30 border-blue-200/90 shadow-md shadow-blue-500/5 text-slate-800 ring-2 ring-blue-500/20'
-          : 'bg-white border-slate-200 shadow-sm text-slate-800'
+          ? 'bg-gradient-to-br from-white via-sky-50/40 to-indigo-50/30 border-blue-300 shadow-md shadow-blue-500/5 text-slate-800 ring-2 ring-blue-500/20'
+          : 'bg-white border-slate-300 shadow-md text-slate-800 hover:border-slate-400 hover:shadow-lg'
     }`}>
       {/* Glow effect */}
       <div className="absolute -top-16 -left-16 w-48 h-48 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />

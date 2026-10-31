@@ -602,7 +602,7 @@ const LowGradesReportModal = ({
         <div className="px-6 sm:px-8 py-3 bg-slate-50/70 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-3 shrink-0">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 flex-1 max-w-4xl">
             {/* KPI 1: Estudantes */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-300 shadow-md flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <Users className="w-4 h-4" />
               </div>
@@ -617,7 +617,7 @@ const LowGradesReportModal = ({
             </div>
 
             {/* KPI 2: Registros */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-300 shadow-md flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
                 <AlertCircle className="w-4 h-4" />
               </div>
@@ -632,7 +632,7 @@ const LowGradesReportModal = ({
             </div>
 
             {/* KPI 3: Maior Incidência */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-300 shadow-md flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
                 <BookOpen className="w-4 h-4" />
               </div>
@@ -647,7 +647,7 @@ const LowGradesReportModal = ({
             </div>
 
             {/* KPI 4: Freq. Média */}
-            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
+            <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-300 shadow-md flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <UserCheck className="w-4 h-4" />
               </div>
@@ -799,7 +799,7 @@ const LowGradesReportModal = ({
         {/* Tabela Rolável com Registros e Cabeçalhos Classificáveis */}
         <div className="flex-1 overflow-auto p-4 sm:p-6 custom-scrollbar">
           {reportRecords.length > 0 ? (
-            <div className="rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs bg-white">
+            <div className="rounded-2xl border border-slate-300 overflow-hidden shadow-md bg-white">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 border-b-2 border-slate-300 text-[10px] font-black text-slate-500 uppercase tracking-wider select-none">
