@@ -623,3 +623,217 @@ export const isNonSubjectHeader = (header) => {
     compact === 'N'
   );
 };
+
+export const getMapaoStudentCount = (conceitoData = [], showOnlyActive = true, targetTurma = 'Todos') => {
+  if (!Array.isArray(conceitoData) || conceitoData.length === 0) return 0;
+
+  const isValidTurma = (t) => {
+    if (!t) return false;
+    const s = String(t).trim();
+    return s !== '' && !s.startsWith('405') && !s.startsWith('406') && s !== 'Sem Turma' && s !== 'Desconhecida';
+  };
+
+  const cleanTargetTurma = (targetTurma && targetTurma !== 'Todos') ? formatTurma(targetTurma) : null;
+
+  const studentsMap = new Map();
+
+  conceitoData.forEach(c => {
+    const norm = normalizeName(c.normalizedName || c.nomeOriginal);
+    if (!norm) return;
+    
+    const formattedTurma = formatTurma(c.turmaPlanilha);
+    // Ignora registros de turmas sabidamente inválidas (ex: turmas de teste 405/406 ou sem turma)
+    if (c.turmaPlanilha && !isValidTurma(formattedTurma)) return;
+
+    const bNum = getBimestreNum(c.bimestre);
+    const situacao = c.situacao || 'Ativo';
+
+    if (!studentsMap.has(norm)) {
+      studentsMap.set(norm, {
+        nomeOriginal: c.nomeOriginal || c.normalizedName,
+        maxBim: bNum,
+        situacao: situacao,
+        turma: formattedTurma || '',
+      });
+    } else {
+      const existing = studentsMap.get(norm);
+      if (bNum > existing.maxBim) {
+        existing.maxBim = bNum;
+        existing.situacao = situacao;
+        if (formattedTurma) existing.turma = formattedTurma;
+      } else if (bNum === existing.maxBim) {
+        if (!isStudentActive(existing.situacao) && isStudentActive(situacao)) {
+          existing.situacao = situacao;
+          if (formattedTurma) existing.turma = formattedTurma;
+        } else if (!existing.turma && formattedTurma) {
+          existing.turma = formattedTurma;
+        }
+      }
+    }
+  });
+
+  let count = 0;
+  studentsMap.forEach(info => {
+    // Se foi selecionada uma turma específica no seletor, filtra por ela
+    if (cleanTargetTurma && info.turma !== cleanTargetTurma) {
+      return;
+    }
+
+    if (showOnlyActive) {
+      if (isStudentActive(info.situacao)) {
+        count++;
+      }
+    } else {
+      count++;
+    }
+  });
+
+  return count;
+};
+
+export const getMapaoCoverageDetails = (conceitoData = [], tutoradosCount = 0, showOnlyActive = true, targetTurma = 'Todos', debugContext = {}) => {
+  if (!Array.isArray(conceitoData) || conceitoData.length === 0) {
+    return null;
+  }
+
+  const turmaStr = targetTurma || 'Todos';
+  const cleanTargetTurma = (turmaStr && turmaStr !== 'Todos') ? formatTurma(turmaStr) : null;
+
+  const isValidTurma = (t) => {
+    if (!t) return false;
+    const s = String(t).trim();
+    return s !== '' && !s.startsWith('405') && !s.startsWith('406') && s !== 'Sem Turma' && s !== 'Desconhecida';
+  };
+
+  const studentsMap = new Map();
+
+  conceitoData.forEach(c => {
+    const norm = normalizeName(c.normalizedName || c.nomeOriginal);
+    if (!norm) return;
+    
+    const formattedTurma = formatTurma(c.turmaPlanilha);
+    if (c.turmaPlanilha && !isValidTurma(formattedTurma)) return;
+
+    const bNum = getBimestreNum(c.bimestre);
+    const situacao = c.situacao || 'Ativo';
+
+    if (!studentsMap.has(norm)) {
+      studentsMap.set(norm, {
+        nomeOriginal: c.nomeOriginal || c.normalizedName,
+        maxBim: bNum,
+        situacao: situacao,
+        turma: formattedTurma || '',
+      });
+    } else {
+      const existing = studentsMap.get(norm);
+      if (bNum > existing.maxBim) {
+        existing.maxBim = bNum;
+        existing.situacao = situacao;
+        if (formattedTurma) existing.turma = formattedTurma;
+      } else if (bNum === existing.maxBim) {
+        if (!isStudentActive(existing.situacao) && isStudentActive(situacao)) {
+          existing.situacao = situacao;
+          if (formattedTurma) existing.turma = formattedTurma;
+        } else if (!existing.turma && formattedTurma) {
+          existing.turma = formattedTurma;
+        }
+      }
+    }
+  });
+
+  const mapaoStudentsList = [];
+  studentsMap.forEach(info => {
+    if (cleanTargetTurma && info.turma !== cleanTargetTurma) return;
+    if (showOnlyActive && !isStudentActive(info.situacao)) return;
+    mapaoStudentsList.push(info);
+  });
+
+  const mapaoCount = mapaoStudentsList.length;
+  const dashboardNorms = new Set((debugContext.sortedData || []).map(s => normalizeName(s.normalizedName || s.nome)));
+  const missing = mapaoStudentsList.filter(m => !dashboardNorms.has(normalizeName(m.nomeOriginal)));
+  const isMatching = debugContext.sortedData ? (missing.length === 0 && mapaoCount === tutoradosCount) : (mapaoCount === tutoradosCount);
+
+  const diagnostico = missing.map(m => {
+    const normM = normalizeName(m.nomeOriginal);
+    const inAll = (debugContext.allStudents || []).find(s => s.normalizedName === normM || normalizeName(s.nome) === normM);
+
+    if (!inAll) {
+      return {
+        aluno: m.nomeOriginal,
+        turmaMapao: m.turma,
+        statusMapao: m.situacao,
+        turmaSistema: 'NÃO INCLUÍDO',
+        statusSistema: '-',
+        causa: 'Não foi inserido no sistema (descartado por turma inválida ou não alocado)',
+        tipoCausa: 'nao_incluido'
+      };
+    }
+
+    const turmaBate = formatTurma(inAll.turma) === (cleanTargetTurma || formatTurma(m.turma));
+    const ativoNoSistema = isStudentActive(inAll.situacao);
+    let causa = '';
+    let tipoCausa = '';
+
+    if (!turmaBate) {
+      const origemTurma = (turmaStr !== 'Todos' && turmaStr) ? turmaStr : (m.turma || 'Mapão');
+      causa = `Alocado da turma "${origemTurma}" para "${inAll.turma}"`;
+      tipoCausa = 'outra_turma';
+    } else if (!ativoNoSistema) {
+      causa = `Classificado como inativo ("${inAll.situacao}") pelo sistema`;
+      tipoCausa = 'inativo';
+    } else {
+      causa = 'Presente como ativo na turma, mas filtrado do dashboard';
+      tipoCausa = 'filtrado';
+    }
+
+    return {
+      aluno: m.nomeOriginal,
+      turmaMapao: m.turma,
+      statusMapao: m.situacao,
+      turmaSistema: inAll.turma,
+      statusSistema: inAll.situacao,
+      causa,
+      tipoCausa
+    };
+  });
+
+  return {
+    isMatching,
+    mapaoCount,
+    tutoradosCount,
+    showOnlyActive,
+    turma: turmaStr,
+    diagnostico
+  };
+};
+
+export const validateMapaoCoverage = (conceitoData = [], tutoradosCount = 0, showOnlyActive = true, targetTurma = 'Todos', debugContext = {}) => {
+  const details = getMapaoCoverageDetails(conceitoData, tutoradosCount, showOnlyActive, targetTurma, debugContext);
+  if (!details) {
+    return { isMatching: false, mapaoCount: 0, tutoradosCount, message: 'Mapão não carregado' };
+  }
+
+  if (details.isMatching) {
+    console.log(`Ok, Todos os alunos do mapão da turma ${details.turma} estão inclusos`);
+  } else {
+    console.warn(
+      `Atenção (Turma: ${details.turma}): Nem todos os alunos do mapão estão inclusos (Mapão: ${details.mapaoCount} vs Tutorados: ${details.tutoradosCount})`
+    );
+
+    if (details.diagnostico && details.diagnostico.length > 0) {
+      console.group(`[TutorDash Diagnóstico] Lista dos ${details.diagnostico.length} alunos divergentes da Turma ${details.turma}`);
+      console.table(details.diagnostico.map(d => ({
+        'Aluno': d.aluno,
+        'Turma Mapão': d.turmaMapao,
+        'Status Mapão': d.statusMapao,
+        'Turma Sistema': d.turmaSistema,
+        'Status Sistema': d.statusSistema,
+        'Causa': d.causa
+      })));
+      console.groupEnd();
+    }
+  }
+
+  return details;
+};
+

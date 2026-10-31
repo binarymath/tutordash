@@ -2,7 +2,7 @@
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // Design Clean, Minimalista e Executivo • Acompanhamento 3º Bimestre
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown,
   Users, GraduationCap, Filter, FileSpreadsheet,
@@ -10,9 +10,10 @@ import {
   TrendingUp, TrendingDown, Minus, Calendar, CheckCircle2,
   Clock, Compass, Info, ChevronDown, ClipboardList
 } from 'lucide-react';
-import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing, isStudentActive } from '../utils/helpers';
+import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing, isStudentActive, validateMapaoCoverage, getMapaoCoverageDetails } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
+import MapaoAuditModal from './MapaoAuditModal';
 
 const SortIcon = ({ columnKey, sortConfig }) => {
   if (sortConfig.key !== columnKey) return <ArrowUpDown className="w-3 h-3 text-slate-300" />;
@@ -154,10 +155,11 @@ const Dashboard = ({
   selectedValue, setSelectedValue, optionsList = [], stats = {},
   searchTerm, setSearchTerm, setSelectedStudent, setSelectedTurma, sortConfig, handleSort,
   showOnlyActive, setShowOnlyActive, rankingStudents, filterLabel, onOpenLowGradesReport,
-  onOpenTraceability
+  onOpenTraceability, conceitoData = []
 }) => {
   const [selectedBimestre, setSelectedBimestre] = useState('3');
   const [showRanking, setShowRanking] = useState(false);
+  const [showMapaoAuditModal, setShowMapaoAuditModal] = useState(false);
   
   // Modos de Visão das Notas:
   // - isMediasOnly: Somente as médias gerais consolidadas (Conselho de Classe e Prova Paulista)
@@ -702,6 +704,31 @@ const Dashboard = ({
     };
   }, [enrichedStudents, selectedBimestre, stats.totalGroups]);
 
+  // ── Auditoria e Validação da Inclusão dos Alunos do Mapão no Dashboard ─────
+  const mapaoCoverage = useMemo(() => {
+    if (!conceitoData || conceitoData.length === 0) return null;
+    const turmaDoSeletor = filterMode === 'turma' ? selectedValue : (selectedValue === 'Todos' ? 'Todos' : null);
+    if (!turmaDoSeletor) return null;
+
+    return getMapaoCoverageDetails(conceitoData, pedagogicalStats.total, showOnlyActive, turmaDoSeletor, {
+      allStudents,
+      sortedData
+    });
+  }, [conceitoData, pedagogicalStats.total, showOnlyActive, selectedValue, filterMode, allStudents, sortedData]);
+
+  useEffect(() => {
+    if (!conceitoData || conceitoData.length === 0) return;
+
+    // Identifica a turma selecionada no seletor (se filterMode for turma, ou 'Todos' no panorama geral)
+    const turmaDoSeletor = filterMode === 'turma' ? selectedValue : (selectedValue === 'Todos' ? 'Todos' : null);
+    if (!turmaDoSeletor) return;
+
+    validateMapaoCoverage(conceitoData, pedagogicalStats.total, showOnlyActive, turmaDoSeletor, {
+      allStudents,
+      sortedData
+    });
+  }, [conceitoData, pedagogicalStats.total, showOnlyActive, selectedValue, filterMode, allStudents, sortedData]);
+
   // Título limpo
   const currentTitle = useMemo(() => {
     if (selectedValue === 'Todos') return 'Panorama Geral da Turma';
@@ -1043,6 +1070,17 @@ const Dashboard = ({
               <p className="text-[11px] text-slate-500 font-medium text-center">
                 {pedagogicalStats.card1Subtitle}
               </p>
+              {mapaoCoverage && mapaoCoverage.diagnostico && mapaoCoverage.diagnostico.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowMapaoAuditModal(true)}
+                  className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 text-center border border-amber-200/80 px-2 py-0.5 rounded-md cursor-pointer transition-all shadow-2xs group"
+                  title="Clique para ver detalhes dos alunos divergentes do Mapão"
+                >
+                  <AlertTriangle className="w-3 h-3 text-amber-600 shrink-0 group-hover:scale-110 transition-transform" />
+                  <span>Mapão: {mapaoCoverage.mapaoCount} • {mapaoCoverage.diagnostico.length} {mapaoCoverage.diagnostico.length === 1 ? 'divergência' : 'divergências'}</span>
+                </button>
+              )}
               {onOpenTraceability && pedagogicalStats.emLancamento > 0 && (
                 <button
                   type="button"
@@ -1528,6 +1566,13 @@ const Dashboard = ({
 
         </div>
       )}
+
+      {/* Modal de Auditoria do Mapão */}
+      <MapaoAuditModal
+        isOpen={showMapaoAuditModal}
+        onClose={() => setShowMapaoAuditModal(false)}
+        mapaoCoverage={mapaoCoverage}
+      />
 
     </div>
   );

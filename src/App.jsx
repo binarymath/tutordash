@@ -1116,6 +1116,7 @@ const App = () => {
             ) : !selectedStudent ? (
               <Dashboard
                 allStudents={allStudents}
+                conceitoData={conceitoData}
                 sortedData={sortedData}
                 filterMode={filterMode}
                 setFilterMode={setFilterMode}
