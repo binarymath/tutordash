@@ -1,59 +1,76 @@
 // ─────────────────────────────────────────────────────────────
 // components/Header.jsx — Header sticky com navegação flutuante
 // ─────────────────────────────────────────────────────────────
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard, ChevronLeft, ChevronRight,
-  RefreshCw, ExternalLink, Settings, Plus
+  RefreshCw, ExternalLink, Settings, Plus, Pencil
 } from 'lucide-react';
+import PromptModal from './PromptModal';
 
 const Header = ({
   selectedStudent, studentProfile, prevStudent, nextStudent,
   setSelectedStudent, isSyncing, onRefresh, config,
-  activeProfile, profiles, onChangeProfile,
+  activeProfile, profiles, onChangeProfile, onRenameProfile,
   onOpenSettings, onOpenLinksModal, showStickyName,
   hasLgpdConsent = true,
   showActions = true
-}) => (
-  <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-    <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 relative">
-      <div className="h-16 flex items-center justify-between">
+}) => {
+  const [renamingProfile, setRenamingProfile] = useState(null);
 
-        {/* Logo e Marca + Seletor de Períodos Isolados */}
-        <div className="flex items-center gap-3">
-          <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-2xl shadow-md shadow-blue-600/20 flex items-center justify-center">
-            <LayoutDashboard className="text-white w-5 h-5" />
-          </div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-black tracking-tight text-slate-900 hidden sm:block">TutorDash</h1>
-            <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100">
-              Gestão Escolar
-            </span>
-          </div>
+  return (
+    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 relative">
+        <div className="h-16 flex items-center justify-between">
 
-          {/* Seletor de Períodos / Ambientes Isolados (quando há mais de um período) */}
-          {hasLgpdConsent && profiles && Object.keys(profiles).length > 1 && (
-            <div className="flex items-center bg-slate-100 p-1 rounded-2xl gap-1 border border-slate-200/80 shadow-2xs ml-1 sm:ml-2">
-              {Object.keys(profiles).map(nome => {
-                const isActive = activeProfile === nome;
-                return (
-                  <button
-                    key={nome}
-                    onClick={() => onChangeProfile && onChangeProfile(nome)}
-                    className={`px-3 py-1 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
-                      isActive
-                        ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90 font-black'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-                    }`}
-                    title={`Alternar para o período ${nome}`}
-                  >
-                    {nome}
-                  </button>
-                );
-              })}
+          {/* Logo e Marca + Seletor de Períodos Isolados */}
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-tr from-blue-600 to-indigo-600 p-2.5 rounded-2xl shadow-md shadow-blue-600/20 flex items-center justify-center">
+              <LayoutDashboard className="text-white w-5 h-5" />
             </div>
-          )}
-        </div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black tracking-tight text-slate-900 hidden sm:block">TutorDash</h1>
+            </div>
+
+            {/* Seletor de Períodos / Ambientes Isolados (quando há mais de um período) */}
+            {hasLgpdConsent && profiles && Object.keys(profiles).length > 1 && (
+              <div className="flex items-center bg-slate-100 p-1 rounded-2xl gap-1 border border-slate-200/80 shadow-2xs ml-1 sm:ml-2">
+                {Object.keys(profiles).map(nome => {
+                  const isActive = activeProfile === nome;
+                  return (
+                    <div key={nome} className="flex items-center group relative">
+                      <button
+                        key={nome}
+                        onClick={() => onChangeProfile && onChangeProfile(nome)}
+                        className={`px-3 py-1 rounded-xl text-xs font-bold transition-all duration-150 cursor-pointer ${
+                          isActive
+                            ? 'bg-white text-blue-700 shadow-xs border border-slate-200/90 font-black'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                        }`}
+                        title={`Alternar para o período ${nome}`}
+                      >
+                        {nome}
+                      </button>
+                      {isActive && onRenameProfile && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRenamingProfile(nome);
+                          }}
+                          className="p-1 -ml-1 text-slate-400 hover:text-blue-600 hover:bg-white/80 rounded-lg transition-all cursor-pointer"
+                          title={`Renomear "${nome}" (Ex: Ensino Médio)`}
+                          aria-label={`Renomear ${nome}`}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
         {/* Navegação flutuante centrada (visível ao rolar ficha de aluno) */}
         {selectedStudent && showStickyName && (
@@ -143,7 +160,29 @@ const Header = ({
         </div>
       </div>
     </div>
+
+    {/* Modal Discreto para Renomear Período */}
+    <PromptModal
+      isOpen={Boolean(renamingProfile)}
+      title="Renomear Período"
+      label="Nome do Período"
+      initialValue={renamingProfile || ''}
+      placeholder="Ex: Ensino Médio"
+      validator={(val) => {
+        if (profiles && profiles[val] && val !== renamingProfile) {
+          return `Já existe um período com o nome "${val}".`;
+        }
+        return null;
+      }}
+      onConfirm={(novoNome) => {
+        if (onRenameProfile && renamingProfile) {
+          onRenameProfile(renamingProfile, novoNome);
+        }
+      }}
+      onClose={() => setRenamingProfile(null)}
+    />
   </header>
-);
+  );
+};
 
 export default Header;

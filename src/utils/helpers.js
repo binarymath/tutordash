@@ -355,6 +355,9 @@ const DISCIPLINA_SIGLAS = {
   TEC: 'Tecnologia',
   RED: 'Redação',
   PV: 'Projeto de Vida',
+  FIN: 'Educação Financeira',
+  EDFIN: 'Educação Financeira',
+  FINANCEIRA: 'Educação Financeira',
 };
 
 // Expande apenas siglas (CIE → Ciências). Qualquer outro nome é devolvido intacto.
@@ -388,6 +391,40 @@ export const formatDisciplina = (nome) => {
   return nome;
 };
 
+// Normaliza o nome/sigla de uma disciplina para comparação segura entre gráficos e tabelas
+export const normalizeDiscKey = (name) => {
+  if (!name) return '';
+  const expanded = expandSiglaDisciplina(name);
+  const formatted = formatDisciplina(expanded);
+  return String(formatted || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+};
+
+// Encontra a disciplina correspondente em uma lista de opções normalizando siglas e acentos
+export const findMatchingDisciplina = (target, list = []) => {
+  if (!target || target === 'Geral' || String(target).toLowerCase().includes('geral') || target === 'ALL') {
+    return 'ALL';
+  }
+  const normTarget = normalizeDiscKey(target);
+  if (!normTarget) return 'ALL';
+
+  // 1. Match exato normalizado
+  const exact = list.find(d => normalizeDiscKey(d) === normTarget);
+  if (exact) return exact;
+
+  // 2. Um contém o outro (ex: "EDUCACAO FINANCEIRA" e "FIN")
+  const partial = list.find(d => {
+    const normD = normalizeDiscKey(d);
+    return normD && (normTarget.includes(normD) || normD.includes(normTarget));
+  });
+  if (partial) return partial;
+
+  return 'ALL';
+};
+
 export const formatTurma = (turma) => {
   if (!turma) return '';
   let str = String(turma).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
@@ -417,6 +454,18 @@ export const formatTurma = (turma) => {
   }
   
   return str.trim();
+};
+
+// Formata a turma para exibição visual separando número e letra (ex: "1A" -> "1 A", "Turma 1A" -> "1 A")
+export const formatTurmaDisplay = (turma) => {
+  if (!turma) return '';
+  const norm = formatTurma(turma);
+  if (!norm) return '';
+  const match = norm.match(/^(\d+)([A-Z]+)$/);
+  if (match) {
+    return `${match[1]} ${match[2]}`;
+  }
+  return norm;
 };
 
 export const getSerieFromTurma = (turma) => {

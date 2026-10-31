@@ -602,7 +602,7 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
     fireEvent.click(screen.getByText('Frequência Geral'));
   });
 
-  it('aplica tag verde para frequência a partir de 75% e vermelha abaixo de 75%', () => {
+  it('aplica tag azul para frequência a partir de 75% e vermelha abaixo de 75%', () => {
     const studentVerde = {
       ...studentComHistoricos,
       nome: 'Aluno Verde',
@@ -627,8 +627,8 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
     fireEvent.click(screen.getByRole('button', { name: /conselho de classe/i }));
 
     const badgeVerde = screen.getByText('75%');
-    expect(badgeVerde).toHaveClass('text-emerald-700');
-    expect(badgeVerde).toHaveClass('bg-emerald-50');
+    expect(badgeVerde).toHaveClass('text-blue-700');
+    expect(badgeVerde).toHaveClass('bg-blue-50');
 
     const badgeVermelho = screen.getByText('74.9%');
     expect(badgeVermelho).toHaveClass('text-rose-700');

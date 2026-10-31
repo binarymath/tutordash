@@ -888,7 +888,7 @@ const Dashboard = ({
                   )}
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded ml-auto border ${
                     isStudentActive(s.situacao)
-                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
                       : 'bg-rose-50 text-rose-700 border-rose-200'
                   }`}>
                     {s.situacao}
@@ -1285,9 +1285,9 @@ const Dashboard = ({
               <button
                 onClick={handleExportExcel}
                 title="Baixar Tabela com Linha do Tempo em Excel"
-                className="px-3.5 py-1.5 text-slate-700 hover:text-emerald-700 bg-white hover:bg-emerald-50 rounded-xl transition-all border border-slate-200 hover:border-emerald-300 flex items-center justify-center gap-1.5 shadow-2xs text-xs font-semibold cursor-pointer"
+                className="px-3.5 py-1.5 text-slate-700 hover:text-blue-700 bg-white hover:bg-blue-50 rounded-xl transition-all border border-slate-200 hover:border-blue-300 flex items-center justify-center gap-1.5 shadow-2xs text-xs font-semibold cursor-pointer"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
                 <span>Baixar Excel</span>
               </button>
 
@@ -1551,7 +1551,7 @@ const Dashboard = ({
                                   num == null 
                                     ? 'text-slate-400 bg-slate-50 border-slate-200'
                                     : num >= 75
-                                      ? 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                      ? 'text-blue-700 bg-blue-50 border-blue-200'
                                       : 'text-rose-700 bg-rose-50 border-rose-200'
                                 }`}>
                                   {display}

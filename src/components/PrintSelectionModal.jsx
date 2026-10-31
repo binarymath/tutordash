@@ -264,6 +264,11 @@ const PrintSelectionModal = ({
           }
         }
         @media print {
+          html, body {
+            background: #ffffff !important;
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+          }
           body > *:not(#${containerId}):not(script):not(style) {
             display: none !important;
           }

@@ -44,7 +44,7 @@ const PrivacyPolicyModal = ({ isOpen, onClose }) => {
           <div className="space-y-4">
             <div>
               <h4 className="font-bold text-slate-800 text-sm mb-1.5 flex items-center gap-2">
-                <UserCheck className="w-4 h-4 text-emerald-600" />
+                <UserCheck className="w-4 h-4 text-blue-600" />
                 1. Tratamento de Dados de Menores (Art. 14 da LGPD)
               </h4>
               <p className="text-xs text-slate-600">
@@ -82,7 +82,7 @@ const PrivacyPolicyModal = ({ isOpen, onClose }) => {
               </p>
             </div>
 
-            <div className="p-3.5 bg-emerald-50/60 rounded-2xl border border-emerald-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="p-3.5 bg-blue-50/60 rounded-2xl border border-blue-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div>
                 <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider mb-0.5">Canal de Atendimento & Dúvidas LGPD (Art. 41)</h4>
                 <p className="text-xs text-slate-600">Para dúvidas sobre privacidade, suporte ou tratamento pedagógico de dados, entre em contato direto:</p>

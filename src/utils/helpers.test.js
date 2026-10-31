@@ -18,6 +18,9 @@ import {
   getMapaoStudentCount,
   validateMapaoCoverage,
   getMapaoCoverageDetails,
+  normalizeDiscKey,
+  findMatchingDisciplina,
+  formatTurmaDisplay,
 } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -168,6 +171,33 @@ describe('formatTurma', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// formatTurmaDisplay
+// ─────────────────────────────────────────────────────────────────────────────
+describe('formatTurmaDisplay', () => {
+  it('converte "1A" ou "Turma 1A" para "1 A"', () => {
+    expect(formatTurmaDisplay('1A')).toBe('1 A');
+    expect(formatTurmaDisplay('Turma 1A')).toBe('1 A');
+    expect(formatTurmaDisplay('turma 1a')).toBe('1 A');
+  });
+
+  it('converte outras turmas separando número e letra', () => {
+    expect(formatTurmaDisplay('6A')).toBe('6 A');
+    expect(formatTurmaDisplay('3E')).toBe('3 E');
+    expect(formatTurmaDisplay('9B')).toBe('9 B');
+    expect(formatTurmaDisplay('1 A')).toBe('1 A');
+  });
+
+  it('retorna string vazia para entrada vazia ou nula', () => {
+    expect(formatTurmaDisplay('')).toBe('');
+    expect(formatTurmaDisplay(null)).toBe('');
+  });
+
+  it('trata "SEM TURMA" corretamente', () => {
+    expect(formatTurmaDisplay('Sem Turma')).toBe('SEM TURMA');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // parseGrade
 // ─────────────────────────────────────────────────────────────────────────────
 describe('parseGrade', () => {
@@ -300,6 +330,59 @@ describe('formatDisciplina', () => {
   it('não altera nomes que apenas contêm uma sigla', () => {
     expect(formatDisciplina('Geometria')).toBe('Geometria');
     expect(formatDisciplina('Física Aplicada')).toBe('Física Aplicada');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// normalizeDiscKey & findMatchingDisciplina
+// ─────────────────────────────────────────────────────────────────────────────
+describe('normalizeDiscKey', () => {
+  it('expande e normaliza siglas para chave alfanumérica limpa', () => {
+    expect(normalizeDiscKey('FIN')).toBe('EDUCACAOFINANCEIRA');
+    expect(normalizeDiscKey('EDUCAÇÃO FINANCEIRA')).toBe('EDUCACAOFINANCEIRA');
+    expect(normalizeDiscKey('Matemática')).toBe('MATEMATICA');
+    expect(normalizeDiscKey('MATEMÁTICA')).toBe('MATEMATICA');
+    expect(normalizeDiscKey('Língua Portuguesa')).toBe('LINGUAPORTUGUESA');
+    expect(normalizeDiscKey('LÍNGUA PORTUGUESA')).toBe('LINGUAPORTUGUESA');
+  });
+
+  it('retorna string vazia para entrada vazia ou nula', () => {
+    expect(normalizeDiscKey('')).toBe('');
+    expect(normalizeDiscKey(null)).toBe('');
+  });
+});
+
+describe('findMatchingDisciplina', () => {
+  const tableList = ['BIOLOGIA', 'EDUCAÇÃO FINANCEIRA', 'FILOSOFIA', 'FÍSICA', 'MATEMÁTICA', 'QUÍMICA'];
+
+  it('retorna ALL quando o alvo for Geral ou vazio', () => {
+    expect(findMatchingDisciplina('Geral', tableList)).toBe('ALL');
+    expect(findMatchingDisciplina('🌟 Média Geral', tableList)).toBe('ALL');
+    expect(findMatchingDisciplina('ALL', tableList)).toBe('ALL');
+    expect(findMatchingDisciplina('', tableList)).toBe('ALL');
+  });
+
+  it('encontra disciplina correspondente via sigla no topo (FIN -> EDUCAÇÃO FINANCEIRA)', () => {
+    expect(findMatchingDisciplina('FIN', tableList)).toBe('EDUCAÇÃO FINANCEIRA');
+    expect(findMatchingDisciplina('Educação Financeira', tableList)).toBe('EDUCAÇÃO FINANCEIRA');
+  });
+
+  it('encontra disciplina correspondente ignorando acentos e caixa alta', () => {
+    expect(findMatchingDisciplina('Matemática', tableList)).toBe('MATEMÁTICA');
+    expect(findMatchingDisciplina('matematica', tableList)).toBe('MATEMÁTICA');
+    expect(findMatchingDisciplina('Física', tableList)).toBe('FÍSICA');
+    expect(findMatchingDisciplina('Biologia', tableList)).toBe('BIOLOGIA');
+  });
+
+  it('faz mapeamento reverso de tabela para lista do topo', () => {
+    const topList = ['Geral', 'Biologia', 'FIN', 'Filosofia', 'Física', 'Matemática'];
+    expect(findMatchingDisciplina('EDUCAÇÃO FINANCEIRA', topList)).toBe('FIN');
+    expect(findMatchingDisciplina('MATEMÁTICA', topList)).toBe('Matemática');
+    expect(findMatchingDisciplina('ALL', topList)).toBe('ALL');
+  });
+
+  it('retorna ALL se a disciplina não existir na lista', () => {
+    expect(findMatchingDisciplina('Artes Cênicas', tableList)).toBe('ALL');
   });
 });
 

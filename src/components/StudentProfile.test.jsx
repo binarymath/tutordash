@@ -202,12 +202,12 @@ describe('StudentProfile — navegação', () => {
     expect(setSelectedStudent).toHaveBeenCalledWith(prev);
   });
 
-  it('mantém a navegação disponível com a sidebar expandida', () => {
+  it('mantém a navegação disponível com o accordion de anotações expandido', () => {
     const setSelectedStudent = vi.fn();
     const next = { nome: 'Maria' };
     render(<StudentProfile {...defaultProps} nextStudent={next} setSelectedStudent={setSelectedStudent} />);
 
-    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
+    fireEvent.click(screen.getByRole('button', { name: /expandir anotações/i }));
     fireEvent.click(screen.getByText('Próximo').closest('button'));
 
     expect(setSelectedStudent).toHaveBeenCalledWith(next);
@@ -215,92 +215,86 @@ describe('StudentProfile — navegação', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Seção de Anotações (toggle + conteúdo)
+// Seção Hero: Resumo do Período (3 cards com contorno cinza)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('StudentProfile — cards de resumo (hero)', () => {
+  it('renderiza os três cards de resumo com a card de frequência total', () => {
+    const profile = makeProfile({
+      frequenciaMedia: 88.5,
+      totalFaltas: 6,
+    });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
+
+    expect(screen.getAllByText(/Conselho Bimestral/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Prova Paulista/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Frequência Total/i)).toBeInTheDocument();
+    expect(screen.getByText('88.5%')).toBeInTheDocument();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seção de Anotações (accordion toggle + conteúdo)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('StudentProfile — seção de anotações', () => {
-  it('exibe o botão "Anotações e Sessões"', () => {
+  it('exibe o botão "Anotações"', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/anotações e sessões/i)).toBeInTheDocument();
+    expect(screen.getByText(/^Anotações$/i)).toBeInTheDocument();
   });
 
   it('exibe mensagem "não possui anotações" quando notes é vazio e seção está aberta', () => {
     const profile = makeProfile({ notes: [] });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[]} />);
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[]} defaultOpenNotes={true} />);
     expect(screen.getByText(/este aluno ainda não possui anotações/i)).toBeInTheDocument();
   });
 
-  it('exibe notas quando filteredNotes está preenchido', () => {
+  it('exibe notas quando filteredNotes está preenchido e accordion está aberto', () => {
     const note = makeNote();
     const profile = makeProfile({ notes: [note] });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} />);
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} defaultOpenNotes={true} />);
     expect(screen.getByText(/aluno muito participativo/i)).toBeInTheDocument();
   });
 
   it('exibe nota sem descrição quando note está vazio', () => {
     const note = makeNote({ note: '' });
     const profile = makeProfile({ notes: [note] });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} />);
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} defaultOpenNotes={true} />);
     expect(screen.getByText(/registo sem descrição/i)).toBeInTheDocument();
   });
 
   it('exibe badge de tipo de sessão na nota', () => {
     const note = makeNote({ tipoSessao: 'Orientação' });
     const profile = makeProfile({ notes: [note] });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} />);
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} defaultOpenNotes={true} />);
     expect(screen.getByText('Orientação')).toBeInTheDocument();
   });
 
   it('exibe mensagem "sem anotações para este filtro" quando notes tem dados mas filteredNotes está vazio', () => {
     const note = makeNote();
     const profile = makeProfile({ notes: [note] });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[]} />);
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[]} defaultOpenNotes={true} />);
     expect(screen.getByText(/sem anotações registradas para este filtro/i)).toBeInTheDocument();
   });
 
-  it('mantém as ocorrências visíveis e exibe somente um botão de expansão', () => {
-    render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/este aluno ainda não possui anotações/i)).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /expandir sidebar lateralmente/i })).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: /recolher sidebar de ocorrências/i })).not.toBeInTheDocument();
+  it('permite abrir e fechar o accordion de anotações', () => {
+    const note = makeNote();
+    const profile = makeProfile({ notes: [note] });
+    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={[note]} />);
+
+    // Por padrão o accordion começa recolhido
+    expect(screen.queryByText(/aluno muito participativo/i)).not.toBeInTheDocument();
+
+    // Clica para expandir
+    fireEvent.click(screen.getByRole('button', { name: /expandir anotações/i }));
+    expect(screen.getByText(/aluno muito participativo/i)).toBeInTheDocument();
+
+    // Clica para recolher
+    fireEvent.click(screen.getByRole('button', { name: /recolher anotações/i }));
+    expect(screen.queryByText(/aluno muito participativo/i)).not.toBeInTheDocument();
   });
 
-  it('bloqueia a rolagem do fundo ao expandir a sidebar', () => {
-    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {});
-    render(<StudentProfile {...defaultProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
-
-    expect(scrollTo).not.toHaveBeenCalled();
-    expect(document.body.style.overflow).toBe('hidden');
-    expect(screen.getByRole('button', { name: /fechar sidebar expandida/i })).toBeInTheDocument();
-    expect(screen.getByText('Fechar')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /fechar sidebar expandida/i }));
-    expect(document.body.style.overflow).toBe('');
-    scrollTo.mockRestore();
-  });
-
-  it('exibe a impressora à esquerda de Fechar na sidebar expandida', () => {
-    render(<StudentProfile {...defaultProps} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
-
-    const printButton = screen.getByRole('button', { name: /imprimir anotações e sessões/i });
-    const closeButton = screen.getByRole('button', { name: /fechar sidebar expandida/i });
-    expect(printButton).toBeInTheDocument();
-    expect(printButton.compareDocumentPosition(closeButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it('mostra o nome e a navegação dentro da sidebar expandida', () => {
-    const next = { nome: 'Maria Oliveira' };
-    const setSelectedStudent = vi.fn();
-    render(<StudentProfile {...defaultProps} nextStudent={next} setSelectedStudent={setSelectedStudent} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /expandir sidebar lateralmente/i }));
-
-    expect(screen.getByText('Perfil do estudante')).toBeInTheDocument();
-    expect(screen.getAllByText('João Silva').length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByText('Próximo').closest('button'));
-    expect(setSelectedStudent).toHaveBeenCalledWith(next);
+  it('exibe botão de impressão quando o accordion está aberto', () => {
+    render(<StudentProfile {...defaultProps} defaultOpenNotes={true} />);
+    expect(screen.getByRole('button', { name: /imprimir anotações/i })).toBeInTheDocument();
   });
 });
 
@@ -315,6 +309,7 @@ describe('StudentProfile — filtros de sessão', () => {
     render(
       <StudentProfile
         {...defaultProps}
+        defaultOpenNotes={true}
         studentProfile={profile}
         filteredNotes={[note]}
         studentSessions={['Tutoria', 'Orientação']}
@@ -331,10 +326,12 @@ describe('StudentProfile — filtros de sessão', () => {
     render(
       <StudentProfile
         {...defaultProps}
+        defaultOpenNotes={true}
         studentProfile={profile}
         filteredNotes={[note]}
         studentSessions={['Tutoria']}
         studentSessionCounts={{ Tutoria: 1 }}
+        selectedSessionFilters={['Tutoria']}
       />
     );
     expect(screen.getByText(/limpar filtros/i)).toBeInTheDocument();
@@ -347,10 +344,12 @@ describe('StudentProfile — filtros de sessão', () => {
     render(
       <StudentProfile
         {...defaultProps}
+        defaultOpenNotes={true}
         studentProfile={profile}
         filteredNotes={[note]}
         studentSessions={['Tutoria']}
         studentSessionCounts={{ Tutoria: 1 }}
+        selectedSessionFilters={['Tutoria']}
         setSelectedSessionFilters={setSelectedSessionFilters}
       />
     );
@@ -364,6 +363,7 @@ describe('StudentProfile — filtros de sessão', () => {
     render(
       <StudentProfile
         {...defaultProps}
+        defaultOpenNotes={true}
         studentProfile={profile}
         filteredNotes={[note]}
         studentSessions={['Tutoria']}
@@ -388,7 +388,7 @@ describe('StudentProfile — período das ocorrências', () => {
       makeNote({ id: 'after', displayDate: '21/04/2024', note: 'Depois do período.' }),
     ];
     const profile = makeProfile({ notes });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={notes} />);
+    render(<StudentProfile {...defaultProps} defaultOpenNotes={true} studentProfile={profile} filteredNotes={notes} />);
 
     fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-10' } });
     fireEvent.change(screen.getByLabelText('Data final das ocorrências'), { target: { value: '2024-04-20' } });
@@ -402,7 +402,7 @@ describe('StudentProfile — período das ocorrências', () => {
   it('limpa o período selecionado e restaura as ocorrências', () => {
     const notes = [makeNote({ displayDate: '10/04/2024' }), makeNote({ id: 'later', displayDate: '20/04/2024', note: 'Registro posterior.' })];
     const profile = makeProfile({ notes });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} filteredNotes={notes} />);
+    render(<StudentProfile {...defaultProps} defaultOpenNotes={true} studentProfile={profile} filteredNotes={notes} />);
 
     fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-20' } });
     expect(screen.queryByText('Aluno muito participativo na sessão de hoje.')).not.toBeInTheDocument();
@@ -413,7 +413,7 @@ describe('StudentProfile — período das ocorrências', () => {
   });
 
   it('informa quando o intervalo é inválido', () => {
-    render(<StudentProfile {...defaultProps} studentProfile={makeProfile({ notes: [makeNote()] })} />);
+    render(<StudentProfile {...defaultProps} defaultOpenNotes={true} studentProfile={makeProfile({ notes: [makeNote()] })} />);
 
     fireEvent.change(screen.getByLabelText('Data inicial das ocorrências'), { target: { value: '2024-04-20' } });
     fireEvent.change(screen.getByLabelText('Data final das ocorrências'), { target: { value: '2024-04-10' } });
@@ -426,92 +426,18 @@ describe('StudentProfile — período das ocorrências', () => {
 // Seção Prova Paulista (toggle)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('StudentProfile — Prova Paulista', () => {
-  it('exibe o botão "Prova Paulista"', () => {
+  it('exibe o card da "Prova Paulista"', () => {
     render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/prova paulista/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/prova paulista/i).length).toBeGreaterThan(0);
   });
 
-  it('expande e exibe o valor ao clicar no toggle da Prova Paulista', () => {
+  it('exibe o valor no card da Prova Paulista', () => {
     const profile = makeProfile({ provaPaulista: '85%' });
     render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    // Procura o botão da Prova Paulista pelo texto
-    const ppBtn = screen.getByText(/prova paulista/i).closest('button');
-    fireEvent.click(ppBtn);
     expect(screen.getByText('85%')).toBeInTheDocument();
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Seção Evolutivo Numérico
-// ─────────────────────────────────────────────────────────────────────────────
-describe('StudentProfile — Evolutivo Numérico', () => {
-  it('exibe o botão de Evolução Comparativa', () => {
-    render(<StudentProfile {...defaultProps} />);
-    expect(screen.getByText(/Evolução Comparativa/i)).toBeInTheDocument();
-  });
-
-  it('exibe mensagem "sem dados bimestrais" quando historicoConceitos é vazio no modo evolutivo', () => {
-    render(<StudentProfile {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
-    expect(screen.getByText(/sem dados bimestrais disponíveis/i)).toBeInTheDocument();
-  });
-
-  it('renderiza EvolutivoNumerico quando há historicoConceitos', () => {
-    const profile = makeProfile({
-      historicoConceitos: [
-        makeBimestre('1º Bimestre'),
-        makeBimestre('2º Bimestre', { notas: { 'Matemática': '9', 'Português': '8' } }),
-      ],
-    });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
-    expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
-  });
-
-  it('renderiza EvolutivoNumerico com disciplinas de risco (< 5.0)', () => {
-    const profile = makeProfile({
-      historicoConceitos: [
-        makeBimestre('1º Bimestre', { notas: { 'Matemática': '3', 'Português': '7' } }),
-      ],
-    });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
-    expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
-  });
-
-  it('renderiza EvolutivoNumerico com faltas', () => {
-    const profile = makeProfile({
-      historicoConceitos: [
-        makeBimestre('1º Bimestre', { tfBimestre: '5', freqBimestre: '80%' }),
-      ],
-    });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
-    const body = document.body.textContent;
-    const hasAttendance = /faltas|frequ/i.test(body);
-    expect(hasAttendance).toBe(true);
-  });
-
-  it('renderiza EvolutivoNumerico com diferentes áreas de conhecimento', () => {
-    const profile = makeProfile({
-      historicoConceitos: [
-        makeBimestre('1º Bimestre', {
-          notas: {
-            'Matemática': '8',
-            'Língua Portuguesa': '7',
-            'História': '9',
-            'Ciências': '8',
-            'OE Matemática': '6',
-            'Disciplina Nova': '7',
-          },
-        }),
-      ],
-    });
-    render(<StudentProfile {...defaultProps} studentProfile={profile} />);
-    fireEvent.click(screen.getByText(/Evolução Comparativa/i));
-    expect(screen.getByText(/pontos de atenção/i)).toBeInTheDocument();
-  });
-});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seção de Gráficos

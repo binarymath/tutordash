@@ -475,7 +475,7 @@ const LowGradesReportModal = ({
     s.textContent = `
       @media print{
         @page{size:A4 portrait;margin:8mm 10mm}
-        html,body{margin:0;padding:0;height:auto;overflow:visible}
+        html,body{margin:0;padding:0;height:auto;overflow:visible;background:#ffffff!important;background-color:#ffffff!important;color:#0f172a!important}
         body>*:not(#${PID}){display:none!important}
         #${PID}{display:block!important;width:100%;font-family:system-ui,-apple-system,sans-serif;font-size:9.5px;color:#0f172a;background:#fff;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
         #${PID} *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;box-sizing:border-box}
@@ -574,8 +574,8 @@ const LowGradesReportModal = ({
                   </span>
                 )}
                 {selectedTutor !== 'Todos' && (
-                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
-                    <UserCheck className="w-3 h-3 text-emerald-600" /> Tutor: {selectedTutor}
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/60 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-blue-600" /> Tutor: {selectedTutor}
                   </span>
                 )}
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60">
@@ -648,7 +648,7 @@ const LowGradesReportModal = ({
 
             {/* KPI 4: Freq. Média */}
             <div className="bg-white px-3.5 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                 <UserCheck className="w-4 h-4" />
               </div>
               <div>
@@ -669,7 +669,7 @@ const LowGradesReportModal = ({
               disabled={reportRecords.length === 0}
               className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white text-slate-700 font-bold text-xs hover:bg-slate-50 hover:border-slate-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs cursor-pointer"
             >
-              <TableIcon className="w-3.5 h-3.5 text-emerald-600" />
+              <TableIcon className="w-3.5 h-3.5 text-blue-600" />
               <span>Exportar Excel</span>
             </button>
             <button
@@ -739,7 +739,7 @@ const LowGradesReportModal = ({
           {/* Seletor 4: Tutor */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-              <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> Tutor
+              <UserCheck className="w-3.5 h-3.5 text-blue-600" /> Tutor
             </label>
             <select
               aria-label="Filtrar por tutor"
