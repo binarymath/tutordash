@@ -17,12 +17,16 @@ const LowGradesReportModal = ({
   onClose,
   onSelectStudent,
   initialPeriod = 'Média Geral',
-  initialTurma = 'Todas'
+  initialTurma = 'Todas',
+  initialTutor = 'Todos'
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState(initialPeriod);
   const [selectedDiscipline, setSelectedDiscipline] = useState('Todas');
   const [selectedTurma, setSelectedTurma] = useState(() => {
     return initialTurma && initialTurma !== 'Todas' ? String(initialTurma).trim() : 'Todas';
+  });
+  const [selectedTutor, setSelectedTutor] = useState(() => {
+    return initialTutor && initialTutor !== 'Todos' ? String(initialTutor).trim() : 'Todos';
   });
   const [removeMissing, setRemoveMissing] = useState(true); // false = mostra sem nota por padrão; true = remove sem nota
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,16 +45,21 @@ const LowGradesReportModal = ({
     }
   };
 
-  // ── Coletar apenas bimestres com nota lançada, disciplinas e turmas ────────
-  const { availablePeriods, availableDisciplines, availableTurmas } = useMemo(() => {
+  // ── Coletar apenas bimestres com nota lançada, disciplinas, turmas e tutores ────────
+  const { availablePeriods, availableDisciplines, availableTurmas, availableTutores } = useMemo(() => {
     const bimSet = new Set();
     const discSet = new Set();
     const turmaSet = new Set();
+    const tutorSet = new Set();
 
     allStudents.forEach(s => {
       if (!isStudentActive(s.situacao)) return;
       const tClean = String(s.turma || '').trim();
       if (tClean) turmaSet.add(tClean);
+      const tutorClean = String(s.tutor || '').trim();
+      if (tutorClean && tutorClean !== '-') {
+        tutorSet.add(tutorClean);
+      }
       const hist = s.historicoConceitos || [];
       hist.forEach(b => {
         const bFormatted = formatBimestre(b.bimestre);
@@ -79,12 +88,17 @@ const LowGradesReportModal = ({
       a.localeCompare(b, 'pt-BR')
     );
 
+    const tutoresSorted = Array.from(tutorSet).sort((a, b) => 
+      a.localeCompare(b, 'pt-BR')
+    );
+
     const periodsSorted = ['Média Geral', ...Array.from(bimSet).sort()];
 
     return {
       availablePeriods: periodsSorted,
       availableDisciplines: ['Todas', ...discSorted],
-      availableTurmas: ['Todas', ...turmasSorted]
+      availableTurmas: ['Todas', ...turmasSorted],
+      availableTutores: ['Todos', ...tutoresSorted]
     };
   }, [allStudents]);
 
@@ -110,10 +124,26 @@ const LowGradesReportModal = ({
     }
   }, [initialTurma, availableTurmas]);
 
+  // Sincronizar tutor inicial com os tutores disponíveis na montagem/atualização
+  useEffect(() => {
+    if (!initialTutor || initialTutor === 'Todos') {
+      setSelectedTutor('Todos');
+      return;
+    }
+    const cleanTarget = String(initialTutor).trim().toLowerCase();
+    const matched = availableTutores.find(t => t.toLowerCase() === cleanTarget);
+    if (matched) {
+      setSelectedTutor(matched);
+    } else {
+      setSelectedTutor(String(initialTutor).trim());
+    }
+  }, [initialTutor, availableTutores]);
+
   // ── Extração, Filtragem e Ordenação unificadas e rigorosas ────────────────
   const reportRecords = useMemo(() => {
     const records = [];
     const targetTurmaClean = String(selectedTurma || '').trim().toLowerCase();
+    const targetTutorClean = String(selectedTutor || '').trim().toLowerCase();
     const targetSearchClean = String(searchTerm || '').trim().toLowerCase();
 
     const formatFreqSafe = (val) => {
@@ -127,6 +157,8 @@ const LowGradesReportModal = ({
       if (!isStudentActive(s.situacao)) return;
       const turmaAluno = String(s.turma || '').trim().toLowerCase();
       if (targetTurmaClean !== 'todas' && turmaAluno !== targetTurmaClean) return;
+      const tutorAluno = String(s.tutor || '').trim().toLowerCase();
+      if (targetTutorClean !== 'todos' && tutorAluno !== targetTutorClean) return;
       if (targetSearchClean && !String(s.nome || '').toLowerCase().includes(targetSearchClean)) return;
 
       const hist = s.historicoConceitos || [];
@@ -318,7 +350,7 @@ const LowGradesReportModal = ({
 
       return a.aluno.localeCompare(b.aluno, 'pt-BR');
     });
-  }, [allStudents, selectedTurma, selectedDiscipline, selectedPeriod, searchTerm, availableDisciplines, removeMissing, sortColumn, sortDirection]);
+  }, [allStudents, selectedTurma, selectedTutor, selectedDiscipline, selectedPeriod, searchTerm, availableDisciplines, removeMissing, sortColumn, sortDirection]);
 
   // ── Estatísticas e Indicadores Rápidos do Relatório ────────────────────────
   const stats = useMemo(() => {
@@ -541,6 +573,11 @@ const LowGradesReportModal = ({
                     Turma {selectedTurma}
                   </span>
                 )}
+                {selectedTutor !== 'Todos' && (
+                  <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-emerald-600" /> Tutor: {selectedTutor}
+                  </span>
+                )}
                 <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200/60">
                   {selectedPeriod}
                 </span>
@@ -647,7 +684,7 @@ const LowGradesReportModal = ({
         </div>
 
         {/* Barra de Filtros e Controles Integrada */}
-        <div className="px-6 sm:px-8 py-3.5 bg-white border-b border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 shrink-0 items-end">
+        <div className="px-6 sm:px-8 py-3.5 bg-white border-b border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 shrink-0 items-end">
           {/* Seletor 1: Período */}
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
@@ -695,6 +732,23 @@ const LowGradesReportModal = ({
             >
               {availableTurmas.map(t => (
                 <option key={t} value={t}>{t === 'Todas' ? 'Todas as Turmas' : `Turma ${t}`}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Seletor 4: Tutor */}
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> Tutor
+            </label>
+            <select
+              aria-label="Filtrar por tutor"
+              value={selectedTutor}
+              onChange={e => setSelectedTutor(e.target.value)}
+              className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all cursor-pointer"
+            >
+              {availableTutores.map(t => (
+                <option key={t} value={t}>{t === 'Todos' ? 'Todos os Tutores' : t}</option>
               ))}
             </select>
           </div>
@@ -926,7 +980,7 @@ const LowGradesReportModal = ({
                 Nenhum estudante em situação de risco encontrado
               </h3>
               <p className="text-xs text-slate-500 font-medium max-w-md mt-1">
-                Com o filtro atual ({selectedPeriod} • {selectedDiscipline} • Turma {selectedTurma}), não foram identificados alunos com nota &lt; 5,0 {!removeMissing ? 'ou sem nota' : ''}.
+                Com o filtro atual ({selectedPeriod} • {selectedDiscipline} • Turma {selectedTurma}{selectedTutor !== 'Todos' ? ` • Tutor ${selectedTutor}` : ''}), não foram identificados alunos com nota &lt; 5,0 {!removeMissing ? 'ou sem nota' : ''}.
               </p>
             </div>
           )}

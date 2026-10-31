@@ -12,7 +12,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
-import { formatDisciplina, parseGrade, toScale10 } from '../utils/helpers';
+import { formatDisciplina, parseGrade, toScale10, isStudentActive } from '../utils/helpers';
 import { buildChartDataMapao, buildChartDataProva } from '../utils/buildChartData';
 import PrintSelectionModal from './PrintSelectionModal';
 
@@ -2093,7 +2093,7 @@ const StudentProfile = ({
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-3xl font-black text-slate-800">{studentProfile.nome}</h2>
           <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-widest ${
-            studentProfile.situacao === 'Ativo'
+            isStudentActive(studentProfile.situacao)
               ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
               : 'border-rose-200 bg-rose-50 text-rose-600'
           }`}>

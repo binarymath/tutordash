@@ -2,7 +2,7 @@
 // components/Dashboard.jsx — Vista principal de tutores/turmas
 // Design Clean, Minimalista e Executivo • Acompanhamento 3º Bimestre
 // ─────────────────────────────────────────────────────────────
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Search, X, UserCheck, ArrowUpDown, ArrowUp, ArrowDown,
   Users, GraduationCap, Filter, FileSpreadsheet,
@@ -716,18 +716,29 @@ const Dashboard = ({
     });
   }, [conceitoData, pedagogicalStats.total, showOnlyActive, selectedValue, filterMode, allStudents, sortedData]);
 
+  // ── Auditoria e Validação da Inclusão dos Alunos do Mapão no Dashboard ─────
+  // O console é mantido limpo (sem logs desnecessários em operação normal).
+  // Apenas emite aviso pontual se houver divergência real de alunos do Mapão.
+  const lastWarnedDivergenceRef = useRef('');
   useEffect(() => {
     if (!conceitoData || conceitoData.length === 0) return;
 
-    // Identifica a turma selecionada no seletor (se filterMode for turma, ou 'Todos' no panorama geral)
     const turmaDoSeletor = filterMode === 'turma' ? selectedValue : (selectedValue === 'Todos' ? 'Todos' : null);
     if (!turmaDoSeletor) return;
 
-    validateMapaoCoverage(conceitoData, pedagogicalStats.total, showOnlyActive, turmaDoSeletor, {
-      allStudents,
-      sortedData
-    });
-  }, [conceitoData, pedagogicalStats.total, showOnlyActive, selectedValue, filterMode, allStudents, sortedData]);
+    if (mapaoCoverage && !mapaoCoverage.isMatching && mapaoCoverage.diagnostico?.length > 0) {
+      const warnKey = `${turmaDoSeletor}-${mapaoCoverage.diagnostico.length}`;
+      if (lastWarnedDivergenceRef.current !== warnKey) {
+        lastWarnedDivergenceRef.current = warnKey;
+        validateMapaoCoverage(conceitoData, pedagogicalStats.total, showOnlyActive, turmaDoSeletor, {
+          allStudents,
+          sortedData
+        });
+      }
+    } else {
+      lastWarnedDivergenceRef.current = '';
+    }
+  }, [conceitoData, pedagogicalStats.total, showOnlyActive, selectedValue, filterMode, allStudents, sortedData, mapaoCoverage]);
 
   // Título limpo
   const currentTitle = useMemo(() => {
@@ -1156,7 +1167,15 @@ const Dashboard = ({
             {/* Card 5: Alunos em Atenção (< 5,0) */}
             {/* Card 4: Foco de Atenção (Conselho de Classe) */}
             <div 
-              onClick={() => onOpenLowGradesReport && onOpenLowGradesReport(selectedBimestre, currentAnalyzedTurma)}
+              onClick={() => {
+                if (onOpenLowGradesReport) {
+                  if (filterMode === 'tutor' && selectedValue && selectedValue !== 'Todos') {
+                    onOpenLowGradesReport(selectedBimestre, currentAnalyzedTurma, selectedValue);
+                  } else {
+                    onOpenLowGradesReport(selectedBimestre, currentAnalyzedTurma);
+                  }
+                }
+              }}
               className={`rounded-2xl p-5 border shadow-2xs transition-all text-center flex flex-col items-center justify-center ${
                 onOpenLowGradesReport 
                   ? 'bg-white border-slate-200/90 hover:border-amber-300 hover:shadow-xs cursor-pointer group' 

@@ -743,8 +743,9 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
     expect(onOpenLowGradesReport).toHaveBeenCalledWith('3', '3A');
   });
 
-  it('valida inclusão dos alunos do Mapão e emite mensagem de sucesso no console com a turma selecionada', () => {
+  it('mantém o console 100% limpo quando todos os alunos do Mapão estão inclusos', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const conceitoData = [
       { nomeOriginal: 'Ana Silva', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
@@ -768,7 +769,9 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
       />
     );
 
-    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+    // O console deve permanecer limpo, sem logs desnecessários
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
 
     // Ao mudar o seletor para a turma '1A'
     const students1A = [students[0]];
@@ -784,8 +787,11 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
       />
     );
 
-    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma 1A estão inclusos');
+    expect(logSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+
     logSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it('exibe indicador discreto no Card 1 e abre o modal de auditoria quando há divergência', () => {
@@ -843,6 +849,32 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
       />
     );
 
+    expect(screen.queryByText(/divergência/i)).not.toBeInTheDocument();
+  });
+
+  it('mantém visível aluno recém-matriculado na tutoria sem acusar divergência no Mapão', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana Silva', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const students = [
+      makeStudent('Ana Silva', { turma: '1A', situacao: 'Ativo' }),
+      makeStudent('Carlos Novo', { turma: '1A', situacao: 'Ativo (Recém-Matriculado)' })
+    ];
+
+    render(
+      <Dashboard
+        {...defaultProps}
+        allStudents={students}
+        sortedData={students}
+        conceitoData={conceitoData}
+        filterMode="turma"
+        selectedValue="1A"
+        showOnlyActive={true}
+      />
+    );
+
+    expect(screen.getByText('Carlos Novo')).toBeInTheDocument();
     expect(screen.queryByText(/divergência/i)).not.toBeInTheDocument();
   });
 });
