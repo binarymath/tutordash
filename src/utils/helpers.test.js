@@ -15,6 +15,9 @@ import {
   matchesBimestre,
   resolveStudentActiveTurma,
   isStudentActive,
+  getMapaoStudentCount,
+  validateMapaoCoverage,
+  getMapaoCoverageDetails,
 } from './helpers';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -575,4 +578,139 @@ describe('resolveStudentActiveTurma', () => {
     expect(res.isTransferido).toBe(false);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// getMapaoStudentCount & validateMapaoCoverage
+// ─────────────────────────────────────────────────────────────────────────────
+describe('getMapaoStudentCount', () => {
+  it('retorna 0 para array vazio ou inválido', () => {
+    expect(getMapaoStudentCount([])).toBe(0);
+    expect(getMapaoStudentCount(null)).toBe(0);
+  });
+
+  it('conta alunos únicos ativos quando showOnlyActive é true', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Carlos Alberto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Carlos Alberto', turmaPlanilha: '1A', bimestre: '2º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Maria Eduarda', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Maria Eduarda', turmaPlanilha: '1A', bimestre: '2º Bimestre', situacao: 'Transferido' },
+      { nomeOriginal: 'Joana Prado', turmaPlanilha: '2B', bimestre: '2º Bimestre', situacao: 'Ativo' },
+    ];
+
+    // Carlos Alberto: Ativo
+    // Maria Eduarda: Transferido no 2º Bimestre (inativa)
+    // Joana Prado: Ativo
+    // Total ativos = 2
+    expect(getMapaoStudentCount(conceitoData, true)).toBe(2);
+    // Total geral de alunos únicos = 3
+    expect(getMapaoStudentCount(conceitoData, false)).toBe(3);
+  });
+
+  it('ignora turmas de teste 405 e 406', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Aluno Regular', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Aluno Fantasma', turmaPlanilha: '405', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+    expect(getMapaoStudentCount(conceitoData, true)).toBe(1);
+    expect(getMapaoStudentCount(conceitoData, false)).toBe(1);
+  });
+});
+
+describe('validateMapaoCoverage', () => {
+  let logSpy;
+  let warnSpy;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('emite a frase com a turma quando as contagens batem em Todos', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Caio', turmaPlanilha: '1B', bimestre: '1º Bimestre', situacao: 'Baixa' },
+    ];
+
+    // Com showOnlyActive = true (padrão): 2 ativos
+    const res = validateMapaoCoverage(conceitoData, 2, true, 'Todos');
+    expect(res.isMatching).toBe(true);
+    expect(res.mapaoCount).toBe(2);
+    expect(res.tutoradosCount).toBe(2);
+    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('emite a frase especificando a turma selecionada (ex: 1A) quando as contagens batem', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Caio', turmaPlanilha: '1B', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    // Para a turma 1A: 2 alunos ativos
+    const res = validateMapaoCoverage(conceitoData, 2, true, '1A');
+    expect(res.isMatching).toBe(true);
+    expect(res.mapaoCount).toBe(2);
+    expect(res.tutoradosCount).toBe(2);
+    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma 1A estão inclusos');
+  });
+
+  it('emite a frase quando showOnlyActive é false e as contagens totais batem', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Caio', turmaPlanilha: '1B', bimestre: '1º Bimestre', situacao: 'Baixa' },
+    ];
+
+    // Com showOnlyActive = false: 3 alunos no total
+    const res = validateMapaoCoverage(conceitoData, 3, false, 'Todos');
+    expect(res.isMatching).toBe(true);
+    expect(res.mapaoCount).toBe(3);
+    expect(res.tutoradosCount).toBe(3);
+    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+  });
+
+  it('emite console.warn quando as contagens divergem', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const res = validateMapaoCoverage(conceitoData, 1, true, '1A');
+    expect(res.isMatching).toBe(false);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Atenção (Turma: 1A): Nem todos os alunos do mapão estão inclusos'));
+    expect(logSpy).not.toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma 1A estão inclusos');
+  });
+
+  it('getMapaoCoverageDetails retorna a lista de diagnósticos para alunos faltantes', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Beto', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const allStudents = [
+      { nome: 'Ana', normalizedName: 'ana', turma: '1A', situacao: 'Ativo' },
+      { nome: 'Beto', normalizedName: 'beto', turma: '2B', situacao: 'Ativo' },
+    ];
+
+    const sortedData = [
+      { nome: 'Ana', normalizedName: 'ana', turma: '1A', situacao: 'Ativo' }
+    ];
+
+    const details = getMapaoCoverageDetails(conceitoData, 1, true, '1A', { allStudents, sortedData });
+    expect(details.isMatching).toBe(false);
+    expect(details.mapaoCount).toBe(2);
+    expect(details.tutoradosCount).toBe(1);
+    expect(details.diagnostico).toHaveLength(1);
+    expect(details.diagnostico[0].aluno).toBe('Beto');
+    expect(details.diagnostico[0].tipoCausa).toBe('outra_turma');
+  });
+});
+
 

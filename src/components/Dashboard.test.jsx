@@ -742,7 +742,111 @@ describe('Dashboard — Botões de Visão: Prova Paulista, Conselho de Classe e 
 
     expect(onOpenLowGradesReport).toHaveBeenCalledWith('3', '3A');
   });
+
+  it('valida inclusão dos alunos do Mapão e emite mensagem de sucesso no console com a turma selecionada', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const conceitoData = [
+      { nomeOriginal: 'Ana Silva', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Bruno Costa', turmaPlanilha: '1B', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const students = [
+      makeStudent('Ana Silva', { turma: '1A', situacao: 'Ativo' }),
+      makeStudent('Bruno Costa', { turma: '1B', situacao: 'Ativo' })
+    ];
+
+    const { rerender } = render(
+      <Dashboard
+        {...defaultProps}
+        allStudents={students}
+        sortedData={students}
+        conceitoData={conceitoData}
+        selectedValue="Todos"
+        filterMode="tutor"
+        showOnlyActive={true}
+      />
+    );
+
+    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma Todos estão inclusos');
+
+    // Ao mudar o seletor para a turma '1A'
+    const students1A = [students[0]];
+    rerender(
+      <Dashboard
+        {...defaultProps}
+        allStudents={students1A}
+        sortedData={students1A}
+        conceitoData={conceitoData}
+        filterMode="turma"
+        selectedValue="1A"
+        showOnlyActive={true}
+      />
+    );
+
+    expect(logSpy).toHaveBeenCalledWith('Ok, Todos os alunos do mapão da turma 1A estão inclusos');
+    logSpy.mockRestore();
+  });
+
+  it('exibe indicador discreto no Card 1 e abre o modal de auditoria quando há divergência', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const conceitoData = [
+      { nomeOriginal: 'Ana Silva', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+      { nomeOriginal: 'Bruno Costa', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const students = [
+      makeStudent('Ana Silva', { turma: '1A', situacao: 'Ativo' })
+    ];
+
+    render(
+      <Dashboard
+        {...defaultProps}
+        allStudents={students}
+        sortedData={students}
+        conceitoData={conceitoData}
+        filterMode="turma"
+        selectedValue="1A"
+        showOnlyActive={true}
+      />
+    );
+
+    const badgeBtn = screen.getByText(/1 divergência/i);
+    expect(badgeBtn).toBeInTheDocument();
+
+    fireEvent.click(badgeBtn);
+    expect(screen.getByText('Auditoria de Alunos: Mapão vs Painel')).toBeInTheDocument();
+    expect(screen.getByText('Bruno Costa')).toBeInTheDocument();
+
+    warnSpy.mockRestore();
+  });
+
+  it('não exibe indicador no Card 1 quando há 0 divergências', () => {
+    const conceitoData = [
+      { nomeOriginal: 'Ana Silva', turmaPlanilha: '1A', bimestre: '1º Bimestre', situacao: 'Ativo' },
+    ];
+
+    const students = [
+      makeStudent('Ana Silva', { turma: '1A', situacao: 'Ativo' })
+    ];
+
+    render(
+      <Dashboard
+        {...defaultProps}
+        allStudents={students}
+        sortedData={students}
+        conceitoData={conceitoData}
+        filterMode="turma"
+        selectedValue="1A"
+        showOnlyActive={true}
+      />
+    );
+
+    expect(screen.queryByText(/divergência/i)).not.toBeInTheDocument();
+  });
 });
+
 
 
 
