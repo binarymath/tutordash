@@ -9,7 +9,7 @@ import {
   BookOpen, Calendar, Filter, ArrowUpDown, AlertTriangle, Users, 
   ChevronRight, Sparkles 
 } from 'lucide-react';
-import { parseGrade, formatDisciplina, formatBimestre, checkIsMissing, isNonSubjectHeader, isStudentActive } from '../utils/helpers';
+import { parseGrade, formatDisciplina, formatBimestre, checkIsMissing, isNonSubjectHeader, isStudentActive, formatTurmaDisplay } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 
 const LowGradesReportModal = ({
@@ -731,7 +731,7 @@ const LowGradesReportModal = ({
               className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200/80 focus:border-blue-500 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 shadow-2xs focus:ring-2 focus:ring-blue-500/10 outline-none transition-all cursor-pointer"
             >
               {availableTurmas.map(t => (
-                <option key={t} value={t}>{t === 'Todas' ? 'Todas as Turmas' : `Turma ${t}`}</option>
+                <option key={t} value={t}>{t === 'Todas' ? 'Todas as Turmas' : formatTurmaDisplay(t)}</option>
               ))}
             </select>
           </div>
@@ -862,7 +862,7 @@ const LowGradesReportModal = ({
                         {/* Turma */}
                         <td className="px-4 py-3.5 text-center font-bold whitespace-nowrap border-b border-slate-300">
                           <span className="bg-white border border-slate-200/90 shadow-2xs px-2.5 py-1 rounded-lg text-slate-700 text-[11px] font-black uppercase">
-                            {r.turma}
+                            {formatTurmaDisplay(r.turma) || r.turma}
                           </span>
                         </td>
 

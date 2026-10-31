@@ -10,7 +10,7 @@ import {
   TrendingUp, TrendingDown, Minus, Calendar, CheckCircle2,
   Clock, Compass, Info, ChevronDown, ClipboardList
 } from 'lucide-react';
-import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing, isStudentActive, validateMapaoCoverage, getMapaoCoverageDetails } from '../utils/helpers';
+import { checkIsTutor, parseGrade, toScale10, formatDisciplina, isNonSubjectHeader, checkIsMissing, isStudentActive, validateMapaoCoverage, getMapaoCoverageDetails, formatTurmaDisplay } from '../utils/helpers';
 import { getXLSX } from '../services/api';
 import RankingPanel from './RankingPanel';
 import MapaoAuditModal from './MapaoAuditModal';
@@ -743,7 +743,7 @@ const Dashboard = ({
   // Título limpo
   const currentTitle = useMemo(() => {
     if (selectedValue === 'Todos') return 'Panorama Geral da Turma';
-    if (filterMode === 'turma') return `Turma ${selectedValue}`;
+    if (filterMode === 'turma') return formatTurmaDisplay(selectedValue);
     if (filterMode === 'tutor') return `Tutorados de ${selectedValue}`;
     if (filterMode === 'serie') return `Nível Escolar: ${selectedValue}`;
     return selectedValue;
@@ -1040,7 +1040,11 @@ const Dashboard = ({
                   value={selectedValue}
                   onChange={e => setSelectedValue(e.target.value)}
                 >
-                  {optionsList.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {optionsList.map(opt => (
+                    <option key={opt} value={opt}>
+                      {filterMode === 'turma' && opt !== 'Todos' ? formatTurmaDisplay(opt) : opt}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Checkbox Apenas alunos Ativos */}
@@ -1475,9 +1479,9 @@ const Dashboard = ({
                           <button
                             onClick={() => setSelectedTurma && setSelectedTurma(student.turma)}
                             className="font-bold text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100 px-2.5 py-1 rounded-lg text-xs uppercase border border-blue-200/50 transition-all cursor-pointer"
-                            title={`Abrir Dashboard Coletiva da Turma ${student.turma}`}
+                            title={`Abrir Dashboard Coletiva da Turma ${formatTurmaDisplay(student.turma) || student.turma}`}
                           >
-                            {student.turma}
+                            {formatTurmaDisplay(student.turma) || student.turma}
                           </button>
                         </td>
 
