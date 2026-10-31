@@ -468,7 +468,28 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(searchInput.value).toBe('MATEMÁTICA');
     expect(screen.getByRole('button', { name: /Limpar busca/i })).toBeInTheDocument();
   });
+
+  it('exibe Sem mapão lançado ou Lançamento não iniciado para turmas não digitadas em vez de Todas as matérias entregues', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="2B"
+      />
+    );
+
+    // O Aluno Turma B 3 é da turma 2B que não possui notas no 3º Bimestre
+    expect(screen.getByText('Aluno Turma B 3')).toBeInTheDocument();
+    // Não deve exibir 'Todas as matérias entregues'
+    expect(screen.queryByText(/Todas as matérias entregues/i)).not.toBeInTheDocument();
+    // Deve exibir indicação de sem mapão ou não iniciado
+    expect(screen.getByText(/Sem mapão lançado neste bimestre/i)).toBeInTheDocument();
+    expect(screen.getByText(/Aguardando início/i)).toBeInTheDocument();
+  });
 });
+
 
 
 
