@@ -413,6 +413,62 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Buscar aluno, turma, tutor ou matéria/i).value).toBe('MATEMÁTICA');
   });
+
+  it('exibe o botão X para limpar a busca e retornar ao estado de todos os alunos', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Buscar aluno, turma, tutor ou matéria/i);
+    // Inicialmente não tem botão X
+    expect(screen.queryByRole('button', { name: /Limpar busca/i })).not.toBeInTheDocument();
+
+    // Digita uma matéria na busca
+    fireEvent.change(searchInput, { target: { value: 'MATEMÁTICA' } });
+    expect(searchInput.value).toBe('MATEMÁTICA');
+
+    // Botão X deve aparecer
+    const clearBtn = screen.getByRole('button', { name: /Limpar busca/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    // Clica no botão X
+    fireEvent.click(clearBtn);
+
+    // O campo de busca é limpo e volta a exibir todos os alunos
+    expect(searchInput.value).toBe('');
+    expect(screen.queryByRole('button', { name: /Limpar busca/i })).not.toBeInTheDocument();
+  });
+
+  it('permite clicar em uma tag de disciplina na tabela de alunos para filtrar por ela', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    // Na tabela de pendências, Aluno Omitido 2 tem furo em MATEMÁTICA
+    const matTagBtn = screen.getByRole('button', { name: /Filtrar por MATEMÁTICA/i });
+    expect(matTagBtn).toBeInTheDocument();
+
+    // Clica na tag
+    fireEvent.click(matTagBtn);
+
+    // Deve preencher o campo de busca com MATEMÁTICA e exibir o botão X
+    const searchInput = screen.getByPlaceholderText(/Buscar aluno, turma, tutor ou matéria/i);
+    expect(searchInput.value).toBe('MATEMÁTICA');
+    expect(screen.getByRole('button', { name: /Limpar busca/i })).toBeInTheDocument();
+  });
 });
+
 
 
