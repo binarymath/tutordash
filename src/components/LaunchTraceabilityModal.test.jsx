@@ -336,4 +336,57 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(screen.getByText('Disciplinas com Dados')).toBeInTheDocument();
     expect(screen.getByText('Conclusão da Turma')).toBeInTheDocument();
   });
+
+  it('permite clicar em uma tag de turma na aba Disciplinas para abrir a auditoria da turma', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    // Navega para a aba Disciplinas
+    fireEvent.click(screen.getByRole('button', { name: /Disciplinas/i }));
+    expect(screen.getByText('MATEMÁTICA')).toBeInTheDocument();
+
+    // Encontra a tag da Turma 1A na coluna de detalhamento
+    const turmaTagBtn = screen.getByRole('button', { name: /Auditar lançamentos da Turma 1A/i });
+    expect(turmaTagBtn).toBeInTheDocument();
+
+    // Clica na tag da Turma 1A
+    fireEvent.click(turmaTagBtn);
+
+    // Deve alternar automaticamente para a aba de alunos e selecionar a Turma 1A
+    expect(screen.getByRole('combobox', { name: /Filtrar por Turma/i }).value).toBe('1A');
+    expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
+    expect(screen.getByText('Aluno Omitido 2')).toBeInTheDocument();
+  });
+
+  it('permite clicar no botão de auditar turma na aba Visão por Turma para navegar até os alunos', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    // Navega para a aba Visão por Turma
+    fireEvent.click(screen.getByRole('button', { name: /Visão por Turma/i }));
+
+    // Clica no botão "Ver Auditoria da Turma" da Turma 1A
+    const auditButtons = screen.getAllByRole('button', { name: /Auditar alunos da Turma/i });
+    expect(auditButtons.length).toBeGreaterThan(0);
+    fireEvent.click(auditButtons[0]);
+
+    // Deve alternar automaticamente para a aba de alunos e selecionar a turma correspondente
+    expect(screen.getByRole('combobox', { name: /Filtrar por Turma/i }).value).toBe('1A');
+    expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
+  });
 });
+
