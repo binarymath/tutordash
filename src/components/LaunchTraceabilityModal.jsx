@@ -948,18 +948,18 @@ const LaunchTraceabilityModal = ({
                                       </button>
                                     ))}
                                   </div>
-                                ) : aluno.isTurmaNaoIniciada ? (
-                                  <span className="text-slate-400 text-xs italic">Aguardando início</span>
+                                ) : aluno.isTurmaNaoIniciada || aluno.materiasComNota.length === 0 ? (
+                                  <span className="text-slate-400 text-xs italic">Aguardando abertura do mapão</span>
                                 ) : (
                                   <span className="text-slate-300 text-xs">Nenhum</span>
                                 )}
                               </td>
 
                               <td className="py-3 px-3">
-                                {aluno.isTurmaNaoIniciada ? (
+                                {aluno.isTurmaNaoIniciada || (!aluno.hasMapao) || (aluno.materiasComNota.length === 0 && aluno.materiasNaoLancadasNaTurma.length === 0) ? (
                                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200/60">
                                     <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                                    {!aluno.hasMapao ? 'Sem mapão lançado neste bimestre' : 'Lançamento não iniciado neste bimestre'}
+                                    Aguardando abertura do mapão
                                   </span>
                                 ) : aluno.materiasNaoLancadasNaTurma.length > 0 ? (
                                   <div className="flex flex-wrap gap-1 max-w-2xl">
@@ -969,7 +969,7 @@ const LaunchTraceabilityModal = ({
                                         type="button"
                                         onClick={() => setSearchTerm(m)}
                                         className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100/90 hover:bg-slate-200 text-slate-600 font-medium border border-slate-200/50 cursor-pointer transition-all hover:scale-105 active:scale-95"
-                                        title={`Filtrar apenas ${m}`}
+                                        title={`Disciplina ainda não iniciada na turma: ${m}`}
                                         aria-label={`Filtrar por ${m}`}
                                       >
                                         {m}
@@ -982,7 +982,7 @@ const LaunchTraceabilityModal = ({
                                   </span>
                                 ) : (
                                   <span className="text-slate-400 text-xs italic">
-                                    Sem pendências de matérias na turma
+                                    Aguardando abertura do mapão
                                   </span>
                                 )}
                               </td>
