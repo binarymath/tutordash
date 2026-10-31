@@ -162,6 +162,13 @@
 }
 
 @media print {
+  /* Garante fundo 100% branco para não imprimir fundo temático da aplicação */
+  html, body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
   /* Evita cortes em gráficos, tabelas e cards durante a impressão nativa */
   table, tr, td, th, img, svg, canvas, .recharts-wrapper, [data-chart], .rounded-2xl, .rounded-3xl, .rounded-xl, .avoid-break {
     page-break-inside: avoid !important;

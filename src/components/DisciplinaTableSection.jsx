@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import {
-  Sheet, BookOpen, Filter, Search, Plus, ExternalLink,
+  Sheet, BookOpen, Search, Plus, ExternalLink,
   ChevronDown, Layers, Calendar, CheckCircle2, AlertCircle, RefreshCw
 } from 'lucide-react';
-import { formatTurma, formatDisciplina } from '../utils/helpers';
+import { formatTurma, formatDisciplina, findMatchingDisciplina, formatTurmaDisplay } from '../utils/helpers';
 
 const DisciplinaTableSection = ({
   selectedTurma,
@@ -15,7 +15,6 @@ const DisciplinaTableSection = ({
   hasUrl = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeDiscFilter, setActiveDiscFilter] = useState('ALL');
 
   // Normaliza a turma atual (ex: "6A")
   const currentTurmaNorm = useMemo(() => formatTurma(selectedTurma), [selectedTurma]);
@@ -38,22 +37,32 @@ const DisciplinaTableSection = ({
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [turmaRows]);
 
-  // Sincroniza o filtro com a disciplina selecionada no topo do painel se aplicável
-  const effectiveDisciplina = useMemo(() => {
-    if (activeDiscFilter !== 'ALL') return activeDiscFilter;
-    if (selectedDisc && selectedDisc !== 'Geral') {
-      const formattedTop = formatDisciplina(selectedDisc);
-      const match = availableDisciplinas.find(d =>
-        d.toLowerCase() === formattedTop.toLowerCase() ||
-        d.toLowerCase().includes(formattedTop.toLowerCase())
-      );
-      if (match) return match;
-    }
-    return 'ALL';
-  }, [activeDiscFilter, selectedDisc, availableDisciplinas]);
+  // Verifica se está no modo Geral / Todas as Matérias
+  const isGeral = useMemo(() => {
+    return !selectedDisc || selectedDisc === 'Geral' || String(selectedDisc).toLowerCase().includes('geral') || selectedDisc === 'ALL';
+  }, [selectedDisc]);
+
+  // Filtro de disciplina segue diretamente a disciplina selecionada no topo
+  const matchedDisciplina = useMemo(() => {
+    if (isGeral) return 'ALL';
+    const match = findMatchingDisciplina(selectedDisc, availableDisciplinas);
+    // Se findMatchingDisciplina não achou correspondência (retornou 'ALL'), a matéria não existe na planilha
+    return match !== 'ALL' ? match : null;
+  }, [isGeral, selectedDisc, availableDisciplinas]);
+
+  const effectiveDisciplina = isGeral ? 'ALL' : matchedDisciplina;
+
+  // Verifica se há linhas disponíveis para a disciplina selecionada nesta turma
+  const hasRowsForDisciplina = useMemo(() => {
+    if (isGeral) return turmaRows.length > 0;
+    if (!matchedDisciplina) return false;
+    return turmaRows.some(r => r.disciplina === matchedDisciplina);
+  }, [isGeral, matchedDisciplina, turmaRows]);
 
   // Filtra por disciplina e busca textual
   const filteredRows = useMemo(() => {
+    if (!isGeral && !hasRowsForDisciplina) return [];
+
     return turmaRows.filter(row => {
       // Filtro de disciplina (Coluna D)
       if (effectiveDisciplina !== 'ALL' && row.disciplina !== effectiveDisciplina) {
@@ -71,7 +80,7 @@ const DisciplinaTableSection = ({
 
       return true;
     });
-  }, [turmaRows, effectiveDisciplina, searchTerm]);
+  }, [turmaRows, isGeral, hasRowsForDisciplina, effectiveDisciplina, searchTerm]);
 
   // Agrupa as linhas filtradas por Bimestre (separando por tabela)
   const groupedByBimestre = useMemo(() => {
@@ -103,6 +112,7 @@ const DisciplinaTableSection = ({
 
   // ── CASO 1: Nenhuma URL configurada ──
   if (!hasUrl) {
+    if (!isGeral) return null;
     return (
       <div className="bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-3xl border border-slate-200/80 p-6 sm:p-8 shadow-xs">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -112,11 +122,8 @@ const DisciplinaTableSection = ({
             </div>
             <div>
               <h3 className="text-base font-black text-slate-800 tracking-tight">
-                Planilha Complementar por Disciplina
+                Descritores Prova Paulista
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Você pode conectar uma planilha com abas por turma e bimestre (ex: <strong>{currentTurmaNorm || '6A'}-1B</strong>) para visualizar as linhas da <strong>Coluna D (Disciplina)</strong>.
-              </p>
             </div>
           </div>
           <button
@@ -164,6 +171,16 @@ const DisciplinaTableSection = ({
     );
   }
 
+  // ── CASO 4: Sem dados na planilha para a turma ──
+  if (turmaRows.length === 0) {
+    return null;
+  }
+
+  // ── CASO 5: Disciplina selecionada não tem dados nesta turma ──
+  if (!isGeral && !hasRowsForDisciplina) {
+    return null;
+  }
+
   return (
     <section className="bg-white rounded-3xl border border-slate-200/90 shadow-sm p-6 sm:p-8 space-y-6">
       
@@ -174,80 +191,40 @@ const DisciplinaTableSection = ({
             <BookOpen className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-black text-slate-800 tracking-tight">
                 Registros e Acompanhamento por Disciplina
               </h3>
               <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase">
-                Turma {currentTurmaNorm}
+                {formatTurmaDisplay(currentTurmaNorm)}
+              </span>
+              <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-lg text-[10px] font-black uppercase">
+                {effectiveDisciplina === 'ALL' ? 'Todas as Matérias' : effectiveDisciplina}
               </span>
             </div>
-            <p className="text-xs font-semibold text-slate-400 mt-0.5">
-              Linhas da planilha filtradas pela Coluna D (Disciplina) e organizadas por bimestre
-            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-end sm:self-auto">
+        <div className="flex items-center gap-2.5 self-end sm:self-auto w-full sm:w-auto">
+          {/* Campo de Busca Textual */}
+          <div className="relative flex-1 sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Filtrar dados nesta tabela..."
+              className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 font-medium transition-colors"
+            />
+          </div>
+
           <button
             onClick={onOpenLinksModal}
-            className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer"
+            className="flex items-center gap-1.5 text-slate-500 hover:text-blue-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer"
             title="Alterar ou gerenciar links"
           >
             <Sheet className="w-3.5 h-3.5" /> Planilha
           </button>
-        </div>
-      </div>
-
-      {/* Controles de Filtros e Busca */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-slate-50/70 p-3.5 rounded-2xl border border-slate-200/80">
-        
-        {/* Seletor de Disciplina */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
-          <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
-            <Filter className="w-3 h-3" /> Disciplina:
-          </span>
-          <button
-            type="button"
-            onClick={() => setActiveDiscFilter('ALL')}
-            className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-              effectiveDisciplina === 'ALL'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            Todas ({turmaRows.length})
-          </button>
-          {availableDisciplinas.map(disc => {
-            const count = turmaRows.filter(r => r.disciplina === disc).length;
-            const isSelected = effectiveDisciplina === disc;
-            return (
-              <button
-                key={disc}
-                type="button"
-                onClick={() => setActiveDiscFilter(disc)}
-                className={`px-3 py-1 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-600 text-white shadow-xs'
-                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                {disc} ({count})
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Campo de Busca Textual */}
-        <div className="relative min-w-[220px]">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Filtrar dados nesta tabela..."
-            className="w-full bg-white border border-slate-200 rounded-xl py-1.5 pl-8 pr-3 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 font-medium"
-          />
         </div>
       </div>
 

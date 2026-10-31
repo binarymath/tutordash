@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
-  ChevronLeft, ChevronRight, Users, TrendingUp, BookOpen,
+  ChevronLeft, ChevronRight, ChevronDown, Users, TrendingUp, BookOpen,
   Maximize2, Minimize2, Award, Trophy, Medal, Star,
   AlertCircle, Sparkles, Filter, Search, ArrowUpRight,
   ArrowDownRight, Minus, Sliders, Zap, Check, ArrowRight,
@@ -13,7 +13,7 @@ import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip as RechartsTooltip, Legend, LabelList
 } from 'recharts';
-import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma, isStudentActive } from '../utils/helpers';
+import { parseGrade, toScale10, formatDisciplina, getSerieFromTurma, isStudentActive, findMatchingDisciplina, formatTurmaDisplay } from '../utils/helpers';
 import SpeedometerGauge from './SpeedometerGauge';
 import DisciplinaTableSection from './DisciplinaTableSection';
 
@@ -174,7 +174,12 @@ const ClassProfile = ({
 
   useEffect(() => {
     if (selectedDisc !== 'Geral' && !availableDisciplines.includes(selectedDisc)) {
-      setSelectedDisc('Geral');
+      const match = findMatchingDisciplina(selectedDisc, availableDisciplines);
+      if (match && match !== 'ALL') {
+        setSelectedDisc(match);
+      } else {
+        setSelectedDisc('Geral');
+      }
     }
   }, [availableDisciplines, selectedDisc]);
 
@@ -608,7 +613,7 @@ const ClassProfile = ({
             onClick={() => ato2Ref.current?.scrollIntoView({ behavior: 'smooth' })}
             className="px-3.5 py-1.5 rounded-xl hover:bg-white hover:text-blue-600 transition-all"
           >
-            2. Velocímetros & Slices
+            2. Velocímetros e Slices
           </button>
           <button
             onClick={() => ato3Ref.current?.scrollIntoView({ behavior: 'smooth' })}
@@ -629,7 +634,7 @@ const ClassProfile = ({
                 : 'text-slate-700 bg-white border-slate-200 shadow-sm hover:text-blue-600 hover:border-blue-300 active:scale-95'
             }`}
           >
-            <ChevronLeft className="w-4 h-4 text-blue-600" /> {prevTurma ? `Turma ${prevTurma}` : 'Anterior'}
+            <ChevronLeft className="w-4 h-4 text-blue-600" /> {prevTurma ? formatTurmaDisplay(prevTurma) : 'Anterior'}
           </button>
           <button
             onClick={() => nextTurma && setSelectedTurma(nextTurma)}
@@ -640,7 +645,7 @@ const ClassProfile = ({
                 : 'text-slate-700 bg-white border-slate-200 shadow-sm hover:text-blue-600 hover:border-blue-300 active:scale-95'
             }`}
           >
-            {nextTurma ? `Turma ${nextTurma}` : 'Próximo'} <ChevronRight className="w-4 h-4 text-blue-600" />
+            {nextTurma ? formatTurmaDisplay(nextTurma) : 'Próximo'} <ChevronRight className="w-4 h-4 text-blue-600" />
           </button>
         </div>
       </div>
@@ -655,9 +660,6 @@ const ClassProfile = ({
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8 relative z-10">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-blue-700 font-extrabold text-[10px] uppercase tracking-widest bg-blue-50 border border-blue-200 px-3 py-1 rounded-xl">
-                  Inteligência Coletiva Oficial
-                </span>
                 <span className="text-indigo-700 font-black text-[10px] uppercase tracking-widest bg-indigo-50 border border-indigo-200 px-3 py-1 rounded-xl">
                   {serieLabel}
                 </span>
@@ -665,12 +667,9 @@ const ClassProfile = ({
               
               <div className="flex items-center gap-3 mt-3">
                 <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900">
-                  Turma {selectedTurma}
+                  {formatTurmaDisplay(selectedTurma)}
                 </h1>
               </div>
-              <p className="text-slate-600 text-sm font-medium mt-2 max-w-3xl">
-                Diagnóstico acadêmico integral da turma. Os números deste bloco representam a verdade oficial de 100% da sala em relação ao nível e à escola.
-              </p>
             </div>
 
             {/* Cards Oficiais de Ranking e Médias */}
@@ -701,9 +700,9 @@ const ClassProfile = ({
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">entre as turmas de {serieLabel}</p>
               </div>
 
-              <div className="bg-white p-4 rounded-2xl border border-emerald-100 shadow-2xs text-center min-w-[110px]">
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Posição na Escola</p>
-                <p className="text-2xl font-black text-emerald-700 mt-1">
+              <div className="bg-white p-4 rounded-2xl border border-sky-100 shadow-2xs text-center min-w-[110px]">
+                <p className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Posição na Escola</p>
+                <p className="text-2xl font-black text-sky-700 mt-1">
                   {officialClassMetrics.rankPP}º <span className="text-xs font-bold text-slate-400">/ {officialClassMetrics.totalPP}</span>
                 </p>
                 <p className="text-[9px] text-slate-400 font-medium mt-0.5">ranking geral das turmas</p>
@@ -750,24 +749,32 @@ const ClassProfile = ({
             </div>
           </div>
 
-          {/* Barra de Disciplinas */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 border-b border-slate-100 max-w-full">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 ml-1">
-              Matéria Analisada:
+          {/* Seletor de Matéria Analisada */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-200/80">
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 ml-1 flex items-center gap-1.5">
+                <Filter className="w-3.5 h-3.5 text-blue-600" /> Matéria Analisada:
+              </span>
+              <div className="relative inline-flex items-center">
+                <select
+                  aria-label="Selecionar Matéria Analisada"
+                  value={selectedDisc}
+                  onChange={(e) => setSelectedDisc(e.target.value)}
+                  className="appearance-none bg-white hover:bg-blue-50/30 focus:bg-white text-slate-800 text-xs font-black pl-4 pr-9 py-2 rounded-full border-2 border-blue-500 hover:border-blue-600 focus:border-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/15 transition-all cursor-pointer shadow-xs min-w-[220px] uppercase tracking-wide"
+                >
+                  {availableDisciplines.map(disc => (
+                    <option key={disc} value={disc} className="uppercase font-bold text-slate-800">
+                      {disc === 'Geral' ? '🌟 MÉDIA GERAL' : String(disc).toUpperCase()}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="w-4 h-4 text-blue-600 absolute right-3 pointer-events-none stroke-[2.5]" />
+              </div>
+            </div>
+
+            <span className="text-[11px] font-bold text-slate-400 hidden sm:inline-block">
+              {availableDisciplines.length} {availableDisciplines.length === 1 ? 'matéria disponível' : 'matérias disponíveis'}
             </span>
-            {availableDisciplines.map(disc => (
-              <button
-                key={disc}
-                onClick={() => setSelectedDisc(disc)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all whitespace-nowrap shrink-0 ${
-                  selectedDisc === disc
-                    ? 'bg-blue-600 text-white shadow-sm scale-[1.02]'
-                    : 'bg-slate-50 text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200/60'
-                }`}
-              >
-                {disc === 'Geral' ? '🌟 Média Geral' : disc}
-              </button>
-            ))}
           </div>
 
           {/* Gráfico de Colunas */}
@@ -840,12 +847,9 @@ const ClassProfile = ({
               <span className="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full">
                 Painel de Velocímetros Bimestrais
               </span>
-              <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full">
-                Lado a Lado
-              </span>
             </div>
             <h2 className="text-2xl font-black text-slate-900 tracking-tight mt-1.5">
-              Velocímetros dos Bimestres & Média Consolidada
+              Velocímetros dos Bimestres e Média Consolidada
             </h2>
             <p className="text-xs text-slate-500 font-medium max-w-3xl mt-0.5">
               Quantos alunos sustentam o rendimento da turma? Visualize simultaneamente o velocímetro consolidado e de cada bimestre. Escolha entre um <strong>Slice Geral sincronizado</strong> ou <strong>Slices Individuais independentes</strong> para cada bimestre.
@@ -1135,7 +1139,7 @@ const ClassProfile = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1 rounded-full">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-200 px-3 py-1 rounded-full">
                 Raio-X dos Alunos
               </span>
               <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-700 px-3 py-1 rounded-full">
@@ -1143,7 +1147,7 @@ const ClassProfile = ({
               </span>
             </div>
             <h3 className="text-2xl font-black text-slate-900 tracking-tight mt-1.5">
-              Posicionamento Individual & Notas Bimestrais
+              Posicionamento Individual e Notas Bimestrais
             </h3>
             <p className="text-xs text-slate-500 font-medium">
               Alunos classificados por nota, com histórico bimestral e médias consolidadas.
@@ -1235,7 +1239,7 @@ const ClassProfile = ({
 
                       {/* Posição na Escola */}
                       <td className="py-3.5 px-3 text-center">
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-lg text-[10px] font-black">
+                        <span className="bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded-lg text-[10px] font-black">
                           #{item.schoolRank}
                         </span>
                       </td>

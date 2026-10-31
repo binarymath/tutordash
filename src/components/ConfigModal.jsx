@@ -2,8 +2,9 @@
 // components/ConfigModal.jsx — Centro de Controle 360° do Sistema
 // ─────────────────────────────────────────────────────────────
 import React, { useState, useEffect } from 'react';
-import { X, Settings, BookMarked, Loader2, Plus, CheckCircle2, AlertCircle, ShieldCheck, Trash2 } from 'lucide-react';
+import { X, Settings, BookMarked, Loader2, Plus, CheckCircle2, AlertCircle, ShieldCheck, Trash2, Pencil } from 'lucide-react';
 import PrivacyPolicyModal from './PrivacyPolicyModal';
+import PromptModal from './PromptModal';
 
 // Função de validação inteligente de links em tempo real
 const validateUrl = (url, type = 'sheet') => {
@@ -94,8 +95,9 @@ const validateUrl = (url, type = 'sheet') => {
   };
 };
 
-const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, deleteProfile, onOpenLinksModal, onClose, onLoad, isLoading, onRevokeConsent }) => {
+const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, deleteProfile, renameProfile, onOpenLinksModal, onClose, onLoad, isLoading, onRevokeConsent }) => {
   const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [promptModal, setPromptModal] = useState(null);
   // Local state para editar as urls da aba atual antes de salvar
   const [localConfig, setLocalConfig] = useState(profiles[activeProfile] || { studentsUrl: '', notesUrl: '', provaUrl: '', conceitoUrl: '', formLink: '', disciplinaUrl: '', customLinks: [] });
 
@@ -113,14 +115,12 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
   };
 
   const handleCreateProfile = () => {
-    const nome = prompt('Nome do novo perfil (Ex: Ensino Médio):');
-    if (nome && nome.trim()) {
-      const trimmed = nome.trim();
-      if (saveProfile) {
-        saveProfile(activeProfile, localConfig);
-      }
-      changeProfile(trimmed);
-    }
+    setPromptModal({ type: 'create', initialValue: '' });
+  };
+
+  const handleRenameProfile = (nome, e) => {
+    e.stopPropagation();
+    setPromptModal({ type: 'rename', targetName: nome, initialValue: nome });
   };
 
   const handleDeleteProfile = (nome, e) => {
@@ -182,10 +182,10 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             <div className="hidden sm:flex items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
                 isCoreConnected 
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80' 
+                  ? 'bg-blue-50 text-blue-700 border-blue-200/80' 
                   : 'bg-amber-50 text-amber-700 border-amber-200/80'
               }`}>
-                <span className={`w-2 h-2 rounded-full ${isCoreConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${isCoreConnected ? 'bg-blue-500 animate-pulse' : 'bg-amber-500'}`} />
                 {isCoreConnected ? 'Base Operacional' : 'Base Pendente'}
               </span>
               <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
@@ -222,11 +222,24 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   }`}
                 >
                   <span>{nome}</span>
+                  {renameProfile && (
+                    <span
+                      onClick={(e) => handleRenameProfile(nome, e)}
+                      className="opacity-50 hover:opacity-100 p-0.5 hover:text-blue-600 hover:bg-blue-50 rounded transition-all ml-0.5 cursor-pointer"
+                      title={`Renomear período "${nome}"`}
+                      role="button"
+                      tabIndex={0}
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </span>
+                  )}
                   {Object.keys(profiles).length > 1 && (
                     <span
                       onClick={(e) => handleDeleteProfile(nome, e)}
                       className="opacity-50 hover:opacity-100 p-0.5 hover:text-rose-600 hover:bg-rose-50 rounded transition-all ml-0.5 cursor-pointer"
                       title={`Excluir período "${nome}"`}
+                      role="button"
+                      tabIndex={0}
                     >
                       <Trash2 className="w-3 h-3" />
                     </span>
@@ -253,7 +266,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             {/* 1. Tutoria (Base Principal) */}
             <div className={`rounded-2xl border-2 p-5 shadow-sm transition-all bg-gradient-to-b from-blue-50/40 via-white to-white ${
               valStudents.status === 'valid'
-                ? 'border-emerald-300/80 focus-within:border-emerald-500'
+                ? 'border-blue-300/80 focus-within:border-blue-500'
                 : valStudents.status === 'invalid'
                 ? 'border-rose-300 focus-within:border-rose-500'
                 : 'border-blue-500/20 focus-within:border-blue-500/50'
@@ -264,8 +277,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 </label>
                 <div className="flex items-center gap-2">
                   {valStudents.status === 'valid' && (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> OK
+                    <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" /> OK
                     </span>
                   )}
                   <span className="text-[10px] font-black text-blue-700 bg-blue-100/80 border border-blue-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
@@ -278,7 +291,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   type="text"
                   className={`w-full bg-white border rounded-xl py-3 pl-4 pr-11 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all shadow-sm font-medium ${
                     valStudents.status === 'valid'
-                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      ? 'border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
                       : valStudents.status === 'invalid'
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
                       : 'border-blue-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
@@ -288,8 +301,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   placeholder="Link (Qualquer Ficheiro Sheets)..."
                 />
                 {valStudents.status === 'valid' && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 animate-in zoom-in-75 duration-150">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 animate-in zoom-in-75 duration-150">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600" />
                   </div>
                 )}
                 {valStudents.status === 'invalid' && (
@@ -299,8 +312,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 )}
               </div>
               {valStudents.status === 'valid' && (
-                <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] text-blue-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                   <span>{valStudents.message}</span>
                 </p>
               )}
@@ -315,7 +328,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             {/* 4. Histórico Bimestral */}
             <div className={`rounded-2xl border p-5 shadow-sm transition-all bg-gradient-to-b from-amber-50/30 via-white to-white ${
               valConceito.status === 'valid'
-                ? 'border-emerald-300/80 focus-within:border-emerald-500'
+                ? 'border-blue-300/80 focus-within:border-blue-500'
                 : valConceito.status === 'invalid'
                 ? 'border-rose-300 focus-within:border-rose-500'
                 : 'border-amber-200/80 focus-within:border-amber-300'
@@ -326,8 +339,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 </label>
                 <div className="flex items-center gap-2">
                   {valConceito.status === 'valid' && (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> OK
+                    <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" /> OK
                     </span>
                   )}
                   <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider flex items-center gap-1.5 border border-amber-200/80">
@@ -340,7 +353,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   type="text"
                   className={`w-full bg-white border rounded-xl py-3 pl-4 pr-11 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all shadow-sm font-medium ${
                     valConceito.status === 'valid'
-                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      ? 'border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
                       : valConceito.status === 'invalid'
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
                       : 'border-amber-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10'
@@ -350,8 +363,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   placeholder="Link da Folha de Cálculo com os Mapões..."
                 />
                 {valConceito.status === 'valid' && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 animate-in zoom-in-75 duration-150">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 animate-in zoom-in-75 duration-150">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600" />
                   </div>
                 )}
                 {valConceito.status === 'invalid' && (
@@ -361,8 +374,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 )}
               </div>
               {valConceito.status === 'valid' && (
-                <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] text-blue-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                   <span>{valConceito.message}</span>
                 </p>
               )}
@@ -382,7 +395,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             {/* 2. Planilha de Anotações */}
             <div className={`rounded-2xl border p-5 shadow-sm transition-all bg-slate-50/50 hover:bg-slate-50/80 ${
               valNotes.status === 'valid'
-                ? 'border-emerald-300/80 focus-within:border-emerald-500'
+                ? 'border-blue-300/80 focus-within:border-blue-500'
                 : valNotes.status === 'invalid'
                 ? 'border-rose-300 focus-within:border-rose-500'
                 : 'border-slate-200/90 focus-within:border-slate-300'
@@ -393,8 +406,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 </label>
                 <div className="flex items-center gap-2">
                   {valNotes.status === 'valid' && (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> OK
+                    <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" /> OK
                     </span>
                   )}
                   <span className="text-[10px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -407,7 +420,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   type="text"
                   className={`w-full bg-white border rounded-xl py-3 pl-4 pr-11 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all shadow-sm font-medium ${
                     valNotes.status === 'valid'
-                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      ? 'border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
                       : valNotes.status === 'invalid'
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
                       : 'border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
@@ -417,8 +430,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   placeholder="Link..."
                 />
                 {valNotes.status === 'valid' && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 animate-in zoom-in-75 duration-150">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 animate-in zoom-in-75 duration-150">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600" />
                   </div>
                 )}
                 {valNotes.status === 'invalid' && (
@@ -428,8 +441,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 )}
               </div>
               {valNotes.status === 'valid' && (
-                <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] text-blue-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                   <span>{valNotes.message}</span>
                 </p>
               )}
@@ -444,7 +457,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             {/* 3. Prova Paulista */}
             <div className={`rounded-2xl border p-5 shadow-sm transition-all bg-slate-50/50 hover:bg-slate-50/80 ${
               valProva.status === 'valid'
-                ? 'border-emerald-300/80 focus-within:border-emerald-500'
+                ? 'border-blue-300/80 focus-within:border-blue-500'
                 : valProva.status === 'invalid'
                 ? 'border-rose-300 focus-within:border-rose-500'
                 : 'border-slate-200/90 focus-within:border-slate-300'
@@ -455,8 +468,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 </label>
                 <div className="flex items-center gap-2">
                   {valProva.status === 'valid' && (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> OK
+                    <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" /> OK
                     </span>
                   )}
                   <span className="text-[10px] font-bold text-slate-500 bg-slate-200/60 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -469,7 +482,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   type="text"
                   className={`w-full bg-white border rounded-xl py-3 pl-4 pr-11 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all shadow-sm font-medium ${
                     valProva.status === 'valid'
-                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      ? 'border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
                       : valProva.status === 'invalid'
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
                       : 'border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
@@ -479,8 +492,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   placeholder="Link..."
                 />
                 {valProva.status === 'valid' && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 animate-in zoom-in-75 duration-150">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 animate-in zoom-in-75 duration-150">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600" />
                   </div>
                 )}
                 {valProva.status === 'invalid' && (
@@ -490,8 +503,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 )}
               </div>
               {valProva.status === 'valid' && (
-                <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] text-blue-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                   <span>{valProva.message}</span>
                 </p>
               )}
@@ -504,24 +517,24 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
             </div>
 
             {/* 5. Acesso Rápido a Formulário Externo */}
-            <div className={`rounded-2xl border p-5 shadow-sm transition-all bg-gradient-to-b from-emerald-50/30 via-white to-white ${
+            <div className={`rounded-2xl border p-5 shadow-sm transition-all bg-gradient-to-b from-sky-50/30 via-white to-white ${
               valForm.status === 'valid'
-                ? 'border-emerald-300/80 focus-within:border-emerald-500'
+                ? 'border-blue-300/80 focus-within:border-blue-500'
                 : valForm.status === 'invalid'
                 ? 'border-rose-300 focus-within:border-rose-500'
-                : 'border-emerald-200/80 focus-within:border-emerald-300'
+                : 'border-sky-200/80 focus-within:border-sky-300'
             }`}>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs font-black text-emerald-950 uppercase tracking-wider block">
+                <label className="text-xs font-black text-sky-950 uppercase tracking-wider block">
                   Acesso Rápido a Formulário Externo
                 </label>
                 <div className="flex items-center gap-2">
                   {valForm.status === 'valid' && (
-                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> OK
+                    <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1 animate-in fade-in">
+                      <CheckCircle2 className="w-3 h-3 text-blue-600" /> OK
                     </span>
                   )}
-                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 border border-emerald-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  <span className="text-[10px] font-bold text-sky-700 bg-sky-100/80 border border-sky-200 px-2 py-0.5 rounded-full uppercase tracking-wider">
                     Forms
                   </span>
                 </div>
@@ -531,18 +544,18 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                   type="text"
                   className={`w-full bg-white border rounded-xl py-3 pl-4 pr-11 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none transition-all shadow-sm font-medium ${
                     valForm.status === 'valid'
-                      ? 'border-emerald-300 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      ? 'border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10'
                       : valForm.status === 'invalid'
                       ? 'border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10'
-                      : 'border-emerald-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'
+                      : 'border-sky-200 focus:border-sky-500 focus:ring-4 focus:ring-sky-500/10'
                   }`}
                   value={localConfig.formLink || ''}
                   onChange={e => setLocalConfig({ ...localConfig, formLink: e.target.value })}
                   placeholder="Cole o link do seu Google Forms aqui..."
                 />
                 {valForm.status === 'valid' && (
-                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 animate-in zoom-in-75 duration-150">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-600 animate-in zoom-in-75 duration-150">
+                    <CheckCircle2 className="w-4 h-4 text-blue-600" />
                   </div>
                 )}
                 {valForm.status === 'invalid' && (
@@ -552,8 +565,8 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 )}
               </div>
               {valForm.status === 'valid' && (
-                <p className="text-[11px] text-emerald-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
-                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                <p className="text-[11px] text-blue-600 mt-2 font-medium flex items-center gap-1.5 animate-in fade-in">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-blue-500" />
                   <span>{valForm.message}</span>
                 </p>
               )}
@@ -570,7 +583,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs font-black text-indigo-950 uppercase tracking-wider flex items-center gap-2">
                   <BookMarked className="w-4 h-4 text-indigo-600" />
-                  Links Adicionais & Disciplinas
+                  Links Adicionais e Disciplinas
                 </label>
                 <span className="text-[10px] font-black text-indigo-700 bg-indigo-100/80 border border-indigo-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Isolado por Período
@@ -639,7 +652,7 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
                 className="text-sm text-slate-600 hover:text-blue-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
               >
                 <ShieldCheck className="w-4 h-4 text-blue-600" />
-                Privacidade & LGPD
+                Privacidade e LGPD
               </button>
 
               {onRevokeConsent && (
@@ -674,6 +687,38 @@ const ConfigModal = ({ activeProfile, profiles, changeProfile, saveProfile, dele
         isOpen={showPolicyModal}
         onClose={() => setShowPolicyModal(false)}
       />
+
+      {promptModal && (
+        <PromptModal
+          isOpen={Boolean(promptModal)}
+          title={promptModal.type === 'create' ? 'Novo Período' : 'Renomear Período'}
+          label="Nome do Período"
+          initialValue={promptModal.initialValue || ''}
+          placeholder="Ex: Ensino Médio"
+          validator={(val) => {
+            if (profiles && profiles[val] && (promptModal.type === 'create' || val !== promptModal.targetName)) {
+              return `Já existe um período com o nome "${val}".`;
+            }
+            return null;
+          }}
+          onConfirm={(trimmed) => {
+            if (promptModal.type === 'create') {
+              if (saveProfile) {
+                saveProfile(activeProfile, localConfig);
+              }
+              changeProfile(trimmed);
+            } else if (promptModal.type === 'rename') {
+              if (saveProfile) {
+                saveProfile(activeProfile, localConfig);
+              }
+              if (renameProfile) {
+                renameProfile(promptModal.targetName, trimmed);
+              }
+            }
+          }}
+          onClose={() => setPromptModal(null)}
+        />
+      )}
     </div>
   );
 };

@@ -683,9 +683,9 @@ const LaunchTraceabilityModal = ({
               <div 
                 className={`h-full rounded-full transition-all ${
                   activeKpis.card4.percent === 100 
-                    ? 'bg-emerald-500' 
+                    ? 'bg-blue-600' 
                     : activeKpis.card4.percent > 0 
-                      ? 'bg-blue-600' 
+                      ? 'bg-blue-500' 
                       : 'bg-slate-300'
                 }`}
                 style={{ width: `${activeKpis.card4.percent}%` }}
@@ -790,8 +790,8 @@ const LaunchTraceabilityModal = ({
             >
               {copiedFeedback ? (
                 <>
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span className="text-emerald-700 font-semibold">Copiado!</span>
+                  <Check className="w-3.5 h-3.5 text-blue-600" />
+                  <span className="text-blue-700 font-semibold">Copiado!</span>
                 </>
               ) : (
                 <>
@@ -803,10 +803,10 @@ const LaunchTraceabilityModal = ({
 
             <button
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 shadow-2xs transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200/80 shadow-2xs transition-all cursor-pointer"
               title="Exportar planilha completa (.xlsx)"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-blue-600" />
               <span>Exportar Excel</span>
             </button>
           </div>
@@ -861,7 +861,7 @@ const LaunchTraceabilityModal = ({
                       {filteredAlunos.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="py-12 text-center text-slate-400">
-                            <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500 opacity-80" />
+                            <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-blue-500 opacity-80" />
                             <p className="font-bold text-slate-700 text-sm">Nenhuma pendência encontrada com os filtros selecionados.</p>
                             <p className="text-xs text-slate-400 mt-1">Todos os alunos ativos atendem aos critérios ou já foram 100% lançados.</p>
                           </td>
@@ -927,14 +927,14 @@ const LaunchTraceabilityModal = ({
                                     ))}
                                   </div>
                                 ) : (
-                                  <span className="text-emerald-600 font-medium text-xs flex items-center gap-1">
+                                  <span className="text-blue-600 font-medium text-xs flex items-center gap-1">
                                     <Check className="w-3 h-3" /> Todas as matérias entregues
                                   </span>
                                 )}
                               </td>
 
                               <td className="py-3 px-3 text-right font-mono font-semibold">
-                                <span className={aluno.porcentagemConcluida === 100 ? 'text-emerald-600' : aluno.porcentagemConcluida > 0 ? 'text-blue-600' : 'text-slate-300'}>
+                                <span className={aluno.porcentagemConcluida === 100 ? 'text-blue-600' : aluno.porcentagemConcluida > 0 ? 'text-sky-600' : 'text-slate-300'}>
                                   {aluno.porcentagemConcluida}%
                                 </span>
                               </td>
@@ -979,9 +979,9 @@ const LaunchTraceabilityModal = ({
                       key={t.turma}
                       className={`p-4 rounded-2xl border transition-all bg-white shadow-2xs ${
                         isConcluida 
-                          ? 'border-emerald-200/80 hover:border-emerald-300' 
+                          ? 'border-blue-200/80 hover:border-blue-300' 
                           : isEmAndamento 
-                            ? 'border-blue-200/80 hover:border-blue-300' 
+                            ? 'border-sky-200/80 hover:border-sky-300' 
                             : 'border-slate-200/60 hover:border-slate-300'
                       }`}
                     >
@@ -997,9 +997,9 @@ const LaunchTraceabilityModal = ({
 
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                           isConcluida 
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60' 
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200/60' 
                             : isEmAndamento 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200/60' 
+                              ? 'bg-sky-50 text-sky-700 border border-sky-200/60' 
                               : 'bg-slate-100 text-slate-500'
                         }`}>
                           {isConcluida ? 'Concluída' : isEmAndamento ? 'Em Lançamento' : t.status === 'sem_mapao' ? 'Sem Mapão' : 'Não Iniciada'}
@@ -1015,7 +1015,7 @@ const LaunchTraceabilityModal = ({
                         <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
                           <div 
                             className={`h-full rounded-full transition-all ${
-                              isConcluida ? 'bg-emerald-500' : isEmAndamento ? 'bg-blue-600' : 'bg-slate-300'
+                              isConcluida ? 'bg-blue-600' : isEmAndamento ? 'bg-sky-600' : 'bg-slate-300'
                             }`}
                             style={{ width: `${t.porcentagemConcluida}%` }}
                           />
@@ -1037,7 +1037,7 @@ const LaunchTraceabilityModal = ({
                                 key={disc}
                                 className={`text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 ${
                                   discConcluida
-                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
                                     : discParcial
                                       ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
                                       : 'bg-slate-50 text-slate-400 border border-slate-200/40'
@@ -1116,7 +1116,7 @@ const LaunchTraceabilityModal = ({
                             </td>
 
                             <td className="py-3.5 px-4 text-right font-mono font-semibold">
-                              <span className={pct === 100 ? 'text-emerald-600' : pct > 0 ? 'text-blue-600' : 'text-slate-300'}>
+                              <span className={pct === 100 ? 'text-blue-600' : pct > 0 ? 'text-sky-600' : 'text-slate-300'}>
                                 {pct}%
                               </span>
                             </td>
@@ -1128,7 +1128,7 @@ const LaunchTraceabilityModal = ({
                                     key={td.turma}
                                     className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
                                       td.status === 'concluida' 
-                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200/70' 
+                                        ? 'bg-blue-50 text-blue-800 border-blue-200/70' 
                                         : 'bg-amber-50 text-amber-900 border-amber-200/80'
                                     }`}
                                     title={`Turma ${td.turma}: ${td.comNota} de ${td.total} alunos avaliados`}
@@ -1160,7 +1160,7 @@ const LaunchTraceabilityModal = ({
         {/* ── 5. Rodapé do Modal (Clean & Minimalista) ─────────────────────── */}
         <div className="p-3 sm:px-7 bg-white border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="text-xs text-slate-400 flex items-center gap-2 font-normal">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
             <span>Auditoria estrita para alunos com status Ativo. Inativos e transferidos são ignorados.</span>
           </div>
 

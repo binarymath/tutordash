@@ -67,7 +67,7 @@ const MapaoAuditModal = ({ isOpen, onClose, mapaoCoverage }) => {
         <div className="flex-1 overflow-y-auto p-6">
           {diagnostico.length === 0 ? (
             <div className="py-12 text-center flex flex-col items-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
+              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-3">
                 <CheckCircle2 className="w-6 h-6" />
               </div>
               <p className="text-base font-bold text-slate-800">Nenhuma divergência encontrada!</p>
@@ -102,7 +102,7 @@ const MapaoAuditModal = ({ isOpen, onClose, mapaoCoverage }) => {
                       <td className="py-3 px-3 text-center">
                         <div className="inline-flex flex-col items-center">
                           <span className="font-bold text-slate-800">{item.turmaMapao || '-'}</span>
-                          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60 mt-0.5">
+                          <span className="text-[10px] text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200/60 mt-0.5">
                             {item.statusMapao || 'Ativo'}
                           </span>
                         </div>
@@ -115,7 +115,7 @@ const MapaoAuditModal = ({ isOpen, onClose, mapaoCoverage }) => {
                           {item.statusSistema && item.statusSistema !== '-' && (
                             <span className={`text-[10px] px-1.5 py-0.2 rounded border mt-0.5 ${
                               item.statusSistema.toLowerCase().includes('ativo')
-                                ? 'text-emerald-700 bg-emerald-50 border-emerald-200/60'
+                                ? 'text-blue-700 bg-blue-50 border-blue-200/60'
                                 : 'text-rose-700 bg-rose-50 border-rose-200/60'
                             }`}>
                               {item.statusSistema}

@@ -215,37 +215,44 @@ describe('ConfigModal — tabs de perfis', () => {
     expect(screen.getByTitle('Novo Perfil')).toBeInTheDocument();
   });
 
-  it('abre prompt ao clicar no botão "+"', () => {
+  it('abre modal discreto ao clicar no botão "+"', () => {
     render(<ConfigModal {...defaultProps} />);
     fireEvent.click(screen.getByTitle('Novo Perfil'));
-    expect(global.prompt).toHaveBeenCalled();
+    expect(screen.getByText('Novo Período')).toBeInTheDocument();
   });
 
-  it('não cria perfil quando prompt é cancelado (retorna null)', () => {
-    global.prompt = vi.fn().mockReturnValue(null);
+  it('não cria perfil quando modal é cancelado', () => {
     const changeProfile = vi.fn();
     const saveProfile = vi.fn();
     render(<ConfigModal {...defaultProps} changeProfile={changeProfile} saveProfile={saveProfile} />);
     fireEvent.click(screen.getByTitle('Novo Perfil'));
+    fireEvent.click(screen.getByRole('button', { name: /cancelar/i }));
     expect(changeProfile).not.toHaveBeenCalled();
     expect(saveProfile).not.toHaveBeenCalled();
   });
 
-  it('não cria perfil quando prompt retorna nome vazio', () => {
-    global.prompt = vi.fn().mockReturnValue('   ');
+  it('cria novo perfil quando preenchido e confirmado no modal discreto', () => {
     const changeProfile = vi.fn();
     render(<ConfigModal {...defaultProps} changeProfile={changeProfile} />);
     fireEvent.click(screen.getByTitle('Novo Perfil'));
-    expect(changeProfile).not.toHaveBeenCalled();
+    const input = screen.getByPlaceholderText('Ex: Ensino Médio');
+    fireEvent.change(input, { target: { value: 'Novo Perfil' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Salvar$/i }));
+    expect(changeProfile).toHaveBeenCalledWith('Novo Perfil');
   });
 
-  it('cria novo perfil quando prompt retorna nome válido', () => {
-    global.prompt = vi.fn().mockReturnValue('Novo Perfil');
-    const changeProfile = vi.fn();
-    // O componente chama changeProfile com o nome (não saveProfile)
-    render(<ConfigModal {...defaultProps} changeProfile={changeProfile} />);
-    fireEvent.click(screen.getByTitle('Novo Perfil'));
-    expect(changeProfile).toHaveBeenCalledWith('Novo Perfil');
+  it('permite renomear período existente chamando renameProfile via modal discreto', () => {
+    const renameProfile = vi.fn();
+    render(<ConfigModal {...defaultProps} renameProfile={renameProfile} />);
+    const renameBtn = screen.getByTitle('Renomear período "Principal"');
+    expect(renameBtn).toBeInTheDocument();
+    fireEvent.click(renameBtn);
+
+    expect(screen.getByText('Renomear Período')).toBeInTheDocument();
+    const input = screen.getByPlaceholderText('Ex: Ensino Médio');
+    fireEvent.change(input, { target: { value: 'Ensino Médio' } });
+    fireEvent.click(screen.getByRole('button', { name: /^Salvar$/i }));
+    expect(renameProfile).toHaveBeenCalledWith('Principal', 'Ensino Médio');
   });
 });
 

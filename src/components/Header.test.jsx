@@ -211,4 +211,38 @@ describe('Header', () => {
     const link = screen.getByText('Drive da Turma');
     expect(link).toBeInTheDocument();
   });
+
+  it('NÃO renderiza a tag "Gestão Escolar"', () => {
+    render(<Header {...defaultProps} />);
+    expect(screen.queryByText(/Gestão Escolar/i)).not.toBeInTheDocument();
+  });
+
+  it('permite renomear período chamando onRenameProfile via modal discreto', () => {
+    const onRenameProfile = vi.fn();
+    const profiles = {
+      Principal: { studentsUrl: '' },
+      'Ensino Fundamental': { studentsUrl: '' }
+    };
+
+    render(
+      <Header
+        {...defaultProps}
+        activeProfile="Principal"
+        profiles={profiles}
+        onRenameProfile={onRenameProfile}
+      />
+    );
+
+    const renameBtn = screen.getByRole('button', { name: /renomear principal/i });
+    expect(renameBtn).toBeInTheDocument();
+    fireEvent.click(renameBtn);
+
+    expect(screen.getByText('Renomear Período')).toBeInTheDocument();
+    const input = screen.getByPlaceholderText('Ex: Ensino Médio');
+    fireEvent.change(input, { target: { value: 'Ensino Médio' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /salvar/i }));
+    expect(onRenameProfile).toHaveBeenCalledWith('Principal', 'Ensino Médio');
+  });
 });
+
