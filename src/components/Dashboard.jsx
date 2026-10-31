@@ -819,7 +819,7 @@ const Dashboard = ({
     <div className="space-y-5 animate-in fade-in duration-200">
       
       {/* ── 1. Barra de Busca Limpa e Discreta ─────────────────────────── */}
-      <div className="bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-2xs flex items-center gap-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10 transition-all">
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-300 shadow-md flex items-center gap-3 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10 transition-all">
         <Search className="w-4 h-4 text-slate-400 shrink-0 ml-1" />
         <input
           type="text"
@@ -849,7 +849,7 @@ const Dashboard = ({
             <button
               key={i}
               onClick={() => { setSelectedStudent(s.nome); setSearchTerm(''); }}
-              className="text-left p-4 rounded-2xl border border-slate-200 bg-white hover:border-blue-400 hover:shadow-sm transition-all duration-150 group flex flex-col justify-between cursor-pointer"
+              className="text-left p-4 rounded-2xl border border-slate-300 bg-white hover:border-slate-400 hover:shadow-lg transition-all duration-150 group flex flex-col justify-between cursor-pointer shadow-md"
             >
               <div>
                 <div className="flex items-center gap-3 mb-2.5">
@@ -919,7 +919,7 @@ const Dashboard = ({
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
             
             {/* Card 1: Seletor de Bimestre & Panorama Geral da Turma */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/70 shadow-2xs flex flex-col justify-between gap-3">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-300 shadow-md flex flex-col justify-between gap-3">
               <div>
                 <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                   <div className="relative inline-flex items-center">
@@ -980,7 +980,7 @@ const Dashboard = ({
             </div>
 
             {/* Card 2: Abas TUTOR, NÍVEL, TURMA e RANKING + Seletor de Opções & Ativos Abaixo */}
-            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/70 shadow-2xs flex flex-col justify-between gap-3">
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-300 shadow-md flex flex-col justify-between gap-3">
               
               {/* Linha 1: Botões Segmentados TUTOR / NÍVEL / TURMA / RANKING */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1067,7 +1067,7 @@ const Dashboard = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
             
             {/* Card 1: Tutorados */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all text-center flex flex-col items-center justify-center">
+            <div className="bg-white rounded-2xl p-5 border border-slate-300 shadow-md hover:border-slate-400 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center">
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <Users className="w-3.5 h-3.5 text-blue-600" />
                 <span>Tutorados</span>
@@ -1106,7 +1106,7 @@ const Dashboard = ({
             </div>
 
             {/* Card 2: Turmas */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all text-center flex flex-col items-center justify-center">
+            <div className="bg-white rounded-2xl p-5 border border-slate-300 shadow-md hover:border-slate-400 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center">
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <GraduationCap className="w-3.5 h-3.5 text-blue-600" />
                 <span>Turmas</span>
@@ -1123,7 +1123,7 @@ const Dashboard = ({
             </div>
 
             {/* Card 3: Conselho de Classe */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all text-center flex flex-col items-center justify-center">
+            <div className="bg-white rounded-2xl p-5 border border-slate-300 shadow-md hover:border-slate-400 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center">
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
                 <span>Conselho de Classe</span>
@@ -1144,7 +1144,7 @@ const Dashboard = ({
             </div>
 
             {/* Card 4: Prova Paulista */}
-            <div className="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all text-center flex flex-col items-center justify-center">
+            <div className="bg-white rounded-2xl p-5 border border-slate-300 shadow-md hover:border-slate-400 hover:shadow-lg transition-all text-center flex flex-col items-center justify-center">
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
                 <Sparkles className="w-3.5 h-3.5 text-blue-600" />
                 <span>Prova Paulista</span>
@@ -1176,10 +1176,10 @@ const Dashboard = ({
                   }
                 }
               }}
-              className={`rounded-2xl p-5 border shadow-2xs transition-all text-center flex flex-col items-center justify-center ${
+              className={`rounded-2xl p-5 border shadow-md transition-all text-center flex flex-col items-center justify-center ${
                 onOpenLowGradesReport 
-                  ? 'bg-white border-slate-200/90 hover:border-amber-300 hover:shadow-xs cursor-pointer group' 
-                  : 'bg-white border-slate-200/90'
+                  ? 'bg-white border-slate-300 hover:border-slate-400 hover:shadow-lg cursor-pointer group' 
+                  : 'bg-white border-slate-300'
               }`}
             >
               <div className="flex items-center justify-center gap-1.5 mb-2 text-slate-500 text-[11px] font-bold uppercase tracking-wider">
@@ -1217,7 +1217,7 @@ const Dashboard = ({
           )}
 
           {/* ── 3.4 Barra de Visão de Notas & Exportação da Tabela ────── */}
-          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-300 shadow-md flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             
             {/* Bloco de Visão & Exportação */}
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between w-full gap-3 flex-wrap">
@@ -1296,7 +1296,7 @@ const Dashboard = ({
           </div>
 
           {/* ── 3.5 Tabela Limpa, Fluida e Sem Caixas Rígidas ───────────── */}
-          <div className="bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs">
+          <div className="bg-white rounded-2xl border border-slate-300 overflow-hidden shadow-md">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-separate border-spacing-0">
                 <thead className="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-wider select-none">
