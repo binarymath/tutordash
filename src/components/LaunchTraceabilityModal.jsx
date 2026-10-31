@@ -886,9 +886,16 @@ const LaunchTraceabilityModal = ({
                               </td>
 
                               <td className="py-3 px-3">
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedTurma(aluno.turma);
+                                  }}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 cursor-pointer transition-all"
+                                  title={`Filtrar apenas Turma ${aluno.turma}`}
+                                >
                                   {aluno.turma}
-                                </span>
+                                </button>
                               </td>
 
                               <td className="py-3 px-3 text-slate-500 font-medium">
@@ -987,9 +994,18 @@ const LaunchTraceabilityModal = ({
                     >
                       <div className="flex items-center justify-between gap-2 mb-2.5">
                         <div className="flex items-center gap-2">
-                          <span className="text-base font-bold text-slate-900">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedTurma(t.turma);
+                              setSearchTerm('');
+                              setActiveTab('alunos');
+                            }}
+                            className="text-base font-bold text-slate-900 hover:text-blue-600 transition-colors cursor-pointer text-left"
+                            title={`Ver rastreabilidade e auditoria da Turma ${t.turma}`}
+                          >
                             Turma {t.turma}
-                          </span>
+                          </button>
                           <span className="text-xs text-slate-400 font-normal">
                             ({t.totalAtivos} ativos)
                           </span>
@@ -1053,6 +1069,22 @@ const LaunchTraceabilityModal = ({
                           })}
                         </div>
                       </div>
+
+                      {/* Botão para auditar a turma */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedTurma(t.turma);
+                          setSearchTerm('');
+                          setActiveTab('alunos');
+                        }}
+                        className="w-full mt-3 py-1.5 px-3 rounded-xl text-xs font-semibold bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200/80 hover:border-blue-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        title={`Auditar alunos da Turma ${t.turma}`}
+                        aria-label={`Auditar alunos da Turma ${t.turma}`}
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        Ver Auditoria da Turma
+                      </button>
                     </div>
                   );
                 })}
@@ -1124,20 +1156,30 @@ const LaunchTraceabilityModal = ({
                             <td className="py-3.5 px-5">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 {turmasComNotas.map(td => (
-                                  <span
+                                  <button
                                     key={td.turma}
-                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border ${
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedTurma(td.turma);
+                                      setSearchTerm('');
+                                      setActiveTab('alunos');
+                                    }}
+                                    className={`text-[11px] font-semibold px-2 py-0.5 rounded-lg border transition-all cursor-pointer hover:shadow-xs hover:scale-105 active:scale-95 inline-flex items-center gap-1 ${
                                       td.status === 'concluida' 
-                                        ? 'bg-blue-50 text-blue-800 border-blue-200/70' 
-                                        : 'bg-amber-50 text-amber-900 border-amber-200/80'
+                                        ? 'bg-blue-50 text-blue-800 border-blue-200/70 hover:bg-blue-100 hover:border-blue-300' 
+                                        : 'bg-amber-50 text-amber-900 border-amber-200/80 hover:bg-amber-100 hover:border-amber-300'
                                     }`}
-                                    title={`Turma ${td.turma}: ${td.comNota} de ${td.total} alunos avaliados`}
+                                    title={`Ver auditoria de lançamentos da Turma ${td.turma}: ${td.comNota} de ${td.total} alunos avaliados (clique para abrir)`}
+                                    aria-label={`Auditar lançamentos da Turma ${td.turma}`}
                                   >
                                     Turma {td.turma} ({td.comNota}/{td.total})
-                                  </span>
+                                  </button>
                                 ))}
                                 {turmasPendentesCount > 0 && (
-                                  <span className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-50 text-slate-400 border border-slate-200/50">
+                                  <span 
+                                    className="text-[11px] font-medium px-2 py-0.5 rounded-lg bg-slate-50 text-slate-400 border border-slate-200/50"
+                                    title={discObj.turmasDetalhes.filter(td => td.comNota === 0).map(td => `Turma ${td.turma}`).join(', ')}
+                                  >
                                     {turmasComNotas.length === 0
                                       ? 'Nenhuma turma iniciada'
                                       : `+${turmasPendentesCount} turma${turmasPendentesCount > 1 ? 's' : ''} pendente${turmasPendentesCount > 1 ? 's' : ''}`}
