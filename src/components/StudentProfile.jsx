@@ -1317,47 +1317,43 @@ const StudentProfile = ({
 
           <!-- Termo de Ciência e Assinaturas -->
           <div class="avoid-break" style="margin-top: 28px; padding-top: 10px; page-break-inside: avoid; break-inside: avoid;">
-            <div style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+            <div style="font-size: 10px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 22px; text-align: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 6px;">
               Termo de Ciência e Assinaturas
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <!-- Card 1: Tutor(a) -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Tutor(a) Responsável</div>
-                  <div style="font-size: 11.5px; font-weight: 800; color: #0f172a;">${tutor ? `Prof(a). ${tutor}` : 'Tutor(a) / Professor(a)'}</div>
-                  <div style="font-size: 9px; color: #64748b; font-weight: 500;">Docente tutor(a) responsável pelo acompanhamento</div>
+            <div style="display: flex; flex-direction: column; gap: 28px;">
+              <!-- Linha 1: Tutor(a) -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Tutor(a) Responsável</div>
+                  ${tutor && tutor !== 'Sem Tutor' ? `<div style="font-size: 11px; font-weight: 700; color: #334155; margin-top: 4px;">${tutor}</div>` : ''}
                 </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 24px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Assinatura do(a) Tutor(a)</div>
-                </div>
-              </div>
-
-              <!-- Card 2: Coordenação -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Coordenação Pedagógica</div>
-                  <div style="font-size: 11.5px; font-weight: 800; color: #0f172a;">Equipe Gestora / Coordenação</div>
-                  <div style="font-size: 9px; color: #64748b; font-weight: 500;">Visto institucional e validação escolar</div>
-                </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 24px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Visto / Carimbo Escolar</div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9.5px; color: #475569; font-weight: 700;">Assinatura do(a) Tutor(a)</div>
                 </div>
               </div>
 
-              <!-- Card 3: Estudante / Responsável -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Estudante / Responsável Legal</div>
-                  <div style="font-size: 11.5px; font-weight: 800; color: #0f172a;">${nome}</div>
-                  <div style="font-size: 9px; color: #64748b; font-weight: 500;">Ciência do acompanhamento de rendimento e assiduidade</div>
+              <!-- Linha 2: Coordenação -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Coordenação Pedagógica</div>
                 </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 20px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Assinatura do(a) Estudante ou Responsável</div>
-                  <div style="font-size: 8.5px; color: #64748b; font-weight: 600; margin-top: 3px;">Data: ____ / ____ / ________</div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9.5px; color: #475569; font-weight: 700;">Visto / Carimbo Escolar</div>
+                </div>
+              </div>
+
+              <!-- Linha 3: Estudante / Responsável -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 11px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Estudante / Responsável Legal</div>
+                  ${nome ? `<div style="font-size: 11px; font-weight: 700; color: #334155; margin-top: 4px;">${nome}</div>` : ''}
+                </div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9.5px; color: #475569; font-weight: 700;">Assinatura do(a) Estudante ou Responsável</div>
+                  <div style="font-size: 8.5px; color: #64748b; font-weight: 600; margin-top: 4px;">Data: ____ / ____ / ________</div>
                 </div>
               </div>
             </div>
@@ -1778,48 +1774,44 @@ const StudentProfile = ({
           ` : ''}
 
           <!-- Termo de Ciência e Assinaturas -->
-          <div class="pdf-panel avoid-break" style="margin-top: 16px; padding: 12px; page-break-inside: avoid; break-inside: avoid;">
-            <div style="font-size: 10px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; text-align: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">
+          <div class="avoid-break" style="margin-top: 22px; padding: 10px 0; page-break-inside: avoid; break-inside: avoid;">
+            <div style="font-size: 10px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 18px; text-align: center; border-bottom: 1.5px solid #e2e8f0; padding-bottom: 6px;">
               Termo de Ciência e Assinaturas
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-              <!-- Card 1: Tutor(a) -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #2563eb; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Tutor(a) Responsável</div>
-                  <div style="font-size: 11px; font-weight: 800; color: #0f172a;">${studentProfile?.tutor ? `Prof(a). ${escapeHtml(studentProfile.tutor)}` : 'Tutor(a) / Professor(a)'}</div>
-                  <div style="font-size: 8.5px; color: #64748b; font-weight: 500;">Docente tutor(a) responsável pelo acompanhamento</div>
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+              <!-- Linha 1: Tutor(a) -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 10.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Tutor(a) Responsável</div>
+                  ${studentProfile?.tutor && studentProfile.tutor !== 'Sem Tutor' ? `<div style="font-size: 10.5px; font-weight: 700; color: #334155; margin-top: 3px;">${escapeHtml(studentProfile.tutor)}</div>` : ''}
                 </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 22px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 8.5px; color: #475569; font-weight: 700;">Assinatura do(a) Tutor(a)</div>
-                </div>
-              </div>
-
-              <!-- Card 2: Coordenação -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #7c3aed; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Coordenação Pedagógica</div>
-                  <div style="font-size: 11px; font-weight: 800; color: #0f172a;">Equipe Gestora / Coordenação</div>
-                  <div style="font-size: 8.5px; color: #64748b; font-weight: 500;">Visto institucional e validação escolar</div>
-                </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 22px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 8.5px; color: #475569; font-weight: 700;">Visto / Carimbo Escolar</div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Assinatura do(a) Tutor(a)</div>
                 </div>
               </div>
 
-              <!-- Card 3: Estudante / Responsável -->
-              <div style="border: 1px solid #cbd5e1; border-radius: 10px; background: #ffffff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-inside: avoid; break-inside: avoid;">
-                <div style="flex: 1; padding-right: 20px;">
-                  <div style="font-size: 8.5px; font-weight: 800; color: #0284c7; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px;">Estudante / Responsável Legal</div>
-                  <div style="font-size: 11px; font-weight: 800; color: #0f172a;">${escapeHtml(studentProfile?.nome || 'Estudante')}</div>
-                  <div style="font-size: 8.5px; color: #64748b; font-weight: 500;">Ciência do acompanhamento de rendimento e assiduidade</div>
+              <!-- Linha 2: Coordenação -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 10.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Coordenação Pedagógica</div>
                 </div>
-                <div style="width: 250px; text-align: center; flex-shrink: 0;">
-                  <div style="border-top: 1.5px solid #475569; margin-top: 18px; margin-bottom: 4px;"></div>
-                  <div style="font-size: 8.5px; color: #475569; font-weight: 700;">Assinatura do(a) Estudante ou Responsável</div>
-                  <div style="font-size: 8.5px; color: #64748b; font-weight: 600; margin-top: 2px;">Data: ____ / ____ / ________</div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Visto / Carimbo Escolar</div>
+                </div>
+              </div>
+
+              <!-- Linha 3: Estudante / Responsável -->
+              <div style="display: flex; justify-content: space-between; align-items: flex-end; padding: 4px 0; page-break-inside: avoid; break-inside: avoid;">
+                <div style="flex: 1; padding-right: 24px;">
+                  <div style="font-size: 10.5px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px;">Estudante / Responsável Legal</div>
+                  ${studentProfile?.nome ? `<div style="font-size: 10.5px; font-weight: 700; color: #334155; margin-top: 3px;">${escapeHtml(studentProfile.nome)}</div>` : ''}
+                </div>
+                <div style="width: 380px; text-align: center; flex-shrink: 0;">
+                  <div style="border-top: 1.5px solid #1e293b; margin-bottom: 5px;"></div>
+                  <div style="font-size: 9px; color: #475569; font-weight: 700;">Assinatura do(a) Estudante ou Responsável</div>
+                  <div style="font-size: 8.5px; color: #64748b; font-weight: 600; margin-top: 3px;">Data: ____ / ____ / ________</div>
                 </div>
               </div>
             </div>
