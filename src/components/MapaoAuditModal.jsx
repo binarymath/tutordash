@@ -76,7 +76,7 @@ const MapaoAuditModal = ({ isOpen, onClose, mapaoCoverage }) => {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-2xl border border-slate-200 shadow-2xs">
+            <div className="overflow-x-auto rounded-2xl border border-slate-300 shadow-md">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-slate-50/90 text-slate-600 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200">

@@ -627,7 +627,7 @@ const LaunchTraceabilityModal = ({
 
         {/* ── 2. Cards de KPIs Rápidos (Dinâmicos: Global vs Turma Analisada) ── */}
         <div className="px-5 sm:px-7 py-3 bg-slate-50/50 border-b border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
+          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-300 shadow-md text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               <Users className="w-3.5 h-3.5 text-slate-400" />
               <span>{activeKpis.card1.label}</span>
@@ -640,7 +640,7 @@ const LaunchTraceabilityModal = ({
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
+          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-300 shadow-md text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               <span className={`w-1.5 h-1.5 rounded-full ${activeKpis.card2.hasAlert ? 'bg-amber-500' : 'bg-slate-300'}`} />
               <span>{activeKpis.card2.label}</span>
@@ -654,7 +654,7 @@ const LaunchTraceabilityModal = ({
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
+          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-300 shadow-md text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               {activeKpis.isGlobal ? (
                 <School className="w-3.5 h-3.5 text-slate-400" />
@@ -671,7 +671,7 @@ const LaunchTraceabilityModal = ({
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-200/60 shadow-2xs text-center flex flex-col items-center justify-center">
+          <div className="bg-white p-4 rounded-xl sm:rounded-2xl border border-slate-300 shadow-md text-center flex flex-col items-center justify-center">
             <div className="flex items-center justify-center gap-1.5 text-xs font-medium text-slate-500 mb-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-slate-400" />
               <span>{activeKpis.card4.label}</span>
@@ -819,7 +819,7 @@ const LaunchTraceabilityModal = ({
           {activeTab === 'alunos' && (
             <div className="space-y-4">
               {/* Tabela de Alunos */}
-              <div className="bg-white rounded-xl border border-slate-200/70 shadow-2xs overflow-hidden">
+              <div className="bg-white rounded-xl border border-slate-300 shadow-md overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -1063,7 +1063,7 @@ const LaunchTraceabilityModal = ({
           {/* ════ ABA 3: VISÃO POR DISCIPLINA (Clean & Agrupada) ════ */}
           {activeTab === 'disciplinas' && (
             <div className="space-y-4">
-              <div className="bg-white rounded-xl border border-slate-200/70 shadow-2xs overflow-hidden">
+              <div className="bg-white rounded-xl border border-slate-300 shadow-md overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
