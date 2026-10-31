@@ -984,7 +984,7 @@ const LaunchTraceabilityModal = ({
                   return (
                     <div 
                       key={t.turma}
-                      className={`p-4 rounded-2xl border transition-all bg-white shadow-2xs ${
+                      className={`p-4 rounded-2xl border transition-all bg-white shadow-2xs flex flex-col justify-between ${
                         isConcluida 
                           ? 'border-blue-200/80 hover:border-blue-300' 
                           : isEmAndamento 
@@ -1039,32 +1039,50 @@ const LaunchTraceabilityModal = ({
                       </div>
 
                       {/* Lista resumida de disciplinas da turma */}
-                      <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                      <div className="space-y-1.5 pt-2 border-t border-slate-100 flex-1">
                         <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                           Disciplinas ({t.discList.length}):
                         </div>
-                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        <div className="flex flex-wrap gap-1.5">
                           {t.discList.map(disc => {
                             const dStats = t.disciplinas[disc];
                             const discConcluida = dStats.comNota.length === t.totalAtivos;
                             const discParcial = dStats.comNota.length > 0 && dStats.semNota.length > 0;
                             return (
-                              <span
+                              <button
                                 key={disc}
-                                className={`text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTurma(t.turma);
+                                  setPendingTypeFilter('todos');
+                                  if (discParcial) {
+                                    setSearchTerm(disc);
+                                  } else {
+                                    setSearchTerm('');
+                                  }
+                                  setActiveTab('alunos');
+                                }}
+                                className={`text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 transition-all cursor-pointer hover:scale-105 active:scale-95 text-left ${
                                   discConcluida
-                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200/60 hover:bg-blue-100 hover:border-blue-300'
                                     : discParcial
-                                      ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
-                                      : 'bg-slate-50 text-slate-400 border border-slate-200/40'
+                                      ? 'bg-amber-50 text-amber-800 border border-amber-200/60 hover:bg-amber-100 hover:border-amber-300'
+                                      : 'bg-slate-50 text-slate-400 border border-slate-200/40 hover:bg-slate-100 hover:border-slate-300'
                                 }`}
-                                title={`${disc}: ${dStats.comNota.length} de ${t.totalAtivos} alunos`}
+                                title={
+                                  discParcial
+                                    ? `${disc}: ${dStats.semNota.length} aluno(s) aguardando nota na Turma ${t.turma}. Clique para auditar pendências.`
+                                    : discConcluida
+                                      ? `${disc}: 100% concluída (${dStats.comNota.length}/${t.totalAtivos}). Clique para ver alunos da turma.`
+                                      : `${disc}: Sem lançamentos na Turma ${t.turma}. Clique para ver alunos da turma.`
+                                }
+                                aria-label={`Auditar disciplina ${disc} na Turma ${t.turma}`}
                               >
                                 {disc}
                                 <span className="opacity-70 font-mono">
                                   {dStats.comNota.length}/{t.totalAtivos}
                                 </span>
-                              </span>
+                              </button>
                             );
                           })}
                         </div>

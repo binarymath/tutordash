@@ -388,5 +388,31 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(screen.getByRole('combobox', { name: /Filtrar por Turma/i }).value).toBe('1A');
     expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
   });
+
+  it('permite clicar em uma tag de disciplina na aba Visão por Turma para auditar a matéria na turma', () => {
+    render(
+      <LaunchTraceabilityModal
+        isOpen={true}
+        onClose={vi.fn()}
+        allStudents={mockStudents}
+        selectedBimestre="3"
+        initialTurma="Todas"
+      />
+    );
+
+    // Navega para a aba Visão por Turma
+    fireEvent.click(screen.getByRole('button', { name: /Visão por Turma/i }));
+
+    // Clica na tag de disciplina MATEMÁTICA da Turma 1A
+    const discBtn = screen.getByRole('button', { name: /Auditar disciplina MATEMÁTICA na Turma 1A/i });
+    expect(discBtn).toBeInTheDocument();
+    fireEvent.click(discBtn);
+
+    // Deve alternar para a aba de alunos com a Turma 1A e busca filtrada
+    expect(screen.getByRole('combobox', { name: /Filtrar por Turma/i }).value).toBe('1A');
+    expect(screen.getByText('Alunos Ativos (1A)')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Buscar aluno, turma, tutor ou matéria/i).value).toBe('MATEMÁTICA');
+  });
 });
+
 
