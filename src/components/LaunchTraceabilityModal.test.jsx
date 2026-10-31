@@ -469,7 +469,7 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(screen.getByRole('button', { name: /Limpar busca/i })).toBeInTheDocument();
   });
 
-  it('exibe Sem mapão lançado ou Lançamento não iniciado para turmas não digitadas em vez de Todas as matérias entregues', () => {
+  it('exibe Aguardando abertura do mapão para turmas não digitadas em vez de Todas as matérias entregues', () => {
     render(
       <LaunchTraceabilityModal
         isOpen={true}
@@ -484,9 +484,8 @@ describe('LaunchTraceabilityModal — Rastreabilidade e Auditoria de Lançamento
     expect(screen.getByText('Aluno Turma B 3')).toBeInTheDocument();
     // Não deve exibir 'Todas as matérias entregues'
     expect(screen.queryByText(/Todas as matérias entregues/i)).not.toBeInTheDocument();
-    // Deve exibir indicação de sem mapão ou não iniciado
-    expect(screen.getByText(/Sem mapão lançado neste bimestre/i)).toBeInTheDocument();
-    expect(screen.getByText(/Aguardando início/i)).toBeInTheDocument();
+    // Deve exibir indicação em cinza de Aguardando abertura do mapão
+    expect(screen.getAllByText(/Aguardando abertura do mapão/i).length).toBeGreaterThan(0);
   });
 });
 
