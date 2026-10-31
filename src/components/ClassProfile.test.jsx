@@ -87,8 +87,8 @@ describe('ClassProfile Component — Storytelling Dashboard', () => {
       />
     );
 
-    expect(screen.getByText('Turma 6A')).toBeInTheDocument();
-    expect(screen.getByText('Inteligência Coletiva Oficial')).toBeInTheDocument();
+    expect(screen.getByText('6 A')).toBeInTheDocument();
+    expect(screen.queryByText('Inteligência Coletiva Oficial')).not.toBeInTheDocument();
     expect(screen.getByText('Alunos Ativos')).toBeInTheDocument();
     expect(screen.getByText('Posição no Nível')).toBeInTheDocument();
     expect(screen.getByText('Como a turma performou em cada bimestre em relação ao nível?')).toBeInTheDocument();
@@ -167,7 +167,7 @@ describe('ClassProfile Component — Storytelling Dashboard', () => {
       />
     );
 
-    expect(screen.getByText('Posicionamento Individual & Notas Bimestrais')).toBeInTheDocument();
+    expect(screen.getByText('Posicionamento Individual e Notas Bimestrais')).toBeInTheDocument();
     expect(screen.getByText('Ana Silva')).toBeInTheDocument();
     expect(screen.getByText('Bruno Souza')).toBeInTheDocument();
     expect(screen.getByText('Carlos Lima')).toBeInTheDocument();
@@ -195,5 +195,22 @@ describe('ClassProfile Component — Storytelling Dashboard', () => {
     fireEvent.click(btnCC);
 
     expect(btnCC).toBeInTheDocument();
+  });
+
+  it('permite selecionar uma matéria analisada via seletor dropdown', () => {
+    render(
+      <ClassProfile
+        selectedTurma="6A"
+        setSelectedTurma={vi.fn()}
+        allStudents={mockStudents}
+        conceitoData={mockConceitoData}
+        provaData={mockProvaData}
+      />
+    );
+
+    const selectDisc = screen.getByLabelText(/Selecionar Matéria Analisada/i);
+    expect(selectDisc).toBeInTheDocument();
+    fireEvent.change(selectDisc, { target: { value: 'MATEMÁTICA' } });
+    expect(selectDisc.value).toBe('MATEMÁTICA');
   });
 });

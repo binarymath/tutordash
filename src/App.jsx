@@ -127,6 +127,34 @@ const App = () => {
     });
   };
 
+  const renameProfile = (oldName, newName) => {
+    if (!oldName || !newName) return;
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+
+    setMultiConfig(prev => {
+      if (!prev.profiles[oldName]) return prev;
+      if (prev.profiles[trimmed]) return prev;
+
+      const newProfiles = {};
+      Object.keys(prev.profiles).forEach(key => {
+        if (key === oldName) {
+          newProfiles[trimmed] = prev.profiles[oldName];
+        } else {
+          newProfiles[key] = prev.profiles[key];
+        }
+      });
+
+      const newActive = prev.activeProfile === oldName ? trimmed : prev.activeProfile;
+
+      return {
+        ...prev,
+        activeProfile: newActive,
+        profiles: newProfiles
+      };
+    });
+  };
+
   const saveProfile = (nome, configUrls) => {
     setMultiConfig(prev => {
       const defaultProfile = {
@@ -1015,6 +1043,7 @@ const App = () => {
           changeProfile={changeProfile}
           saveProfile={saveProfile}
           deleteProfile={deleteProfile}
+          renameProfile={renameProfile}
           onOpenLinksModal={() => setShowLinksModal(true)}
           onClose={() => setShowSettings(false)}
           onLoad={() => loadAllData(false)}
@@ -1080,6 +1109,7 @@ const App = () => {
         activeProfile={activeProfile}
         profiles={multiConfig.profiles}
         onChangeProfile={changeProfile}
+        onRenameProfile={renameProfile}
         onOpenSettings={() => setShowSettings(true)}
         onOpenLinksModal={() => setShowLinksModal(true)}
         showStickyName={showStickyName}

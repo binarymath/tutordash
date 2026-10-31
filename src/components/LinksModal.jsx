@@ -93,7 +93,7 @@ const LinksModal = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-slate-800 tracking-tight">
-                  Adicionar Links & Planilhas
+                  Adicionar Links e Planilhas
                 </h2>
                 {activeProfile && (
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-blue-50 text-blue-700 border border-blue-200">
@@ -154,14 +154,14 @@ const LinksModal = ({
           
           {/* SEÇÃO 1: PLANILHA DE DISCIPLINAS */}
           <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-5 shadow-xs transition-all focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <label className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
                 <Sheet className="w-4 h-4 text-blue-600" />
-                Planilha de Disciplinas por Turma/Bimestre
+                Descritores Prova Paulista
               </label>
               {isDisciplinaSheetConfigured ? (
-                <span className="text-[10px] font-black text-emerald-700 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Vinculada
+                <span className="text-[10px] font-black text-blue-700 bg-blue-100/90 border border-blue-300 px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3 text-blue-600" /> Vinculada
                 </span>
               ) : (
                 <span className="text-[10px] font-bold text-slate-500 bg-slate-200/70 px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -169,11 +169,6 @@ const LinksModal = ({
                 </span>
               )}
             </div>
-
-            <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-              Cole o link do Google Sheets ou arquivo Excel com abas no formato <strong className="text-slate-700">6A-1B</strong>.
-              O sistema lerá a <strong className="text-slate-700">Coluna D (Disciplina)</strong> e exibirá as linhas separadas por bimestre no final da página da turma.
-            </p>
 
             <div className="relative">
               <input
@@ -206,7 +201,7 @@ const LinksModal = ({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
                 <Globe className="w-4 h-4 text-indigo-600" />
-                Links Importantes & Atalhos Rápidos
+                Links Importantes e Atalhos Rápidos
               </h3>
               <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">
                 {customLinks.length} {customLinks.length === 1 ? 'link' : 'links'}
