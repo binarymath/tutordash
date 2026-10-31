@@ -705,8 +705,19 @@ const LaunchTraceabilityModal = ({
                 placeholder="Buscar aluno, turma, tutor ou matéria..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full text-xs font-medium pl-9 pr-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
+                className="w-full text-xs font-medium pl-9 pr-8 py-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-slate-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                  title="Limpar busca (voltar a todos)"
+                  aria-label="Limpar busca"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
             {/* Filtro por Turma */}
@@ -906,14 +917,17 @@ const LaunchTraceabilityModal = ({
                                 {temFuros ? (
                                   <div className="flex flex-wrap gap-1">
                                     {aluno.furosDeDigitacao.map((f, i) => (
-                                      <span 
+                                      <button 
                                         key={i}
-                                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200/70"
-                                        title={`Outros ${f.colegasComNota} alunos da turma ${aluno.turma} já têm nota nessa matéria`}
+                                        type="button"
+                                        onClick={() => setSearchTerm(f.disciplina)}
+                                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/70 hover:border-amber-300 transition-all cursor-pointer hover:scale-105 active:scale-95"
+                                        title={`Filtrar apenas ${f.disciplina} (outros ${f.colegasComNota} alunos já têm nota)`}
+                                        aria-label={`Filtrar por ${f.disciplina}`}
                                       >
                                         <AlertTriangle className="w-3 h-3 text-amber-500" />
                                         {f.disciplina}
-                                      </span>
+                                      </button>
                                     ))}
                                   </div>
                                 ) : (
@@ -925,12 +939,16 @@ const LaunchTraceabilityModal = ({
                                 {aluno.materiasNaoLancadasNaTurma.length > 0 ? (
                                   <div className="flex flex-wrap gap-1 max-w-2xl">
                                     {aluno.materiasNaoLancadasNaTurma.map((m, i) => (
-                                      <span 
+                                      <button 
                                         key={i}
-                                        className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100/90 text-slate-600 font-medium border border-slate-200/50"
+                                        type="button"
+                                        onClick={() => setSearchTerm(m)}
+                                        className="text-[11px] px-2 py-0.5 rounded-md bg-slate-100/90 hover:bg-slate-200 text-slate-600 font-medium border border-slate-200/50 cursor-pointer transition-all hover:scale-105 active:scale-95"
+                                        title={`Filtrar apenas ${m}`}
+                                        aria-label={`Filtrar por ${m}`}
                                       >
                                         {m}
-                                      </span>
+                                      </button>
                                     ))}
                                   </div>
                                 ) : (
@@ -1055,11 +1073,7 @@ const LaunchTraceabilityModal = ({
                                 onClick={() => {
                                   setSelectedTurma(t.turma);
                                   setPendingTypeFilter('todos');
-                                  if (discParcial) {
-                                    setSearchTerm(disc);
-                                  } else {
-                                    setSearchTerm('');
-                                  }
+                                  setSearchTerm(disc);
                                   setActiveTab('alunos');
                                 }}
                                 className={`text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1 transition-all cursor-pointer hover:scale-105 active:scale-95 text-left ${
@@ -1137,7 +1151,18 @@ const LaunchTraceabilityModal = ({
                         return (
                           <tr key={discObj.disciplina} className="hover:bg-slate-50/60 transition-colors">
                             <td className="py-3.5 px-5 font-semibold text-slate-800 text-sm">
-                              {discObj.disciplina}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSearchTerm(discObj.disciplina);
+                                  setActiveTab('alunos');
+                                }}
+                                className="text-left font-semibold text-slate-800 hover:text-blue-600 transition-colors cursor-pointer"
+                                title={`Ver alunos com pendência em ${discObj.disciplina}`}
+                                aria-label={`Filtrar por ${discObj.disciplina}`}
+                              >
+                                {discObj.disciplina}
+                              </button>
                             </td>
 
                             <td className="py-3.5 px-4 font-medium text-slate-600">
